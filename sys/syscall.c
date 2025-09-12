@@ -19,7 +19,7 @@
 #include "scnum.h"
 #include "process.h"
 #include "memory.h"
-#include "io.h"
+#include "uio.h"
 #include "device.h"
 #include "fs.h"
 #include "intr.h"

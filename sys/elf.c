@@ -119,13 +119,13 @@ struct elf64_phdr {
 
 #define  EM_RISCV   243
 
-int elf_load(struct io * elfio, void (**eptr)(void)) {
+int elf_load(struct uio * uio, void (**eptr)(void)) {
     static const uint32_t MAGIC_LSB = 0x464c457f;
     struct elf64_ehdr ehdr;
     struct elf64_phdr phdr;
     uint_fast16_t phidx;
-    uint64_t elf_size;
-    uint64_t pos;
+    unsigned long long size;
+    unsigned long long pos;
     long result;
     int pte_flags;
     int entry_ok = 0;
@@ -135,21 +135,21 @@ int elf_load(struct io * elfio, void (**eptr)(void)) {
 
     // Get ELF file length
 
-    result = ioctl(elfio, IOCTL_GETEND, &elf_size);
+    result = uio_cntl(uio, IOCTL_GETEND, &size);
 
     if (result != 0)
         return result;
     
-    debug("ELF file size is %lu", elf_size);
+    debug("ELF uio size is %llu", size);
 
-    if (elf_size < sizeof(struct elf64_ehdr))
+    if (size < sizeof(struct elf64_ehdr))
         return -EBADFMT;
     
     // Read in ELF header
 
-    result = ioreadat(elfio, 0, &ehdr, sizeof(struct elf64_ehdr));
+    result = uio_read(uio, &ehdr, sizeof(ehdr));
 
-    if (result != sizeof(struct elf64_ehdr)) {
+    if (result != sizeof(ehdr)) {
         if (result < 0)
             return result;
         return -EIO;
@@ -182,12 +182,12 @@ int elf_load(struct io * elfio, void (**eptr)(void)) {
         return -EBADFMT;
     }
 
-    if (elf_size < ehdr.e_phoff) {
+    if (size < ehdr.e_phoff) {
         debug("e_phoff past eof");
         return -EBADFMT;
     }
 
-    if (elf_size - ehdr.e_phoff < (uint64_t)ehdr.e_phnum * ehdr.e_phentsize) {
+    if (size - ehdr.e_phoff < (uint64_t)ehdr.e_phnum * ehdr.e_phentsize) {
         debug("program header past eof");
         return -EBADFMT;
     }
@@ -208,7 +208,12 @@ int elf_load(struct io * elfio, void (**eptr)(void)) {
     for (phidx = 0; phidx < ehdr.e_phnum; phidx++) {
         pos = ehdr.e_phoff + (uint64_t)phidx * ehdr.e_phentsize;
         
-        result = ioreadat(elfio, pos, &phdr, sizeof(phdr));
+        result = uio_cntl(uio, IOCTL_GETPOS, &pos);
+
+        if (result != 0)
+            return result;
+        
+        result = uio_read(uio, &phdr, sizeof(phdr));
         if (result != sizeof(phdr)) {
             if (result < 0)
                 return result;
@@ -292,7 +297,13 @@ int elf_load(struct io * elfio, void (**eptr)(void)) {
             debug("PH[%d] Loading %d bytes at address %p from file offset 0x%lx",
                 phidx, phdr.p_filesz, (void*)phdr.p_vaddr, phdr.p_offset);
             
-            result = ioreadat(elfio, phdr.p_offset, (void *)phdr.p_vaddr, phdr.p_filesz);
+            pos = phdr.p_offset;
+            result = uio_cntl(uio, IOCTL_SETPOS, &pos);
+
+            if (result != 0)
+                return result;
+            
+            result = uio_read(uio, (void *)phdr.p_vaddr, phdr.p_filesz);
             if (result < phdr.p_filesz) {
                 if (result < 0)
                     return result;

@@ -4,14 +4,8 @@
 // SPDX-License-identifier: NCSA
 //
 
-/*! @file error.c
-    @brief Error names
-    @copyright Copyright (c) 2024-2025 University of Illinois
-    @license SPDX-License-identifier: NCSA
-*/
-
 #include "error.h"
-#include <stddef.h>
+#include <stddef.h> // for NULL
 
 extern const char * error_name(int code) {
     static const char * const error_names[] = {

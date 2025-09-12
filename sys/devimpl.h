@@ -6,7 +6,7 @@
 
 #include "device.h"
 
-extern int register_device(const char * name, enum device_type type, void * device_struct);
+extern void register_device(const char * name, enum device_type type, void * device_struct);
 
 // SERIAL DEVICES
 //
@@ -57,12 +57,13 @@ struct storage_intf {
         unsigned long long pos,
         const void * buf,
         unsigned long bytecnt);
-    
+        
     int (*cntl)(struct storage * sto, int op, void * arg);
 };
 
 struct storage {
     const struct storage_intf * intf;
+    unsigned long long capacity;
 };
 
 static inline void storage_init (

@@ -95,9 +95,9 @@
 #define VIORNG_INTR_PRIO 1
 #define VIOGPU_INTR_PRIO 2
 
-// Maximum number of open io objects
+// Maximum number of open uio objects
 
-#define PROCESS_IOMAX 16
+#define PROCESS_UIOMAX 16
 
 // Capacity of block cache
 

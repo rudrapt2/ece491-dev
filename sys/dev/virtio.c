@@ -14,7 +14,7 @@
 // EXPORTED FUNCTION DEFINITIONS
 //
 
-void virtio_attach(void * mmio_base, int irqno) {
+void attach_virtio(void * mmio_base, int irqno) {
     volatile struct virtio_mmio_regs * const regs = mmio_base;
 
     extern void viocons_attach (

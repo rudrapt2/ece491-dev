@@ -22,7 +22,7 @@
 #endif
 
 #include "conf.h"
-#include "io.h"
+#include "uio.h"
 #include "thread.h"
 #include "trap.h"
 #include "memory.h"
@@ -31,13 +31,14 @@
 //
 
 /*!
-* @brief Process struct containing the index of the process into the proctab, thread ID of the associated thread, memory space identifier of the associated space and an array of I/O objects associated with the process.
+* @brief Process struct containing the index of the process into the proctab,
+* thread ID of the associated thread, memory space identifier of the associated
+* space and an array of I/O objects associated with the process.
  */
 struct process {
-    int idx; // index into proctab
     int tid; // thread id of our thread
     mtag_t mtag; // memory space
-    struct io * iotab[PROCESS_IOMAX]; // IO objects associated with current process
+    struct uio * uiotab[PROCESS_UIOMAX]; // IO objects associated with current process
 };
 
 // EXPORTED FUNCTION DECLARATIONS
@@ -50,25 +51,34 @@ struct process {
 extern char procmgr_initialized;
 
 /*!
-* @brief Initializes the process manager as well as process 0, the process associated with the main thread. Asserts the procmgr_initialized flag on success.
+* @brief Initializes the process manager as well as process 0, the process
+* associated with the main thread. Asserts the procmgr_initialized flag on
+* success.
 * @param None
 * @return None
 */
 extern void procmgr_init(void);
 
 /*!
-* @brief Executes the process associated with the specified executable I/O object, argc, and argv. 
-* @details Creates and builds the stack, resets the active memory space, loads the process image from the given ELF, sets up the trap frame and jumps to user space. On success, this function does not return. On failure, it terminates the thread.
+* @brief Executes the process associated with the specified executable I/O
+* object, argc, and argv. 
+* @details Creates and builds the stack, resets the active memory space, loads
+* the process image from the given ELF, sets up the trap frame and jumps to user
+* space. On success, this function does not return. On failure, it terminates
+* the thread.
 * @param exeio Pointer to I/O struct of executable to execute
 * @param argc Number of arguments in argv
 * @param argv Array of arguments
 * @return None
 */
-extern int process_exec(struct io * exeio, int argc, char ** argv);
+extern int process_exec(struct uio * exefile, int argc, char ** argv);
 
 /*!
 * @brief Forks a child process. 
-* @details Creates a new process struct for the child, copies the parent's I/O objects and spawns a new thread for the child. The child thread uses the parent's trap frame to return to U mode, signaling the parent that it is done with the trap frame.
+* @details Creates a new process struct for the child, copies the parent's I/O
+* objects and spawns a new thread for the child. The child thread uses the
+* parent's trap frame to return to U mode, signaling the parent that it is done
+* with the trap frame.
 * @param tfr Pointer to trap frame of parent process
 * @return 0 on success, error code on failure
 */
@@ -76,7 +86,8 @@ extern int process_fork(const struct trap_frame * tfr);
 
 #ifndef THIS_IS_ONLY_FOR_DOXYGEN
 /*!
-* @brief Exits the current process. Frees the process struct, discards the active memory space, closes all I/O objects, and exits the thread.
+* @brief Exits the current process. Frees the process struct, discards the
+* active memory space, closes all I/O objects, and exits the thread.
 * @param None
 * @return None
 */

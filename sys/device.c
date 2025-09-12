@@ -5,13 +5,12 @@
 //
 
 #include "device.h"
+#include "devimpl.h"
 #include "error.h"
-#include "uio.h"
 #include "conf.h"
 #include "string.h"
 #include "assert.h"
-#include "fsimpl.h"
-#include "devimpl.h"
+#include "heap.h"
 
 #include <stddef.h>
 #include <limits.h> // INT_MAX
@@ -37,20 +36,10 @@ struct device_record {
     void * device_struct;
 };
 
-struct devfs_listing {
-    struct uio base;
-    struct device_record * dev;
-};
-
 // INTERNAL FUNCTION DECLARATIONS
 //
 
-static int devfs_open(struct filesystem * fs, const char * name, struct uio ** uioptr);
-
-static void devfs_listing_close(struct uio * uio);
-static long devfs_listing_read(struct uio * uio, void * buf, unsigned long bufsz);
-
-static const char * device_type_label(enum device_type type);
+extern const char * device_type_short_name(enum device_type type);
 
 // EXPORTED GLOBAL VARIABLES
 //
@@ -59,15 +48,6 @@ char devmgr_initialized = 0;
 
 // INTERNAL GLOBAL VARIABLES
 //
-
-static const struct filesystem devfs = {
-    .open = &devfs_open
-};
-
-static const struct uio_intf devfs_lsintf = {
-    .close = &devfs_listing_close,
-    .read = &devfs_listing_read
-};
 
 static struct device_record * devl_head;
 static struct device_record * devl_tail;
@@ -80,10 +60,8 @@ void devmgr_init(void) {
     devmgr_initialized = 1;
 }
 
-int register_device(const char * name, enum device_type type, void * device_struct) {
+void register_device(const char * name, enum device_type type, void * device_struct) {
     struct device_record * dev;
-    int instno = 0;
-    int i;
 
     assert (devmgr_initialized);
     assert (name != NULL);
@@ -93,7 +71,8 @@ int register_device(const char * name, enum device_type type, void * device_stru
     dev->name = name;
     dev->device_struct = device_struct;
 
-    // Insert device at end of device linked list
+    // Insert device at end of device linked list. We go through the list to
+    // determine the instance number of the device (which we return).
 
     if (devl_tail != NULL)
         devl_tail->next = dev;
@@ -106,7 +85,7 @@ void * find_device(const char * name, enum device_type type, int instno) {
     struct device_record * dev;
     int k = 0;
 
-    trace("%s(\"%s\",\"%s\",%d)", __func__, name, device_type_label(type), instno);
+    trace("%s(%s/%s%d)", __func__, device_type_short_name(type), name, instno);
 
     // Find numbered instance of device in devtab
 
@@ -119,8 +98,17 @@ void * find_device(const char * name, enum device_type type, int instno) {
         }
     }
 
-    debug("Device %s/%s%d not found", device_type_label(type), name, instno);
+    debug("Device %s/%s%d not found", device_type_short_name(type), name, instno);
     return NULL;
+}
+
+const char * device_type_short_name(enum device_type type) {
+    switch (type) {
+    case DEV_SERIAL: return "ser";
+    case DEV_STORAGE: return "sto";
+    case DEV_VIDEO: return "vid";
+    default: return "UNK";
+    }
 }
 
 int serial_open(struct serial * ser) {
@@ -136,9 +124,13 @@ void serial_close(struct serial * ser) {
 }
 
 int serial_recv(struct serial * ser, void * buf, unsigned int bufsz) {
+    unsigned int const blksz = ser->intf->blksz;
+
     if (ser->intf->recv != NULL) {
-        if (0 <= (int)bufsz)
-            return ser->intf->recv(ser, buf, bufsz);
+        // bufsz may be 0, but if non-zero, must be at least blksz; round bufsz
+        // to a multiple of blksz.
+        if (0 <= (int)bufsz && (bufsz == 0 || blksz <= bufsz))
+            return ser->intf->recv(ser, buf, bufsz / blksz * blksz);
         else
             return -EINVAL;
     } else
@@ -146,9 +138,13 @@ int serial_recv(struct serial * ser, void * buf, unsigned int bufsz) {
 }
 
 int serial_send(struct serial * ser, const void * buf, unsigned int buflen) {
+    unsigned int const blksz = ser->intf->blksz;
+
     if (ser->intf->send != NULL) {
-        if (0 <= (int)buflen)
-            return ser->intf->send(ser, buf, buflen);
+        // buflen may be 0, but if non-zero, must be at least blksz; round
+        // buflen to a multiple of blksz.
+        if (0 <= (int)buflen && (buflen == 0 || blksz <= buflen))
+            return ser->intf->send(ser, buf, buflen / blksz * blksz);
         else
             return -EINVAL;
     } else
@@ -157,9 +153,13 @@ int serial_send(struct serial * ser, const void * buf, unsigned int buflen) {
 
 int serial_cntl(struct serial * ser, int op, void * arg) {
     if (ser->intf->cntl != NULL)
-        return serial_cntl(ser, op, arg);
+        return ser->intf->cntl(ser, op, arg);
     else
         return -ENOTSUP;
+}
+
+unsigned int serial_blksz(const struct serial * ser) {
+    return ser->intf->blksz;
 }
 
 // STORAGE DEVICE
@@ -183,8 +183,12 @@ long storage_fetch (
     void * buf,
     unsigned long bufsz)
 {
+    unsigned int const blksz = sto->intf->blksz;
+
     if (sto->intf->fetch != NULL) {
-        if (0 <= (long)bufsz)
+        // bufsz may be 0, but if non-zero, must be at least blksz; round
+        // bufsz to a multiple of blksz.
+        if (0 <= (long)bufsz && (bufsz == 0 || blksz <= bufsz) && (pos % blksz == 0))
             return sto->intf->fetch(sto, pos, buf, bufsz);
         else
             return -EINVAL;
@@ -198,8 +202,12 @@ long storage_store (
     const void * buf,
     unsigned long buflen)
 {
+    unsigned int const blksz = sto->intf->blksz;
+
     if (sto->intf->store != NULL) {
-        if (0 <= (long)buflen)
+        // buflen may be 0, but if non-zero, must be at least blksz; round
+        // buflen to a multiple of blksz.
+        if (0 <= (long)buflen && (buflen == 0 || blksz <= buflen) && (pos % blksz == 0))
             return sto->intf->store(sto, pos, buf, buflen);
         else
             return -EINVAL;
@@ -209,9 +217,17 @@ long storage_store (
 
 int storage_cntl(struct storage * sto, int op, void * arg) {
     if (sto->intf->cntl != NULL)
-        return storage_cntl(sto, op, arg);
+        return sto->intf->cntl(sto, op, arg);
     else
         return -ENOTSUP;
+}
+
+unsigned int storage_blksz(const struct storage * sto) {
+    return sto->intf->blksz;
+}
+
+unsigned long long storage_capacity(const struct storage * sto) {
+    return sto->capacity;
 }
 
 // VIDEO DEVICE
@@ -236,97 +252,7 @@ void video_flush(struct video * vid) {
 
 int video_cntl(struct video * vid, int op, void * arg) {
     if (vid->intf->cntl != NULL)
-        return video_cntl(vid, op, arg);
+        return vid->intf->cntl(vid, op, arg);
     else
         return -ENOTSUP;
 }
-
-// INTERNAL FUNCTION DEFINITIONS
-//
-
-int devfs_open (
-    struct filesystem * fs __attribute__ ((unused)),
-    const char * name,
-    struct uio ** uioptr)
-{
-    struct devfs_listing * ls;
-    int instno;
-    int k = 0;
-
-    trace("%s(%s)", __func__, name);
-
-    // If name is NULL, then the open call is for a file listing. Return a
-    // special listing uio object.
-
-    if (name == NULL) {
-        ls = kcalloc(1, sizeof(*ls));
-        ls->dev = devl_head;
-        return uio_init1(&ls->base, &devfs_lsintf);
-    }
-
-    // If name is not NULL, the open call is for a file (device). The name
-    // passed to open() consists of the device name followed by an isntance
-    // number (starting at zero). Parse the provided file name into the device
-    // name length (for use with strncmp()) and the instance number.
-
-    // ... TODO
-    
-
-    debug("Device %s%d not found", name, instno);
-    return -ENODEV;
-}
-
-const char * device_type_label(enum device_type type) {
-    switch (type) {
-    case DEV_SERIAL: return "ser";
-    case DEV_STORAGE: return "sto";
-    case DEV_VIDEO: return "vid";
-    default: return "UNK";
-    }
-}
-
-#if 0 // will need this for devfs
-/**
- * @brief Parses a device specification, which is an ASCII string identifying a
- * device instance.
- * @details The specification string must consist of one or more non-digit ASCII
- * printable characters representing the device name followed by one or more
- * decimal digits representing the instance number. If the `spec` points to a
- * well-formed device specification, the device_parse_spec function
- * null-terminates the device name in place and returns the instance number as a
- * non-negative integer. If `spec` is not well-formed, device_parse_spec returns
- * -EINVAL.
- * @param spen device specification string
- * @return extracted instance number on success, or negative error code on
- * failure
- */
-int parse_devfs_name(char * spec) {
-    char * s = spec; // position in string
-    char * p = NULL; // start of number
-    unsigned long ulval; // for strtoul
-    char * end; // for strtoul
-
-    while (*s != '\0') {
-        if ('0' <= *s && *s <= '9') {
-            if (p == NULL)
-                p = s;
-        } else if (' ' < *s && *s < '\x7f')
-            p = NULL;
-        else
-            return -EINVAL;
-        
-        s += 1;
-    }
-
-    if (p != NULL && p != s) {
-        ulval = strtoul(p, &end, 10);
-        if (ulval <= INT_MAX && *end == '\0') {
-            *p = '\0';
-            return (int)ulval;
-        }
-    }
-
-    return -EINVAL;
-}
-
-#endif

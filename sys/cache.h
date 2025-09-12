@@ -12,7 +12,7 @@
 struct storage; // external
 struct cache; // opaque decl.
 
-extern int create_cache(struct storage * store, struct cache ** cptr);
+extern int create_cache(struct storage * sto, struct cache ** cptr);
 
 extern int cache_get_block(struct cache * cache, unsigned long long pos, void ** pptr);
 

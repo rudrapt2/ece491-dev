@@ -99,7 +99,7 @@ void handle_smode_interrupt(unsigned int cause) {
 
 void handle_umode_interrupt(unsigned int cause) {
     handle_interrupt(cause);
-    thread_yield();
+    running_thread_yield();
 }
 
 

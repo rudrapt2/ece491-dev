@@ -53,27 +53,27 @@ extern void thrmgr_init(void);
 
 extern int running_thread(void);
 
-// int thread_spawn(const char * name, void (*start)(void *), ...)
+// int spawn_thread(const char * name, void (*start)(void *), ...)
 // 
 // Creates and starts a new thread. Argument _name_ is the name of the thread
 // (optional, may be NULL), _start_ is the thread entry point, and _arg_ is an
 // argument passed to the thread. The thread is added to the runnable thread
-// list. If _start_ returns, this is equivalent to calling thread_exit from
+// list. If _start_ returns, this is equivalent to calling running_thread_exit from
 // _start_. The new thread is associated with the same process as the calling
 // thread. To change a thread's associated process, use thread_set_process.
 // Returns the TID of the spawned thread or a negative value on error.
 
-extern int thread_spawn (
+extern int spawn_thread (
     const char * name,
     void (*entry)(void),
     ...);
 
-// void thread_yield(void)
+// void running_thread_yield(void)
 // 
 // Yields the CPU to another thread and returns when the current thread is next
 // scheduled to run.
 
-extern void thread_yield(void);
+extern void running_thread_yield(void);
 
 // int thread_join(int tid)
 //
@@ -88,11 +88,11 @@ extern void thread_yield(void);
 
 extern int thread_join(int tid);
 
-// void thread_exit(void)
+// void running_thread_exit(void)
 //
 // Terminates the currently running thread. This function does not return.
 
-extern void __attribute__ ((noreturn)) thread_exit(void);
+extern void __attribute__ ((noreturn)) running_thread_exit(void);
 
 // struct process * thread_process(int tid)
 //
@@ -126,7 +126,7 @@ extern const char * thread_name(int tid);
 
 extern const char * running_thread_name(void);
 
-extern void* get_pointer_to_thread_stack_anchor(void);
+extern void * running_thread_stack_base(void);
 
 // void condition_init(struct condition * cond, const char * name)
 //

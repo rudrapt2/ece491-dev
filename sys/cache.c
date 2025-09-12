@@ -15,7 +15,7 @@
 #include "cache.h"
 #include "assert.h"
 #include "conf.h"
-#include "io.h"
+#include "device.h"
 #include "memory.h"
 #include "error.h"
 #include "string.h"
@@ -36,7 +36,7 @@ struct cache_entry {
 };
 
 struct cache {
-    struct io * bkgio;
+    struct storage * disk;
     struct condition unlocked; // an entry has been unlocked
     struct condition evictable; // a entry became evictable
     struct condition writable; // a block can be written back
@@ -115,7 +115,7 @@ int create_cache(struct io * bkgio, struct cache ** cptr) {
 
     cache = kcalloc(1, sizeof(struct cache));
 
-    cache->bkgio = ioaddref(bkgio);
+    cache->disk = xxx;
     condition_init(&cache->unlocked, "cache.unlocked");
     condition_init(&cache->evictable, "cache.evictable");
     condition_init(&cache->writable, "cache.writable");
@@ -131,7 +131,7 @@ int create_cache(struct io * bkgio, struct cache ** cptr) {
 
     // Create write-back thread
 
-    cache->wtid = thread_spawn (
+    cache->wtid = spawn_thread (
         "cache_writeback", (void(*)(void))&cache_writeback_thrfn, cache);
     
     assert (0 <= cache->wtid);

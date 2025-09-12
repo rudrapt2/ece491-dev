@@ -15,22 +15,28 @@
 #include "dev/virtio.h"
 #include "timer.h"
 #include "string.h"
-#include "fs.h"
+#include "filesys.h"
 #include "error.h"
 
-#define INIT_NAME "intr"
+#define INITEXE "init"
 
-#ifndef NUART
+#define CMNTNAME "c"
+#define CDEVNAME "violblk"
+#define CDEVINST 0
+
+#ifndef NUART // number of UARTs
 #define NUART 0
 #endif
 
+#ifndef NVIODEV // number of VirtIO devices
+#define NVIODEV 8
+#endif
+
+static void attach_devices(void);
+static void mount_cdrive(void); // mount primary storage device ("C drive")
+static void run_init(void);
+
 void main(void) {
-    struct serial * uarts[NUART]; // UART 0 is console, will be NULL
-    char * argv[] = { NULL };
-    struct io * diskio;
-    struct io * initio;
-    int result;
-    int i;
     
     console_init();
     intrmgr_init();
@@ -39,36 +45,72 @@ void main(void) {
     memory_init();
     procmgr_init();
 
-    // Attach devices
+    attach_devices();
 
-    for (i = 0; i < UARTCNT; i++)
-        uarts[0] = uart_attach((void*)UART_MMIO_BASE(i), UART0_INTR_SRCNO+i);
-    
-    for (i = 0; i < 8; i++)
-        virtio_attach((void*)VIRTIO_MMIO_BASE(i), VIRTIO0_INTR_SRCNO+i);
-    
     enable_interrupts();
 
-    result = open_device("vioblk", 0, &diskio);
+    mount_cdrive();
+    run_init();
+}
 
-    if (result != 0) {
-        kprintf("open_device(\"vioblk\", 0) returned %s\n", error_name(result));
-        halt_failure();
-    }
+void attach_devices(void) {
+    int i;
+
+    for (i = 0; i < NUART; i++)
+        attach_uart((void*)UART_MMIO_BASE(i), UART0_INTR_SRCNO+i);
     
-    result = fsmount(diskio);
+    for (i = 0; i < NVIODEV; i++)
+        attach_virtio((void*)VIRTIO_MMIO_BASE(i), VIRTIO0_INTR_SRCNO+i);
+}
 
-    if (result != 0) {
-        kprintf("fsmount() returned %s\n", error_name(result));
+void mount_cdrive(void) {
+#if 0
+    struct storage * hd;
+    struct cache * cache;
+    int result;
+
+    hd = find_storage(CDEVNAME, CDEVINST);
+
+    if (hd == NULL) {
+        kprintf("Storage device %s%d not found\n", CDEVNAME, CDEVINST);
         halt_failure();
     }
+
+    result = create_cache(hd, &cache);
+
+    if (result != 0) {
+        kprintf("create_cache(%s%d) failed: %s\n",
+            CDEVNAME, CDEVINST, error_name(result));
+        halt_failure();
+    }
+
+    result = mount_ktfs(CMNTNAME, cache);
+
+    if (result != 0) {
+        kprintf("mount_ktfs(%s, cache(%s%d)) failed: %s\n",
+            CMNTNAME, CDEVNAME, CDEVINST, error_name(result));
+        halt_failure();
+    }
+#endif
+}
+
+void run_init(void) {
+#if 0
+    char * argv[] = { NULL };
+    struct uio * initexe;
+    int result;
     
-    result = fsopen(INIT_NAME, &initio);
+    result = open_file(CMNTNAME "/" INITEXE, &initexe);
 
     if (result != 0) {
-        kprintf(INIT_NAME ": %s; terminating\n", error_name(result));
+        kprintf(INITEXE ": %s; terminating\n", error_name(result));
         halt_failure();
     }
 
-    process_exec(initio, 0, argv);
+    // Make descriptor 0 be a null uio object, which the shell will need
+
+    current_process()->uiotab[0] = create_null_uio();
+
+    process_exec(initexe, 0, argv);
+#endif
 }

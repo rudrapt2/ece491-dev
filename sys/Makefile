@@ -14,31 +14,33 @@ OBJS = \
 	assert.o \
 	console.o \
 	dev/uart.o \
+	dev/rtc.o \
+	dev/virtio.o \
+	dev/viorng.o \
 	device.o \
+	filesys.o \
 	elf.o \
 	error.o \
 	excp.o \
 	heap0.o \
 	intr.o \
-	io.o \
+	uio.o \
 	memory.o \
 	plic.o \
 	process.o \
 	see.o \
 	start.o \
 	string.o \
-	syscall.o \
 	thrasm.o \
 	thread.o \
 	timer.o \
-	trap.o \
-	fs.o \
-	dev/rtc.o \
-	dev/viogpu.o \
-	dev/viorng.o \
-	dev/virtio.o \
-	dev/vioblk.o \
-	cache.o
+	trap.o
+#	syscall.o \
+#	dev/viogpu.o \
+#	dev/viorng.o \
+#	dev/vioblk.o \
+#	cache.o \
+#	ktfs.o
 #   tarfs.o 
 
 CFLAGS = -Wall -Werror=implicit-function-declaration
@@ -195,8 +197,6 @@ test-create-ktfs.elf: $(OBJS) test/ktfs_test_create.o
 
 test-create-ktfs: test-create-ktfs.elf
 	$(QEMU) $(TEST_KTFS_QEMUOPTS) -m 8M -kernel $< 
-
-
 	
 debug-create-ktfs: test-create-ktfs.elf
 	$(QEMU) $(TEST_KTFS_QEMUOPTS) -m 8M -kernel $< -S -s
@@ -215,7 +215,6 @@ debug-delete-ktfs: test-delete-ktfs.elf
 ELF_LD_OBJS = $(filter-out heap0.o, $(OBJS))
 ELF_LD_OBJS += cp1testcases/elfloadTest/elf_gold.o
 ELF_LD_OBJS += cp1testcases/elfloadTest/heap0.o
-
 
 TEST_ELFLD_QEMUOPTS = $(QEMUOPTS)
 TEST_ELFLD_QEMUOPTS += -drive file=cp1testcases/elfloadTest/ktfs.raw,id=blk0,if=none,format=raw,readonly=false

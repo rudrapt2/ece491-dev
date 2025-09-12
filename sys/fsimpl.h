@@ -3,8 +3,9 @@
 
 struct filesystem {
     int (*open)(struct filesystem * fs, const char * name, struct uio ** uioptr);
-    int (*creat)(struct filesystem * fs, const char * name);
-    int (*unlink)(struct filesystem * fs, const char * name);
+    int (*create)(struct filesystem * fs, const char * name);
+    int (*delete)(struct filesystem * fs, const char * name);
+    void (*flush)(struct filesystem * fs);
 };
 
 extern int attach_fs(const char * name, struct filesystem * fs);

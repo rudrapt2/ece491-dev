@@ -43,7 +43,6 @@ struct rtc_device {
 static int rtc_open(struct serial * ser);
 static void rtc_close(struct serial * ser);
 static int rtc_recv(struct serial * ser, void * buf, unsigned int bufsz);
-static int rtc_cntl(struct serial * ser, int cmd, void * arg);
 
 static uint64_t read_real_time(volatile struct rtc_regs * regs);
 
@@ -52,8 +51,8 @@ static uint64_t read_real_time(volatile struct rtc_regs * regs);
 
 static const struct serial_intf rtc_serial_intf = {
     .blksz = 8,
+    .open = &rtc_open,
     .close = &rtc_close,
-    .cntl = &rtc_cntl,
     .recv = &rtc_recv
 };
 

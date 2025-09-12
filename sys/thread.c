@@ -89,9 +89,6 @@ struct thread_stack_anchor {
     void * kgp;
 };
 
-/**
- * @brief defines the thread constituents
- */
 struct thread {
     struct thread_context ctx;  // must be first member (thrasm.s)
     int id; // index into thrtab[]
@@ -234,7 +231,7 @@ static struct thread idle_thread = {
     .ctx.sp = _idle_stack_anchor,
     .ctx.ra = &_thread_startup,
     .ctx.startup.fp = NULL,
-    .ctx.startup.ra = &thread_exit,
+    .ctx.startup.ra = &running_thread_exit,
     .ctx.startup.pc = &idle_thread_func
 };
 
@@ -263,7 +260,8 @@ int running_thread(void) {
 
 /**
  * @brief Initializes the thread manager.
- * @details Initializes the main and idle threads, and sets the main thread to running state. Must be called before performing any thread operations.
+ * @details Initializes the main and idle threads, and sets the main thread to
+ * running state. Must be called before performing any thread operations.
  * @param void void argument
  * @return void 
  */
@@ -283,7 +281,7 @@ void thrmgr_init(void) {
  * @param arg is an argument passed to the thread
  * @return the TID of the spawned thread
  */
-int thread_spawn (
+int spawn_thread (
     const char * name,
     void (*entry)(void),
     ...)
@@ -306,7 +304,7 @@ int thread_spawn (
 
     child->ctx.startup.fp = NULL;
     child->ctx.startup.pc = entry;
-    child->ctx.startup.ra = &thread_exit;
+    child->ctx.startup.ra = &running_thread_exit;
     child->ctx.ra = &_thread_startup;
     child->ctx.sp = child->stack_anchor;    
 
@@ -320,11 +318,13 @@ int thread_spawn (
 
 /**
  * @brief Terminates the currently running thread.
- * @details The current thread will be set to EXITED state, and all locks will be released on the thread. The function signals the parent if it is waiting for the child thread to exit. The currently running thread will be suspended.
+ * @details The current thread will be set to EXITED state, and all locks will
+ * be released on the thread. The function signals the parent if it is waiting
+ * for the child thread to exit. The currently running thread will be suspended.
  * @param void void argument
  * @return void
  */
-void thread_exit(void) {
+void running_thread_exit(void) {
     if (TP == &main_thread)
         halt_success();
     
@@ -351,7 +351,7 @@ void thread_exit(void) {
  * @param void void argument
  * @return void
  */
-void thread_yield(void) {
+void running_thread_yield(void) {
     trace("%s() in <%s:%d>", __func__, TP->name, TP->id);
     running_thread_suspend();
 }
@@ -470,7 +470,7 @@ const char * running_thread_name(void) {
     return TP->name;
 }
 
-void* get_pointer_to_thread_stack_anchor(void){
+void * running_thread_stack_base(void){
     return TP->stack_anchor;
 }
 
@@ -957,7 +957,7 @@ void idle_thread_func(void) {
         // If there are runnable threads, yield to them.
 
         while (!tlempty(&ready_list))
-            thread_yield();
+            running_thread_yield();
         
         // No runnable threads. Sleep using the wfi instruction. Note that we
         // need to disable interrupts and check the runnable thread list one

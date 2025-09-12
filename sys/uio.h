@@ -4,38 +4,32 @@
 #ifndef _UIO_H_
 #define _UIO_H_
 
-struct uio; // forward decl.
+struct uio; // opaque decl.
 
-struct uio_intf {
-    void (*close)(struct uio * uio);
-    int (*read)(struct uio * uio, void * buf, unsigned long bytecnt);
-    int (*write)(struct uio * uio, const void * buf, unsigned long bytecnt);
-    int (*cntl)(struct uio * uio, int op, void * arg);
-};
+extern int uio_addref(struct uio * uio);
+extern void uio_close(struct uio * uio);
+extern long uio_read(struct uio * uio, void * buf, unsigned long bufsz);
+extern long uio_write(struct uio * uio, const void * buf, unsigned long buflen);
+extern int uio_cntl(struct uio * uio, int op, void * arg);
 
-struct uio {
-    const struct uio_intf * intf;
-    unsigned long refcnt;
-};
+// IOCTL DEFINITIONS
+//
 
-// Initialize a uio object with a reference count of zero.
+#define IOCTL_GETEND 0 // arg is unsigned long long *
+#define IOCTL_SETEND 1 // arg is unsigned long long *
+#define IOCTL_GETPOS 2 // arg is unsigned long long *
+#define IOCTL_SETPOS 3 // arg is unsigned long long *
 
-static inline struct uio * uio_init0 (
-    struct uio * uio, const struct uio_intf * intf)
-{
-    uio->intf = intf;
-    uio->refcnt = 0;
-    return uio;
-}
+// Returns a pointer to a null uio object, which supports the following operations:
+//
+//    close(): decrements reference count
+//     read(): returns 0
+//    write(): accepts all data
+//     cntl(): return -ENOTSUP
+//    
+// There is a single system-wide null uio object. Calling nulluio() increments
+// its reference count and returns a pointer to it.
 
-// Initialize a uio object with a reference count of one.
-
-static inline struct uio * uio_init1 (
-    struct uio * uio, const struct uio_intf * intf)
-{
-    uio->intf = intf;
-    uio->refcnt = 1;
-    return uio;
-}
+extern struct uio * create_null_uio(void);
 
 #endif // _UIO_H_

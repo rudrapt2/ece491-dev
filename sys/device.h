@@ -39,6 +39,11 @@ static inline struct video * find_video(const char * name, int instno) {
     return find_device(name, DEV_VIDEO, instno);
 }
 
+extern const char * device_type_short_name(enum device_type type);
+
+// Class-specific functions
+//
+
 extern int serial_open(struct serial * ser);
 
 extern void serial_close(struct serial * ser);
@@ -48,6 +53,8 @@ extern int serial_recv(struct serial * ser, void * buf, unsigned int bufsz);
 extern int serial_send(struct serial * ser, const void * buf, unsigned int buflen);
 
 extern int serial_cntl(struct serial * ser, int op, void * arg);
+
+extern unsigned int serial_blksz(const struct serial * ser);
 
 extern int storage_open(struct storage * sto);
 
@@ -68,6 +75,10 @@ extern long storage_store (
 extern int storage_cntl (
     struct storage * sto,
     int op, void * arg);
+
+extern unsigned int storage_blksz(const struct storage * sto);
+
+extern unsigned long long storage_capacity(const struct storage * sto);
 
 extern int video_open(struct video * vid, int mode, void ** fbptr);
 extern void video_close(struct video * vid);

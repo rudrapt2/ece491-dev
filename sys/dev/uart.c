@@ -144,10 +144,14 @@ void attach_uart(void * mmio_base, int irqno) {
     struct uart_serial * uart;
 
     // UART0 is used for the console and should not be attached as a normal
-    // device. It should already be initialized by console_init().
+    // device. It should already be initialized by console_init(). We still
+    // register the device (to reserve the name uart0), but pass a NULL device
+    // pointer, so that find_serial("uart", 0) returns NULL.
 
-    if (mmio_base == (void*)UART0_MMIO_BASE)
+    if (mmio_base == (void*)UART0_MMIO_BASE) {
+        register_device(UART_DEVNAME, DEV_SERIAL, NULL);
         return;
+    }
     
     uart = kcalloc(1, sizeof(*uart));
 

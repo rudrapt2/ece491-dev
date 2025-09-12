@@ -167,7 +167,7 @@ struct virtq_used {
 * @param irqno interrupt request no. for the device
 * @return void
 */
-extern void virtio_attach(void * mmio_base, int irqno);
+extern void attach_virtio(void * mmio_base, int irqno);
 
 /**
 * @brief Checks the features device has enabled

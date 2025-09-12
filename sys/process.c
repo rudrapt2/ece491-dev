@@ -4,13 +4,6 @@
 // SPDX-License-identifier: NCSA
 //
 
-/*! @file process.c
-    @brief Process management
-    @copyright Copyright (c) 2024-2025 University of Illinois
-    @license SPDX-License-identifier: NCSA
-
-*/
-
 /*!
 * @brief Enables trace messages for process.c
 */
@@ -29,8 +22,8 @@
 #include "assert.h"
 #include "process.h"
 #include "elf.h"
-#include "fs.h"
-#include "io.h"
+#include "filesys.h"
+#include "uio.h"
 #include "string.h"
 #include "thread.h"
 #include "riscv.h"
@@ -52,23 +45,8 @@
 // INTERNAL FUNCTION DECLARATIONS
 //
 
-/*!
-* @brief Builds the stack for a new process.
-* @details Builds the stack for a new process, including the argument vector and the strings it points to. Note that argv[] contains argc+1 elements (last one is a NULL pointer). Remember to round up the stack size to a multiple of 16 (RISC-V ABI requirement).
-* @param stack Pointer to the stack page
-* @param argc Number of arguments in argv
-* @param argv Array of arguments
-* @return Size of the stack page on success, negative error code on failure
-*/
 static int build_stack(void * stack, int argc, char ** argv);
 
-/*!
-* @brief Function to be executed by the child process after fork.
-* @details Signals the parent process that it is done with the trap frame, then jumps to user space.
-* @param forked Pointer to condition variable to signal parent
-* @param tfr Pointer to trap frame
-* @return None
-*/
 static void fork_func(struct condition * forked, struct trap_frame * tfr);
 
 // INTERNAL GLOBAL VARIABLES
@@ -79,9 +57,6 @@ static void fork_func(struct condition * forked, struct trap_frame * tfr);
 */
 static struct process main_proc;
 
-/*!
-* @brief A table of pointers to all user processes in the system
-*/
 static struct process * proctab[NPROC] = {
     &main_proc
 };
@@ -98,24 +73,22 @@ void procmgr_init(void) {
     assert (memory_initialized && heap_initialized);
     assert (!procmgr_initialized);
 
-    main_proc.idx = 0;
     main_proc.tid = running_thread();
     main_proc.mtag = active_mspace();
     thread_set_process(main_proc.tid, &main_proc);
-    main_proc.iotab[0] = create_null_io();
     procmgr_initialized = 1;
 }
 
-int process_exec(struct io * exeio, int argc, char ** argv) {
+int process_exec(struct uio * exefile, int argc, char ** argv) {
     struct trap_frame tfr;
     void (*entry)(void);
     void * stack;
     int stksz;
     int result;
 
-    trace("%s(exeio=%p)", __func__, exeio);
+    trace("%s(exefile=%p)", __func__, exefile);
 
-    // The exec system call is a tricky. if something goes wrong after we reset
+    // The exec system call is a tricky. If something goes wrong after we reset
     // the process memory space, we cannot just return an error, since there is
     // nothing to return to. We try to do as much as possible before resetting
     // the memory space so that we can return an error.
@@ -128,16 +101,10 @@ int process_exec(struct io * exeio, int argc, char ** argv) {
     // to build the new stack page containing argv[] and the strings it points
     // to. Otherwise, set _argc_ to zero and argv[0] = NULL.
 
-#ifdef WITH_ARGV
     stksz = build_stack(stack, argc, argv);
 
     if (stksz < 0)
         return stksz;
-#else
-    argc = 0;
-    stksz = 16;
-    memset(stack + PAGE_SIZE - stksz, 0, stksz);
-#endif
 
     // Clear user memory mapping
 
@@ -147,8 +114,8 @@ int process_exec(struct io * exeio, int argc, char ** argv) {
     // return an error, since we have reset the address space. So we print an
     // error to the console and terminate our thread.
 
-    result = elf_load(exeio, &entry);
-    ioclose(exeio);
+    result = elf_load(exefile, &entry);
+    uio_close(exefile);
 
     if (result != 0) {
         kprintf("exec: elf_load: %s\n", error_name(result));
@@ -170,7 +137,7 @@ int process_exec(struct io * exeio, int argc, char ** argv) {
     tfr.sstatus |= RISCV_SSTATUS_SPIE;
     tfr.sstatus &= ~RISCV_SSTATUS_SPP;
     
-    trap_frame_jump(&tfr, get_pointer_to_thread_stack_anchor() - sizeof(struct trap_frame));
+    trap_frame_jump(&tfr, running_thread_stack_base() - sizeof(tfr));
 }
 
 int process_fork(const struct trap_frame * tfr) {
@@ -201,15 +168,14 @@ int process_fork(const struct trap_frame * tfr) {
 
     child = kcalloc(1, sizeof(struct process));
     proctab[idx] = child;
-    child->idx = idx;
     child->mtag = clone_active_mspace();
 
     // Copy io object pointers and increment ref count
 
     for (i = 0; i < PROCESS_IOMAX; i++) {
-        child->iotab[i] = parent->iotab[i];
-        if (child->iotab[i] != NULL)
-            ioaddref(child->iotab[i]);
+        child->uiotab[i] = parent->uiotab[i];
+        if (child->uiotab[i] != NULL)
+            uio_addref(child->uiotab[i]);
     }
 
     // Spawn a new thread for the child. The child thread will use the parent's
@@ -223,7 +189,7 @@ int process_fork(const struct trap_frame * tfr) {
     // parent writes return value into trap frame and returns normally
 
     condition_init(&done, "fork_child_done");
-    ctid = thread_spawn("fork_child", (void*)&fork_func, &done, tfr);
+    ctid = spawn_thread("fork_child", (void*)&fork_func, &done, tfr);
     thread_set_process(ctid, child);
 
     if (ctid < 0)
@@ -243,25 +209,32 @@ void process_exit(void) {
     trace("%s() in %s", __func__, thread_name(running_thread()));
 
     if (running_thread() == 0) {
-        fsflush();
+        fsmgr_flushall();
         panic("Main process exited");
     }
 
     discard_active_mspace();
 
-    for (i = 0; i < PROCESS_IOMAX; i++) {
-        if (self->iotab[i] != NULL)
-            ioclose(self->iotab[i]);
+    for (i = 0; i < PROCESS_UIOMAX; i++) {
+        if (self->uiotab[i] != NULL)
+            uio_close(self->uiotab[i]);
     }
     
     // Free process struct. First, though, remove references to it from thread
     // struct and proctab.
 
     thread_set_process(running_thread(), NULL);
-    proctab[self->idx] = NULL;
+    
+    for (i = 0; i < NPROC; i++) {
+        if (proctab[i] == self) {
+            proctab[i] = NULL;
+            break;
+        }
+    }
+
     kfree(self);
 
-    thread_exit();
+    running_thread_exit();
 }
 
 // INTERNAL FUNCTION DEFINITIONS
@@ -322,5 +295,5 @@ void fork_func(struct condition * done, struct trap_frame * tfr) {
     condition_broadcast(done); // signal parent we're done using trap frame
 
     tfr->a0 = 0;
-    trap_frame_jump(tfr, get_pointer_to_thread_stack_anchor() - sizeof(struct trap_frame));
+    trap_frame_jump(tfr, running_thread_stack_base() - sizeof(struct trap_frame));
 }
