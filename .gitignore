@@ -1,0 +1,10 @@
+.gdbhist
+.gdbinit
+*.o
+*.dump
+*.elf
+*.raw
+util/mkfs_ktfs
+util/unmkfs_ktfs
+.vscode
+.clang-format
