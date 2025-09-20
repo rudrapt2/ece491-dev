@@ -453,6 +453,7 @@ static int devfs_open_serial(struct serial * ser, struct uio ** uioptr) {
 
 void devfs_serial_close(struct uio * uio) {
     struct serial * ser = (struct serial *)(((void*)uio) + offsetof(struct devfs_serial_uio, ser));
+    ser->intf->close(ser);
 }
 
 long devfs_serial_read(struct uio * uio, void * buf, unsigned long bufsz) {
