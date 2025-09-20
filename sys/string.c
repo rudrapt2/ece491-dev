@@ -92,14 +92,14 @@ char * strncpy(char *dst, const char *src, size_t n) {
     char * orig_dst = dst;
 
     while (n != 0 && *src != '\0') {
-        *dst = *src;
-        src += 1;
-        dst += 1;
+        *dst++ = *src++;
         n -= 1;
     }
 
-    if (n != 0)
-        *dst = '\0';
+    while (n != 0) {
+        *dst++ = '\0';
+        n -= 1;
+    }
     
     return orig_dst;
 }
@@ -227,8 +227,10 @@ size_t vsnprintf(char * buf, size_t bufsz, const char * fmt, va_list ap) {
 
     n = vgprintf(vsnprintf_putc, &state, fmt, ap);
 
-    if (state.rem != 0)
+    if (state.rem != 0) {
         *state.pos = '\0';
+        n += 1;
+    }
 
     return n;
 }

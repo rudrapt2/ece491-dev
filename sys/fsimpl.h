@@ -8,4 +8,4 @@ struct filesystem {
     void (*flush)(struct filesystem * fs);
 };
 
-extern int attach_fs(const char * name, struct filesystem * fs);
+extern int mount_fs(const char * name, struct filesystem * fs);

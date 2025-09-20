@@ -9,16 +9,25 @@
 #include "error.h"
 #include <stddef.h>
 
+// INTERNAL TYPE DEFINITIONS
+//
+
+struct mountpoint {
+
+    const char * name;
+    struct filesystem * fs;
+};
+
 // INTERNAL FUNCTION PROTOTYPES
 //
 
-int nullfs_open(struct filesystem * fs, const char * name, struct uio ** uioptr);
-void nullfs_flush(struct filesystem * fs);
+static int nullfs_open(struct filesystem * fs, const char * name, struct uio ** uioptr);
+static void nullfs_flush(struct filesystem * fs);
 
 // INTERNAL GLOBAL VARIABLES
 //
 
-static struct filesystem nullfs = {
+static const struct filesystem nullfs = {
     .open = &nullfs_open,
     .flush = &nullfs_flush
 };
@@ -58,7 +67,7 @@ int mount_nullfs(const char * name) {
     return attach_fs(name, &nullfs);
 }
 
-int attach_fs(const char * name, struct filesystem * fs) {
+int mount_fs(const char * name, struct filesystem * fs) {
     // ...
     return -ENOTSUP;
 }
