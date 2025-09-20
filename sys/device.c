@@ -368,7 +368,7 @@ int devfs_open (
     if (name == NULL || *name == '\0')
         return devfs_open_listing(uioptr);
     else
-        return devfs_open_file(name, uioptr);
+        return devfs_open_device(name, uioptr);
 }
 
 int devfs_open_listing(struct uio ** uioptr) {
