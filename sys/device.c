@@ -444,11 +444,15 @@ int devfs_open_device(const char * name, struct uio ** uioptr) {
 }
 
 static int devfs_open_serial(struct serial * ser, struct uio ** uioptr) {
-    // ...
+    struct devfs_serial_uio *ser_uio = kcalloc(1, sizeof(struct devfs_serial_uio));
+    ser_uio->base = **uioptr;
+    ser_uio->ser = ser;
+    return ser->intf->open(ser);
+    // uio_addref(*uioptr); - fs_open should do this
 }
 
 void devfs_serial_close(struct uio * uio) {
-    // ...
+    struct serial * ser = (struct serial *)(((void*)uio) + offsetof(struct devfs_serial_uio, ser));
 }
 
 long devfs_serial_read(struct uio * uio, void * buf, unsigned long bufsz) {
