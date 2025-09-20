@@ -25,6 +25,7 @@ extern char devmgr_initialized;
 //
 
 extern void devmgr_init(void);
+extern int mount_devfs(const char * name);
 extern void * find_device(const char * name, enum device_type type, int instno);
 
 static inline struct serial * find_serial(const char * name, int instno) {
@@ -41,6 +42,7 @@ static inline struct video * find_video(const char * name, int instno) {
 
 extern const char * device_type_short_name(enum device_type type);
 
+
 // Class-specific functions
 //
 
@@ -48,9 +50,11 @@ extern int serial_open(struct serial * ser);
 
 extern void serial_close(struct serial * ser);
 
-extern int serial_recv(struct serial * ser, void * buf, unsigned int bufsz);
+extern int serial_recv (
+    struct serial * ser, void * buf, unsigned int bufsz);
 
-extern int serial_send(struct serial * ser, const void * buf, unsigned int buflen);
+extern int serial_send (
+    struct serial * ser, const void * buf, unsigned int buflen);
 
 extern int serial_cntl(struct serial * ser, int op, void * arg);
 
@@ -84,5 +88,7 @@ extern int video_open(struct video * vid, int mode, void ** fbptr);
 extern void video_close(struct video * vid);
 extern void video_flush(struct video * vid);
 extern int video_cntl(struct video * vid, int op, void * arg);
+
+#define FCTL_VID_MAP_FBUF ((DEV_VIDEO << 16) | 0)
 
 #endif

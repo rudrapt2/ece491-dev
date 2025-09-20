@@ -6,7 +6,7 @@
 
 #include "device.h"
 
-extern void register_device(const char * name, enum device_type type, void * device_struct);
+extern int register_device(const char * name, enum device_type type, void * device_struct);
 
 // SERIAL DEVICES
 //

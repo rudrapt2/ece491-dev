@@ -23,6 +23,7 @@
 #include "thread.h"
 #include "process.h"
 #include "error.h"
+#include "misc.h"
 
 // COMPILE-TIME CONFIGURATION
 //
