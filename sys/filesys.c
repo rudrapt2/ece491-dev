@@ -64,7 +64,7 @@ int delete_file(const char * name) {
 }
 
 int mount_nullfs(const char * name) {
-    return attach_fs(name, &nullfs);
+    return mount_fs(name, &nullfs);
 }
 
 int mount_fs(const char * name, struct filesystem * fs) {
