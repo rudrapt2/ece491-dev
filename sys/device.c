@@ -457,15 +457,18 @@ void devfs_serial_close(struct uio * uio) {
 }
 
 long devfs_serial_read(struct uio * uio, void * buf, unsigned long bufsz) {
-    // ...
+    struct serial * ser = (struct serial *)(((void*)uio) + offsetof(struct devfs_serial_uio, ser));
+    ser->intf->recv(ser, buf, bufsz);
 }
 
 long devfs_serial_write(struct uio * uio, const void * buf, unsigned long buflen) {
-    // ...
+    struct serial * ser = (struct serial *)(((void*)uio) + offsetof(struct devfs_serial_uio, ser));
+    ser->intf->send(ser, buf, buflen);
 }
 
 int devfs_serial_cntl(struct uio * uio, int op, void * arg) {
-    // ...
+    struct serial * ser = (struct serial *)(((void*)uio) + offsetof(struct devfs_serial_uio, ser));
+    ser->intf->cntl(ser, op, arg);
 }
 
 void devfs_storage_close(struct uio * uio) {
