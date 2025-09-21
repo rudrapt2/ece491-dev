@@ -505,7 +505,7 @@ static int devfs_open_video(struct video * vid, struct uio ** uioptr){
     struct devfs_video_uio *vid_uio = kcalloc(1, sizeof(struct devfs_video_uio));
     vid_uio->base = **uioptr;
     vid_uio->vid = vid;
-    return vid->intf->open(vid); //mode and fbufptr???
+    return vid->intf->open(vid, 0, NULL); //mode and fbufptr???
 }
 
 void devfs_video_close(struct uio * uio) {
