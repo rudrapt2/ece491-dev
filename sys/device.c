@@ -59,8 +59,8 @@ static void devfs_listing_read (
 
 static int devfs_open_device(const char * name, struct uio ** uioptr);
 static int devfs_open_serial(struct serial * ser, struct uio ** uioptr);
-static int devfs_open_storage(struct storage * ser, struct uio ** uioptr);
-static int devfs_open_video(struct video * ser, struct uio ** uioptr);
+static int devfs_open_storage(struct storage * sto, struct uio ** uioptr);
+static int devfs_open_video(struct video * vid, struct uio ** uioptr);
 
 static void devfs_serial_close(struct uio * uio);
 static long devfs_serial_read(struct uio * uio, void * buf, unsigned long bufsz);
@@ -433,7 +433,7 @@ int devfs_open_device(const char * name, struct uio ** uioptr) {
             case DEV_STORAGE:
                 return devfs_open_storage(dev->device_struct, uioptr);
             case DEV_VIDEO:
-                return devfs_open_serial(dev->device_struct, uioptr);
+                return devfs_open_video(dev->device_struct, uioptr);
             default:
                 panic("Bad device type");
             }
