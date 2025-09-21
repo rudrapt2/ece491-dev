@@ -44,6 +44,16 @@ struct devfs_serial_uio {
     struct serial * ser;
 };
 
+struct devfs_storage_uio {
+    struct uio base;
+    struct storage * sto;
+};
+
+struct devfs_video_uio {
+    struct uio base;
+    struct video * vid;
+};
+
 // INTERNAL FUNCTION DECLARATIONS
 //
 
@@ -471,6 +481,10 @@ int devfs_serial_cntl(struct uio * uio, int op, void * arg) {
     ser->intf->cntl(ser, op, arg);
 }
 
+static int devfs_open_storage(struct storage * sto, struct uio ** uioptr){
+    
+}
+
 void devfs_storage_close(struct uio * uio) {
     // ...
 }
@@ -485,6 +499,10 @@ long devfs_storage_write(struct uio * uio, const void * buf, unsigned long bufle
 
 int devfs_storage_cntl(struct uio * uio, int op, void * arg) {
     // ...
+}
+
+static int devfs_open_video(struct video * vid, struct uio ** uioptr){
+    
 }
 
 void devfs_video_close(struct uio * uio) {
