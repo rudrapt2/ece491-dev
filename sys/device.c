@@ -58,9 +58,9 @@ static void devfs_listing_read (
     struct uio * uio, void * buf, unsigned long bufsz);
 
 static int devfs_open_device(const char * name, struct uio ** uioptr);
-static int devfs_open_serial(struct serial * ser, struct uio ** uioptr) {
-static int devfs_open_storage(struct storage * ser, struct uio ** uioptr) {
-static int devfs_open_video(struct video * ser, struct uio ** uioptr) {
+static int devfs_open_serial(struct serial * ser, struct uio ** uioptr);
+static int devfs_open_storage(struct storage * ser, struct uio ** uioptr);
+static int devfs_open_video(struct video * ser, struct uio ** uioptr);
 
 static void devfs_serial_close(struct uio * uio);
 static long devfs_serial_read(struct uio * uio, void * buf, unsigned long bufsz);
