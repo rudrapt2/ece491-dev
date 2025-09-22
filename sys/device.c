@@ -516,7 +516,8 @@ static int devfs_open_video(struct video * vid, struct uio ** uioptr){
 }
 
 void devfs_video_close(struct uio * uio) {
-    // ...
+    struct video * vid = (struct video *)(((void*)uio) + offsetof(struct devfs_video_uio, vid));
+    vid->intf->close(vid);
 }
 
 long devfs_video_read(struct uio * uio, void * buf, unsigned long bufsz) {
@@ -528,5 +529,6 @@ long devfs_video_write(struct uio * uio, const void * buf, unsigned long buflen)
 }
 
 int devfs_video_cntl(struct uio * uio, int op, void * arg) {
-    // ...
+    struct video * vid = (struct video *)(((void*)uio) + offsetof(struct devfs_video_uio, vid));
+    vid->intf->cntl(vid, op, arg);
 }
