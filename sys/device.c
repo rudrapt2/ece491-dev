@@ -482,23 +482,30 @@ int devfs_serial_cntl(struct uio * uio, int op, void * arg) {
 }
 
 static int devfs_open_storage(struct storage * sto, struct uio ** uioptr){
-    
+    struct devfs_storage_uio *sto_uio = kcalloc(1, sizeof(struct devfs_storage_uio));
+    sto_uio->base = **uioptr;
+    sto_uio->sto = sto;
+    return sto->intf->open(sto);
 }
 
 void devfs_storage_close(struct uio * uio) {
-    // ...
+    struct storage * sto = (struct storage *)(((void*)uio) + offsetof(struct devfs_storage_uio, sto));
+    sto->intf->close(sto);
 }
 
 long devfs_storage_read(struct uio * uio, void * buf, unsigned long bufsz) {
-    // ...
+    struct storage * sto = (struct storage *)(((void*)uio) + offsetof(struct devfs_storage_uio, sto));
+    sto->intf->fetch(sto, 0, buf, bufsz);
 }
 
 long devfs_storage_write(struct uio * uio, const void * buf, unsigned long buflen) {
-    // ...
+    struct storage * sto = (struct storage *)(((void*)uio) + offsetof(struct devfs_storage_uio, sto));
+    sto->intf->store(sto, 0, buf, buflen);
 }
 
 int devfs_storage_cntl(struct uio * uio, int op, void * arg) {
-    // ...
+    struct storage * sto = (struct storage *)(((void*)uio) + offsetof(struct devfs_storage_uio, sto));
+    sto->intf->cntl(sto, op, arg);
 }
 
 static int devfs_open_video(struct video * vid, struct uio ** uioptr){
