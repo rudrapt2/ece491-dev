@@ -6,11 +6,13 @@
 
 struct uio; // opaque decl.
 
+extern unsigned long uio_refcnt(const struct uio * uio);
 extern int uio_addref(struct uio * uio);
 extern void uio_close(struct uio * uio);
 extern long uio_read(struct uio * uio, void * buf, unsigned long bufsz);
 extern long uio_write(struct uio * uio, const void * buf, unsigned long buflen);
 extern int uio_cntl(struct uio * uio, int op, void * arg);
+extern void create_pipe(struct uio ** wptr, struct uio ** rptr);
 
 // IOCTL DEFINITIONS
 //

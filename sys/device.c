@@ -138,7 +138,7 @@ void devmgr_init(void) {
 }
 
 int register_device(const char * name, enum device_type type, void * device_struct) {
-    struct device_record ** dptr;
+    struct device_record ** dptr = &devlist;
     struct device_record * dev;
     size_t namesz;
     int instno = 0;
