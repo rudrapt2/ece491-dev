@@ -34,8 +34,8 @@ OBJS = \
 	thrasm.o \
 	thread.o \
 	timer.o \
-	trap.o
-#	syscall.o \
+	trap.o \
+	syscall.o 
 #	dev/viogpu.o \
 #	dev/viorng.o \
 #	dev/vioblk.o \
