@@ -233,21 +233,35 @@ int sysusleep(unsigned long us)
 int sysfscreate(const char *name)
 {
     int result = validate_vstr(name, PTE_U);
+    char *mpname;
+    char *flname;
 
     if (result != 0)
         return result;
 
-    return create_file(name);
+    result = parse_path(name, &mpname, &flname);
+
+    if (result != 0)
+        return result;
+
+    return create_file(mpname, flname);
 }
 
 int sysfsdelete(const char *name)
 {
     int result = validate_vstr(name, PTE_U);
+    char *mpname;
+    char *flname;
 
     if (result != 0)
         return result;
 
-    return delete_file(name);
+    result = parse_path(name, &mpname, &flname);
+
+    if (result != 0)
+        return result;
+
+    return delete_file(mpname, flname);
 }
 
 /**
@@ -263,6 +277,8 @@ int sysopen(int fd, const char *name)
     struct process *proc;
     struct uio *uio;
     int result;
+    char *mpname;
+    char *flname;
 
     trace("%s(fd=%d,name=%p,instno=%d)", __func__, fd, name, instno);
 
@@ -291,7 +307,12 @@ sysopen_fd_ok:
     if (result != 0)
         return result;
 
-    result = open_file(name, &uio);
+    result = parse_path(name, &mpname, &flname);
+
+    if (result != 0)
+        return result;
+
+    result = open_file(mpname, flname, &uio);
 
     if (result < 0)
         return result;
@@ -411,10 +432,11 @@ int sysioctl(int fd, int cmd, void *arg)
         uint8_t flags; ///< permissions
     } argdef[] = {     ///< definition of arguments for each ioctal
                   // [IOCTL_GETBLKSZ] = {0, 0},
-                  [IOCTL_GETPOS] = {sizeof(unsigned long long), PTE_W},
-                  [IOCTL_SETPOS] = {sizeof(unsigned long long), PTE_R},
-                  [IOCTL_GETEND] = {sizeof(unsigned long long), PTE_W},
-                  [IOCTL_SETEND] = {sizeof(unsigned long long), PTE_R}};
+                  [FCNTL_GETPOS] = {sizeof(unsigned long long), PTE_W},
+                  [FCNTL_SETPOS] = {sizeof(unsigned long long), PTE_R},
+                  [FCNTL_GETEND] = {sizeof(unsigned long long), PTE_W},
+                  [FCNTL_SETEND] = {sizeof(unsigned long long), PTE_R},
+                  [FCNTL_MMAP] = {sizeof(unsigned long long), PTE_W}};
 
     struct process *self;
     int result;
