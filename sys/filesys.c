@@ -101,7 +101,7 @@ int mount_nullfs(const char * name) {
     return attach_filesystem(name, (struct filesystem*)&nullfs);
 }
 
-int attach_filesystem(const char * mpname, struct filesystem * fs) {
+int attach_filesystem(const char * mpname, const struct filesystem * fs) {
     struct mountpoint ** mpptr;
     struct mountpoint * mp;
     size_t namelen;
@@ -121,7 +121,7 @@ int attach_filesystem(const char * mpname, struct filesystem * fs) {
     mp->fs = fs;
     *mpptr = mp;
 
-    return -ENOTSUP;
+    return 0;
 }
 
 // INTERNAL FUNCTION DEFINITIONS

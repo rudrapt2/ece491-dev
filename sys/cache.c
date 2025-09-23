@@ -101,6 +101,16 @@ static void cache_writeback_thrfn(struct cache * cache);
 // EXPORTED FUNCTION DEFINITIONS
 //
 
+
+//Helper for ktfs to get a reference to the backing device for arbitrary r/w.
+int cache_get_backing_device(struct cache * cache, struct storage ** disk){
+    if(cache == NULL)
+        return -EINVAL;
+
+    *(disk) = cache->disk;
+    return 0;
+}
+
 int create_cache(struct storage * disk, struct cache ** cptr) {
     struct cache * cache;
     int bkgblksz;
@@ -240,7 +250,7 @@ int cache_get_block(struct cache * cache, unsigned long long pos, void ** pptr) 
 
     *pptr = blkidx_to_blkptr(cache, i);
     debug("Reading block from 0x%llx into cache at %d (pblk = %lp)", pos, i, *pptr);
-    rcnt = ioreadat(cache->disk, pos, *pptr, CACHE_BLKSZ);
+    rcnt = storage_fetch(cache->disk, pos, *pptr, CACHE_BLKSZ);
 
     debug("%08lx: "
         "%02x %02x %02x %02x %02x %02x %02x %02x "
@@ -312,11 +322,10 @@ void cache_release_block(struct cache * cache, void * pblk, int dirty) {
     i = blkptr_to_blkidx(cache, pblk);
     ent = cache->entries + i;
     assert (ent->locked == 1);
-    assert (ent->refcnt > 0);
-    
+    assert (ent->refcnt > 0);  
     debug("Releasing block %d (pos = %llx) at %p", i, ent->pos, pblk);
 
-    if (dirty && !ent->dirty) {
+   if (dirty && !ent->dirty) {
         cache->dirty_cnt += 1;
         ent->dirty = 1;
     }
@@ -402,7 +411,7 @@ void cache_writeback_thrfn(struct cache * cache) {
 
                 debug("Writing dirty block 0x%llx to storage", ents[i].pos);
 
-                wcnt = iowriteat(cache->disk,
+                wcnt = storage_store(cache->disk,
                     ents[i].pos, blkidx_to_blkptr(cache, i), CACHE_BLKSZ);
                 
                 if (wcnt != CACHE_BLKSZ) {
