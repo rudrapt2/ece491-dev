@@ -4,9 +4,9 @@
 // SPDX-License-identifier: NCSA
 //
 
-#include "assert.h"
 #include "console.h"
 #include "intr.h"
+#include "misc.h"
 
 #include <stdarg.h>
 #include <stdint.h>
@@ -120,7 +120,6 @@ char * kgetsn(char * buf, size_t n) {
 
 void kprintf(const char * fmt, ...) {
     va_list ap;
-
     va_start(ap, fmt);
     kvprintf(fmt, ap);
     va_end(ap);
@@ -131,27 +130,6 @@ void kvprintf(const char * fmt, va_list ap) {
 
     pie = disable_interrupts();
     vgprintf(vprintf_putc, NULL, fmt, ap);
-    restore_interrupts(pie);
-}
-
-void klprintf (
-    const char * label,
-    const char * src_flname,
-    int src_lineno,
-    const char * fmt, ...)
-{
-    va_list ap;
-    int pie;
-
-    pie = disable_interrupts();
-
-    kprintf("%s %s:%d: ", label, src_flname, src_lineno);
-
-    va_start(ap, fmt);
-    kvprintf(fmt, ap);
-    kputc('\n');
-    va_end(ap);
-
     restore_interrupts(pie);
 }
 

@@ -4,7 +4,7 @@
 #include "uio.h"
 #include "uioimpl.h"
 #include "error.h"
-#include "assert.h"
+#include "misc.h"
 
 #include <stddef.h> // for NULL
 

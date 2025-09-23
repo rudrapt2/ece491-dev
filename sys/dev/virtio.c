@@ -3,9 +3,8 @@
 */
 
 #include "virtio.h"
-#include "assert.h"
-#include "console.h"
 #include "error.h"
+#include "misc.h"
 
 #include <stddef.h>
 
@@ -33,12 +32,12 @@ void attach_virtio(void * mmio_base, int irqno) {
         volatile struct virtio_mmio_regs * regs, int irqno); // viohi.c
 
     if (regs->magic_value != VIRTIO_MAGIC) {
-        kprintf("%p: No virtio magic number found\n", mmio_base);
+        debug("%p: No virtio magic number found\n", mmio_base);
         return;
     }
 
     if (regs->version != 2) {
-        kprintf("%p: Unexpected virtio version (found %u, expected %u)\n",
+        debug("%p: Unexpected virtio version (found %u, expected %u)\n",
             mmio_base, (unsigned int)regs->version, 2);
         return;
     }
@@ -71,7 +70,7 @@ void attach_virtio(void * mmio_base, int irqno) {
         viohi_attach(regs, irqno);
         break;
     default:
-        kprintf("%p: Unknown virtio device type %u ignored\n",
+        debug("%p: Unknown virtio device type %u ignored\n",
             mmio_base, (unsigned int) regs->device_id);
         return;
     }

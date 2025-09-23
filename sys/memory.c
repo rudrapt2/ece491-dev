@@ -18,7 +18,7 @@
 #include "riscv.h"
 #include "heap.h"
 #include "console.h"
-#include "assert.h"
+#include "misc.h"
 #include "string.h"
 #include "thread.h"
 #include "process.h"
@@ -569,7 +569,7 @@ int _ptab_reset(unsigned int lvl, struct pte * pt) {
                 if (lvl == 0) {
                     assert ((pt[i].flags & (PTE_W | PTE_X)) != 0);
                     // The if the page is in RAM, return it to the allocator
-                    if (_kimg_end <= pp && pp < RAM_END)
+                    if ((void*)_kimg_end <= pp && pp < RAM_END)
                         free_phys_page(pp);
                 } else {
                     assert (!PTE_LEAF(pt[i]));

@@ -89,6 +89,4 @@ extern void video_close(struct video * vid);
 extern void video_flush(struct video * vid);
 extern int video_cntl(struct video * vid, int op, void * arg);
 
-#define FCTL_VID_MAP_FBUF ((DEV_VIDEO << 16) | 0)
-
 #endif

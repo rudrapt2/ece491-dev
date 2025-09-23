@@ -11,10 +11,9 @@
 #include "string.h"
 #include "thread.h"
 #include "devimpl.h"
-#include "assert.h"
 #include "conf.h"
 #include "intr.h"
-#include "console.h"
+#include "misc.h"
 
 // INTERNAL CONSTANT DEFINITIONS
 //
@@ -112,7 +111,7 @@ void viorng_attach(volatile struct virtio_mmio_regs * regs, int irqno) {
         enabled_features, wanted_features, needed_features);
 
     if (result != 0) {
-        kprintf("%p: virtio feature negotiation failed\n", regs);
+        debug("%p: virtio feature negotiation failed\n", regs);
         return;
     }
 

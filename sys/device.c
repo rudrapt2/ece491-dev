@@ -11,9 +11,9 @@
 #include "error.h"
 #include "conf.h"
 #include "string.h"
-#include "assert.h"
+#include "misc.h"
 #include "heap.h"
-#include "misc.h" // ISPOW2
+#include "misc.h"
 
 #include <stddef.h>
 #include <limits.h> // INT_MAX
@@ -28,20 +28,28 @@
 
 struct device_record {
     struct device_record * next;
-    const char * name;
     int instno;
     enum device_type type;
     void * device_struct;
+    char name[];
 };
+
+// devfs listing uio object
 
 struct devfs_listing_uio {
     struct uio base;
     const struct device_record * dev;
 };
 
-struct devfs_serial_uio {
+struct serial_uio {
     struct uio base;
     struct serial * ser;
+};
+
+struct video_uio {
+    struct uio base;
+    struct video * vid;
+    // ...
 };
 
 // INTERNAL FUNCTION DECLARATIONS
@@ -54,28 +62,26 @@ static int devfs_open_listing(struct uio ** uioptr);
 
 static void devfs_listing_close(struct uio * uio);
 
-static void devfs_listing_read (
+static long devfs_listing_read (
     struct uio * uio, void * buf, unsigned long bufsz);
 
-static int devfs_open_device(const char * name, struct uio ** uioptr);
-static int devfs_open_serial(struct serial * ser, struct uio ** uioptr) {
-static int devfs_open_storage(struct storage * ser, struct uio ** uioptr) {
-static int devfs_open_video(struct video * ser, struct uio ** uioptr) {
+static int devfs_open_file(const char * name, struct uio ** uioptr);
 
-static void devfs_serial_close(struct uio * uio);
-static long devfs_serial_read(struct uio * uio, void * buf, unsigned long bufsz);
-static long devfs_serial_write(struct uio * uio, const void * buf, unsigned long buflen);
-static int devfs_serial_cntl(struct uio * uio, int op, void * arg);
+static int serial_open_uio(struct serial * ser, struct uio ** uioptr);
+static void serial_uio_close(struct uio * uio);
+static long serial_uio_read(struct uio * uio, void * buf, unsigned long bufsz);
+static long serial_uio_write(struct uio * uio, const void * buf, unsigned long buflen);
 
-static void devfs_storage_close(struct uio * uio);
-static long devfs_storage_read(struct uio * uio, void * buf, unsigned long bufsz);
-static long devfs_storage_write(struct uio * uio, const void * buf, unsigned long buflen);
-static int devfs_storage_cntl(struct uio * uio, int op, void * arg);
+static int storage_open_uio(struct storage * sto, struct uio ** uioptr);
+static void storage_uio_close(struct uio * uio);
+static long storage_uio_read(struct uio * uio, void * buf, unsigned long bufsz);
+static long storage_uio_write(struct uio * uio, const void * buf, unsigned long buflen);
+static int storage_uio_cntl(struct uio * uio, int op, void * arg);
 
-static void devfs_video_close(struct uio * uio);
-static long devfs_video_read(struct uio * uio, void * buf, unsigned long bufsz);
-static long devfs_video_write(struct uio * uio, const void * buf, unsigned long buflen);
-static int devfs_video_cntl(struct uio * uio, int op, void * arg);
+static int video_open_uio(struct video * vid, struct uio ** uioptr);
+static void video_uio_close(struct uio * uio);
+static long video_uio_write(struct uio * uio, const void * buf, unsigned long buflen);
+static int video_uio_cntl(struct uio * uio, int op, void * arg);
 
 // EXPORTED GLOBAL VARIABLES
 //
@@ -94,29 +100,28 @@ static const struct filesystem devfs = {
 // Array of /uio_intf/ structures indexed by device type. The first entry,
 // corresponding to DEV_UNDEF is for /devfs_listing_uio/.
 
-static const struct uio_intf devfs_uio_intfs[] = {
-    [DEV_UNDEF] = {
-        .close = &devfs_listing_close,
-        .read = &devfs_listing_read
-    },
-    [DEV_SERIAL] = {
-        .close = &devfs_serial_close,
-        .read = &devfs_serial_read,
-        .write = &devfs_serial_write,
-        .cntl = &devfs_serial_cntl
-    },
-    [DEV_STORAGE] = {
-        .close = &devfs_storage_close,
-        .read = &devfs_storage_read,
-        .write = &devfs_storage_write,
-        .cntl = &devfs_storage_cntl
-    },
-    [DEV_VIDEO] = {
-        .close = &devfs_video_close,
-        .read = &devfs_video_read,
-        .write = &devfs_video_write,
-        .cntl = &devfs_video_cntl
-    }
+static const struct uio_intf devfs_listing_uio_intf = {
+    .close = &devfs_listing_close,
+    .read = &devfs_listing_read
+};
+
+static const struct uio_intf serial_uio_intf = {
+    .close = &serial_uio_close,
+    .read = &serial_uio_read,
+    .write = &serial_uio_write
+};
+
+static const struct uio_intf storage_uio_intf = {
+    .close = &storage_uio_close,
+    .read = &storage_uio_read,
+    .write = &storage_uio_write,
+    .cntl = &storage_uio_cntl
+};
+
+static const struct uio_intf video_uio_intf = {
+    .close = &video_uio_close,
+    .write = &video_uio_write,
+    .cntl = &video_uio_cntl
 };
 
 // EXPORTED FUNCTION DEFINITIONS
@@ -130,7 +135,7 @@ void devmgr_init(void) {
 int register_device(const char * name, enum device_type type, void * device_struct) {
     struct device_record ** dptr;
     struct device_record * dev;
-    size_t namesz;
+    size_t namelen;
     int instno = 0;
 
     assert (devmgr_initialized);
@@ -152,16 +157,19 @@ int register_device(const char * name, enum device_type type, void * device_stru
     // the list (if not list is not empty) or to /devlist/ if the list is empty
     // (devlist == NULL).
 
-    while (*dptr != NULL) {
-        instno += (strcmp(name, (*dptr)->name) == 0);
-        dptr = &(*dptr)->next;
+    dptr = &devlist;
+    while ((dev = *dptr) != NULL) {
+        instno += (strcmp(name, dev->name) == 0);
+        dptr = &dev->next;
     }
 
     // Allocate device_record struct and fill it in.
 
-    dev = kcalloc(1, sizeof(*dev));
+    namelen = strlen(name);
+    dev = kmalloc(sizeof(*dev) + namelen+1);
+    memset(dev, 0, sizeof(*dev));
 
-    dev->name = name;
+    strncpy(dev->name, name, namelen+1);
     dev->instno = instno;
     dev->type = type;
     dev->device_struct = device_struct;
@@ -173,9 +181,6 @@ int register_device(const char * name, enum device_type type, void * device_stru
 }
 
 void * find_device(const char * name, enum device_type type, int instno) {
-struct device_record * find_device_record (
-    const char * name, enum device_type type, int instno)
-{
     struct device_record * dev;
 
     trace("%s(%s/%s%d)", __func__, device_type_short_name(type), name, instno);
@@ -192,8 +197,6 @@ struct device_record * find_device_record (
 
     debug("Device %s/%s%d not found", device_type_short_name(type), name, instno);
     return NULL;
-}
-
 }
 
 const char * device_type_short_name(enum device_type type) {
@@ -352,7 +355,7 @@ int video_cntl(struct video * vid, int op, void * arg) {
 }
 
 int mount_devfs(const char * name) {
-    return mount_fs(name, (struct filesystem*)&devfs);
+    return attach_filesystem(name, (struct filesystem*)&devfs);
 }
 
 // INTERNAL FUNCTION DEFINITIONS
@@ -375,7 +378,7 @@ int devfs_open_listing(struct uio ** uioptr) {
     ls->dev = devlist;
 
     // Note: The listing uio_intf is at index DEV_UNDEF in /devfs_uio_intfs/.
-    *uioptr = uio_init1(&ls->base, devfs_uio_intfs + DEV_UNDEF);
+    *uioptr = uio_init1(&ls->base, &devfs_listing_uio_intf);
 
     return 0;
 }
@@ -385,7 +388,7 @@ void devfs_listing_close(struct uio * uio) {
     kfree(ls);
 }
 
-void devfs_listing_read (
+long devfs_listing_read (
     struct uio * uio, void * buf, unsigned long bufsz)
 {
     struct devfs_listing_uio * const ls = (struct devfs_listing_uio*)uio;
@@ -399,7 +402,7 @@ void devfs_listing_read (
         return 0;
 }
 
-int devfs_open_device(const char * name, struct uio ** uioptr) {
+int devfs_open_file(const char * name, struct uio ** uioptr) {
     const char * dp = NULL; // position of trailing sequence of digits
     const char * s; // position in string
     struct device_record * dev;
@@ -429,11 +432,11 @@ int devfs_open_device(const char * name, struct uio ** uioptr) {
         {
             switch (dev->type) {
             case DEV_SERIAL:
-                return devfs_open_serial(dev->device_struct, uioptr);
+                return serial_open_uio(dev->device_struct, uioptr);
             case DEV_STORAGE:
-                return devfs_open_storage(dev->device_struct, uioptr);
+                return storage_open_uio(dev->device_struct, uioptr);
             case DEV_VIDEO:
-                return devfs_open_serial(dev->device_struct, uioptr);
+                return video_open_uio(dev->device_struct, uioptr);
             default:
                 panic("Bad device type");
             }
@@ -443,54 +446,76 @@ int devfs_open_device(const char * name, struct uio ** uioptr) {
     return -ENOENT;
 }
 
-static int devfs_open_serial(struct serial * ser, struct uio ** uioptr) {
+int serial_open_uio(struct serial * ser, struct uio ** uioptr) {
+    struct serial_uio * suio;
+    int result;
+
+    // Try to open device
+
+    result = serial_open(ser);
+
+    if (result != 0)
+        return result;
+    
+    suio = kcalloc(1, sizeof(*suio));
+
+    suio->ser = ser;
+    *uioptr = uio_init1(&suio->base, &serial_uio_intf);
+    return 0;
+}
+
+void serial_uio_close(struct uio * uio) {
+    struct serial_uio * suio = (struct serial_uio*)uio;
+
+    serial_close(suio->ser);
+    kfree(suio);
+}
+
+long serial_uio_read(struct uio * uio, void * buf, unsigned long bufsz) {
+    struct serial_uio * suio = (struct serial_uio*)uio;
+    return serial_recv(suio->ser, buf, bufsz);
+}
+
+long serial_uio_write(struct uio * uio, const void * buf, unsigned long buflen) {
+    struct serial_uio * suio = (struct serial_uio*)uio;
+    return serial_send(suio->ser, buf, buflen);
+}
+
+int storage_open_uio(struct storage * sto, struct uio ** uioptr) {
+    return -ENOTSUP;
+}
+
+void storage_uio_close(struct uio * uio) {
     // ...
 }
 
-void devfs_serial_close(struct uio * uio) {
+long storage_uio_read(struct uio * uio, void * buf, unsigned long bufsz) {
+    // ...
+    return -ENOTSUP;
+}
+
+long storage_uio_write(struct uio * uio, const void * buf, unsigned long buflen) {
+    // ...
+    return -ENOTSUP;
+}
+
+int storage_uio_cntl(struct uio * uio, int op, void * arg) {
+    // ...
+    return -ENOTSUP;
+}
+
+int video_open_uio(struct video * vid, struct uio ** uioptr) {
+    return -ENOTSUP;
+}
+
+void video_uio_close(struct uio * uio) {
     // ...
 }
 
-long devfs_serial_read(struct uio * uio, void * buf, unsigned long bufsz) {
-    // ...
+long video_uio_write(struct uio * uio, const void * buf, unsigned long buflen) {
+    return -ENOTSUP;
 }
 
-long devfs_serial_write(struct uio * uio, const void * buf, unsigned long buflen) {
-    // ...
-}
-
-int devfs_serial_cntl(struct uio * uio, int op, void * arg) {
-    // ...
-}
-
-void devfs_storage_close(struct uio * uio) {
-    // ...
-}
-
-long devfs_storage_read(struct uio * uio, void * buf, unsigned long bufsz) {
-    // ...
-}
-
-long devfs_storage_write(struct uio * uio, const void * buf, unsigned long buflen) {
-    // ...
-}
-
-int devfs_storage_cntl(struct uio * uio, int op, void * arg) {
-    // ...
-}
-
-void devfs_video_close(struct uio * uio) {
-    // ...
-}
-
-long devfs_video_read(struct uio * uio, void * buf, unsigned long bufsz) {
-    // ...
-}
-
-long devfs_video_write(struct uio * uio, const void * buf, unsigned long buflen) {
-    // ...
-}
-
-int devfs_video_cntl(struct uio * uio, int op, void * arg) {
-    // ...
+int video_uio_cntl(struct uio * uio, int op, void * arg) {
+    return -ENOTSUP;
 }

@@ -19,5 +19,38 @@
 
 #define ISPOW2(n) (((n)&((n)-1)) == 0)
 
+// The panic() macro prints a message to the console and halts the system.
+
+extern void __attribute__ ((noreturn)) panic_actual (
+    const char * filename, int lineno, const char * msg);
+
+#define panic(msg) do { \
+    panic_actual(__FILE__, __LINE__, (msg)); \
+} while(0)
+
+// The assert() macro tests if a statement is true. If it is not, it prints an
+// assertion error to the console and halts the system.
+
+extern void __attribute__ ((noreturn)) assert_failed (
+    const char * filename, int lineno, const char * stmt);
+
+#define assert(c) do { \
+    if (!(c)) { \
+        assert_failed(__FILE__, __LINE__, #c); \
+    } \
+} while (0)
+
+
+#ifdef DEBUG
+#define debug(...) debug_actual(__FILE__, __LINE__, __VA_ARGS__)
+#else
+#define debug(...) do {} while(0)
+#endif
+
+#ifdef TRACE
+#define trace(...) trace_actual(__FILE__, __LINE__, __VA_ARGS__)
+#else
+#define trace(...) do {} while(0)
+#endif
 
 #endif // _MISC_H_
