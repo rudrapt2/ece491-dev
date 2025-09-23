@@ -101,21 +101,21 @@ static void cache_writeback_thrfn(struct cache * cache);
 // EXPORTED FUNCTION DEFINITIONS
 //
 
-int create_cache(struct io * bkgio, struct cache ** cptr) {
+int create_cache(struct storage * disk, struct cache ** cptr) {
     struct cache * cache;
     int bkgblksz;
     int i;
 
-    trace("%s(%p)", __func__, bkgio);
+    trace("%s(%p)", __func__, disk);
 
     // Get backing device block size. Make sure it divides cache block size.
 
-    bkgblksz = ioblksz(bkgio);
+    bkgblksz = ioblksz(disk);
     assert (bkgblksz < 0 || CACHE_BLKSZ % bkgblksz == 0);
 
     cache = kcalloc(1, sizeof(struct cache));
 
-    cache->disk = xxx;
+    cache->disk = disk;
     condition_init(&cache->unlocked, "cache.unlocked");
     condition_init(&cache->evictable, "cache.evictable");
     condition_init(&cache->writable, "cache.writable");
@@ -240,7 +240,7 @@ int cache_get_block(struct cache * cache, unsigned long long pos, void ** pptr) 
 
     *pptr = blkidx_to_blkptr(cache, i);
     debug("Reading block from 0x%llx into cache at %d (pblk = %lp)", pos, i, *pptr);
-    rcnt = ioreadat(cache->bkgio, pos, *pptr, CACHE_BLKSZ);
+    rcnt = ioreadat(cache->disk, pos, *pptr, CACHE_BLKSZ);
 
     debug("%08lx: "
         "%02x %02x %02x %02x %02x %02x %02x %02x "
@@ -402,7 +402,7 @@ void cache_writeback_thrfn(struct cache * cache) {
 
                 debug("Writing dirty block 0x%llx to storage", ents[i].pos);
 
-                wcnt = iowriteat(cache->bkgio,
+                wcnt = iowriteat(cache->disk,
                     ents[i].pos, blkidx_to_blkptr(cache, i), CACHE_BLKSZ);
                 
                 if (wcnt != CACHE_BLKSZ) {
