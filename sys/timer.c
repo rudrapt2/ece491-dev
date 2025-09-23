@@ -16,10 +16,13 @@
 #include "timer.h"
 #include "thread.h"
 #include "riscv.h"
-#include "assert.h"
 #include "intr.h"
 #include "conf.h"
 #include "see.h" // for set_stcmp
+#include "misc.h"
+
+
+#include <stddef.h>
 
 // EXPORTED GLOBAL VARIABLE DEFINITIONS
 // 

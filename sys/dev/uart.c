@@ -13,13 +13,13 @@
 #endif
 
 #include "conf.h"
-#include "assert.h"
 #include "uart.h"
 #include "devimpl.h"
 #include "intr.h"
 #include "heap.h"
 #include "thread.h"
 #include "console.h"
+#include "misc.h"
 
 #include "error.h"
 

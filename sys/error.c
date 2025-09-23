@@ -13,7 +13,6 @@ extern const char * error_name(int code) {
         [EINVAL] = "EINVAL",
         [EBUSY] = "EBUSY",
         [ENOTSUP] = "ENOTSUP",
-        [ENODEV] = "ENODEV",
         [EIO] = "EIO",
         [EBADFMT] = "EBADFMT",
         [ENOENT] = "ENOENT",
@@ -23,7 +22,8 @@ extern const char * error_name(int code) {
         [EMPROC] = "EMPROC",
         [EMTHR] = "EMTHR",
         [ECHILD] = "ECHILD",
-        [ENOMEM] = "ENOMEM"
+        [ENOMEM] = "ENOMEM",
+        [EEXIST] = "EEXIST"
     };
 
     const char * name;

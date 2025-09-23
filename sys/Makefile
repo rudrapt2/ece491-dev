@@ -11,7 +11,7 @@ OBJCOPY=$(PREFIX)objcopy
 OBJDUMP=$(PREFIX)objdump
 
 OBJS = \
-	assert.o \
+    misc.o \
 	console.o \
 	dev/uart.o \
 	dev/rtc.o \
@@ -84,7 +84,7 @@ QEMUOPTS += -serial mon:stdio
 QEMUOPTS += -serial pty
 QEMUOPTS += -serial pty
 QEMUOPTS += -serial pty
-QEMUOPTS += -drive file=ktfs.raw,id=blk0,if=none,format=raw,readonly=false
+QEMUOPTS += -drive file=/dev/null,id=blk0,if=none,format=raw,readonly=false
 QEMUOPTS += -device virtio-blk-device,drive=blk0
 #QEMUOPTS += -device virtio-gpu-device -display gtk
 

@@ -19,7 +19,6 @@
 #endif
 
 #include "conf.h"
-#include "assert.h"
 #include "process.h"
 #include "elf.h"
 #include "filesys.h"
@@ -31,6 +30,7 @@
 #include "memory.h"
 #include "heap.h"
 #include "error.h"
+#include "misc.h"
 
 // COMPILE-TIME PARAMETERS
 //
@@ -118,7 +118,7 @@ int process_exec(struct uio * exefile, int argc, char ** argv) {
     uio_close(exefile);
 
     if (result != 0) {
-        kprintf("exec: elf_load: %s\n", error_name(result));
+        debug("exec: elf_load: %s\n", error_name(result));
         process_exit();
     }
 
