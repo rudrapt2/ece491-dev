@@ -13,7 +13,6 @@
 #endif
 
 #include "cache.h"
-#include "assert.h"
 #include "conf.h"
 #include "device.h"
 #include "memory.h"
@@ -21,6 +20,7 @@
 #include "string.h"
 #include "thread.h"
 #include "heap.h"
+#include "misc.h"
 
 #define CACHE_CAPACITY 64 // must be power of two
 

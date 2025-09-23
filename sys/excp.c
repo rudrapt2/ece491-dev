@@ -16,9 +16,9 @@
 #include "thread.h"
 #include "intr.h"
 #include "console.h"
-#include "assert.h"
 #include "process.h"
 #include "string.h"
+#include "misc.h"
 
 #include <stddef.h>
 

@@ -15,10 +15,10 @@
 #include "intr.h"
 #include "trap.h"
 #include "riscv.h"
-#include "assert.h"
 #include "plic.h"
 #include "timer.h"
 #include "thread.h"
+#include "misc.h"
 
 #include <stddef.h>
 

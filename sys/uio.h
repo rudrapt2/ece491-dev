@@ -14,15 +14,20 @@ extern long uio_write(struct uio * uio, const void * buf, unsigned long buflen);
 extern int uio_cntl(struct uio * uio, int op, void * arg);
 extern void create_pipe(struct uio ** wptr, struct uio ** rptr);
 
-// IOCTL DEFINITIONS
+// FNCTL OP CONSTANTS
 //
 
-#define IOCTL_GETEND 0 // arg is unsigned long long *
-#define IOCTL_SETEND 1 // arg is unsigned long long *
-#define IOCTL_GETPOS 2 // arg is unsigned long long *
-#define IOCTL_SETPOS 3 // arg is unsigned long long *
+#define FCNTL_GETEND 0 // arg is unsigned long long *
+#define FCNTL_SETEND 1 // arg is unsigned long long *
+#define FCNTL_GETPOS 2 // arg is unsigned long long *
+#define FCNTL_SETPOS 3 // arg is unsigned long long *
 
-// Returns a pointer to a null uio object, which supports the following operations:
+#define FCNTL_MMAP   4 // arg is void **
+
+// See also device.h for device-specific FNCTL values
+
+// The create_null_uio() function returns a pointer to a null_uio uio object,
+// which supports the following operations:
 //
 //    close(): decrements reference count
 //     read(): returns 0

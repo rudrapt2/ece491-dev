@@ -18,8 +18,8 @@
 #include "uio.h"
 #include "string.h"
 #include "memory.h"
-#include "assert.h"
 #include "error.h"
+#include "misc.h"
 
 #include <stdint.h>
 
@@ -135,7 +135,7 @@ int elf_load(struct uio * uio, void (**eptr)(void)) {
 
     // Get ELF file length
 
-    result = uio_cntl(uio, IOCTL_GETEND, &size);
+    result = uio_cntl(uio, FCNTL_GETEND, &size);
 
     if (result != 0)
         return result;
@@ -208,7 +208,7 @@ int elf_load(struct uio * uio, void (**eptr)(void)) {
     for (phidx = 0; phidx < ehdr.e_phnum; phidx++) {
         pos = ehdr.e_phoff + (uint64_t)phidx * ehdr.e_phentsize;
         
-        result = uio_cntl(uio, IOCTL_GETPOS, &pos);
+        result = uio_cntl(uio, FCNTL_GETPOS, &pos);
 
         if (result != 0)
             return result;
@@ -298,7 +298,7 @@ int elf_load(struct uio * uio, void (**eptr)(void)) {
                 phidx, phdr.p_filesz, (void*)phdr.p_vaddr, phdr.p_offset);
             
             pos = phdr.p_offset;
-            result = uio_cntl(uio, IOCTL_SETPOS, &pos);
+            result = uio_cntl(uio, FCNTL_SETPOS, &pos);
 
             if (result != 0)
                 return result;

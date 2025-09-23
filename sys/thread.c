@@ -22,8 +22,8 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdarg.h>
 
-#include "assert.h"
 #include "heap.h"
 #include "string.h"
 #include "riscv.h"
@@ -31,8 +31,8 @@
 #include "process.h"
 #include "memory.h"
 #include "error.h"
-
-#include <stdarg.h>
+#include "misc.h"
+#include "see.h"
 
 // COMPILE-TIME PARAMETERS
 //

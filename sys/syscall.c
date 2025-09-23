@@ -13,7 +13,6 @@
 #endif
 
 #include "conf.h"
-#include "assert.h"
 #include "scnum.h"
 #include "process.h"
 #include "memory.h"
@@ -25,6 +24,7 @@
 #include "error.h"
 #include "thread.h"
 #include "process.h"
+#include "misc.h"
 
 // EXPORTED FUNCTION DECLARATIONS
 //

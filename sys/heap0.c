@@ -16,7 +16,7 @@
 #include "heap.h"
 #include "string.h"
 #include "riscv.h"
-#include "assert.h"
+#include "misc.h"
 
 #include <stddef.h>
 #include <stdint.h>
