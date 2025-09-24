@@ -1,5 +1,5 @@
 #include <stdint.h>
-#include "ioimpl.h"
+#include "uioimpl.h"
 
 #define KTFS_BLKSZ              512
 #define KTFS_INOSZ              32

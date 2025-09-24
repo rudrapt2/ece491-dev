@@ -7,15 +7,18 @@
 #endif
 
 #include "heap.h"
-#include "fs.h"
-#include "ioimpl.h"
+#include "filesys.h"
+#include "uioimpl.h"
 #include "ktfs.h"
 #include "error.h"
 #include "thread.h"
 #include "string.h"
 #include "console.h"
 #include "cache.h"
-#include "io.h"
+#include "uio.h"
+#include "device.h"
+#include "devimpl.h"
+#include "fsimpl.h"
 
 // INTERNAL TYPE DEFINITIONS
 //
@@ -26,31 +29,33 @@
 // };
 
 struct ktfs_file {
-    struct io io;
+    struct uio uio;
     struct ktfs_dir_entry dentry;
     struct ktfs_file * prev;
     struct ktfs_file * next;
     uint32_t file_size;
     uint8_t flag;
+    unsigned long pos;// add pos
 };
 
 // INTERNAL FUNCTION DECLARATIONS
 //
 
-int ktfs_mount(struct io * io);
-int ktfs_open(const char * name, struct io ** ioptr);
-void ktfs_close(struct io* io);
-long ktfs_read(struct io* io, void* buf, long n);
-int ktfs_cntl(struct io* io, int cmd, void* arg);
-long ktfs_readat(struct io* io, unsigned long long pos, void * buf, long len); 
-long ktfs_writeat(struct io* io, unsigned long long pos, const void * buf, long len);
-int ktfs_create(const char* name);
-int ktfs_delete(const char* name);
-int ktfs_flush(void);
+int ktfs_mount(struct cache * cache);
+int ktfs_open(struct filesystem * fs, const char * name, struct uio ** uioptr);
+void ktfs_close(struct uio* uio);
+int ktfs_cntl(struct uio* uio, int cmd, void* arg);
+long ktfs_fetch(struct uio* uio, void * buf, unsigned long len); 
+long ktfs_store(struct uio* uio, const void * buf, unsigned long len);
+int ktfs_create(struct filesystem * fs, const char* name);
+int ktfs_delete(struct filesystem * fs, const char* name);
+void ktfs_flush(struct filesystem * fs);
 
 int ktfs_getblksz(struct ktfs_file *fd);
 int ktfs_getend(struct ktfs_file *fd, void *arg);
 int ktfs_setend(struct ktfs_file *fd, void *arg);
+int ktfs_setpos(struct ktfs_file *fd, void *arg);
+int ktfs_getpos(struct ktfs_file *fd, void *arg);
 
 // Interal helper functions
 uint64_t inode_number_to_absolute_position(uint16_t inode_number);
@@ -83,7 +88,7 @@ static inline int max(int a, int b) {
 static struct lock fs_lock;
 
 static struct cache * ktfs_block_cache;
-static struct io * ktfs_backing_device;
+static struct storage * ktfs_backing_device;
 static struct ktfs_superblock superblock;
 
 static struct ktfs_free_inode_elem * free_inode_list;
@@ -96,46 +101,45 @@ static uint16_t max_num_of_inodes;
 #define INODE_BLOCK (BITMAP_BLOCK + superblock.bitmap_block_count)
 #define DATA_BLOCK (INODE_BLOCK + superblock.inode_block_count)
 
-static const struct iointf fs_intf = {
+static const struct uio_intf file_intf = {
     .close = &ktfs_close,
     .cntl = &ktfs_cntl,
-    .read = NULL,
-    .write = NULL,
-    .readat = &ktfs_readat,
-    .writeat = &ktfs_writeat
+    .read = &ktfs_fetch,
+    .write = &ktfs_store
+    // .readat = &ktfs_readat,
+    // .writeat = &ktfs_writeat
 };
 
-// EXPORTED FUNCTION DEFINITIONS
-//
+static const struct filesystem fs_intf = {
+    .open = &ktfs_open,
+    .create = &ktfs_create,
+    .delete = &ktfs_delete,
+    .flush = &ktfs_flush
+};
 
-int fsmount(struct io * io)
-    __attribute__ ((alias("ktfs_mount")));
-
-int fsopen(const char * name, struct io ** ioptr)
-    __attribute__ ((alias("ktfs_open")));
-
-int fscreate(const char * name)
-    __attribute__ ((alias("ktfs_create")));
-
-int fsdelete(const char* name)
-    __attribute__ ((alias("ktfs_delete")));
-
-int fsflush(void)
-    __attribute__ ((alias("ktfs_flush")));
 
 /**
  * @brief Mounts the hard drive represented by the io object as a filesystem
  * @param io the io object to get the raw filesystem image from (e.g. block device io)
  * @return 0 if mount successful, negative values if there's error.
  */
-int ktfs_mount(struct io * io) {
+int mount_ktfs(const char * name, struct cache * cache) {
     struct ktfs_inode root_directory;
-    if(io == NULL)
+    if(cache == NULL)
         return -ENODEV;
 
+    if(name == NULL)
+        return -EINVAL;
+
     lock_init(&fs_lock);
-    ktfs_backing_device = ioaddref(io);
-    create_cache(io, &ktfs_block_cache);
+
+    int result = attach_filesystem(name, &fs_intf);
+    if(result != 0)
+        return result;
+
+    ktfs_block_cache = cache;
+    
+    cache_get_backing_device(cache, &ktfs_backing_device);
 
     // loads the super block to memory
     arbitrary_read(0, &superblock, sizeof(struct ktfs_superblock));
@@ -156,7 +160,7 @@ int ktfs_mount(struct io * io) {
     for(uint64_t i = 0; i < root_directory.size / KTFS_DENSZ; i++) {
         // create a new file struct
         struct ktfs_file * new_file = kmalloc(sizeof(struct ktfs_file));
-        ioinit0(&(new_file->io), &fs_intf);
+        uio_init0(&(new_file->uio), &file_intf);
         new_file->flag = 0;
 
         // get the address of the current dentry 
@@ -181,6 +185,7 @@ int ktfs_mount(struct io * io) {
 
         new_file->prev = NULL;
         files_list = new_file;
+        new_file->pos = 0;
     }
     return 0;
 }
@@ -192,7 +197,7 @@ int ktfs_mount(struct io * io) {
  * @param ioptr will return a pointer to a file io object through this double pointer 
  * @return 0 if open successful, negative values if there's error.
  */
-int ktfs_open(const char * name, struct io ** ioptr) {
+int ktfs_open(struct filesystem * fs, const char * name, struct uio ** uioptr) {
     for(struct ktfs_file* curr_file = files_list; curr_file != NULL; curr_file = curr_file->next){
         // found file in filesystem
         if (strncmp(name, curr_file->dentry.name, KTFS_MAX_FILENAME_LEN) == 0){
@@ -202,7 +207,7 @@ int ktfs_open(const char * name, struct io ** ioptr) {
             curr_file->flag |= FILE_OPENED;
             // ioaddref(&curr_file->io);
             // wrap in a seekio
-            *ioptr = create_seekable_io(&curr_file->io);
+            *uioptr = &curr_file->uio;
             return 0;
         }
     }
@@ -217,22 +222,22 @@ int ktfs_open(const char * name, struct io ** ioptr) {
  * @param io the file io of the file to close
  * @return None
  */
-void ktfs_close(struct io* io) {
-    struct ktfs_file* curr_file = (void*)io - offsetof(struct ktfs_file, io);
+void ktfs_close(struct uio* uio) {
+    struct ktfs_file* curr_file = (void*)uio - offsetof(struct ktfs_file, uio);
     curr_file->flag &= ~FILE_OPENED;
 }
 
-long ktfs_readat(struct io *io, unsigned long long pos, void *buf, long len) {
+long ktfs_fetch(struct uio *uio, void *buf, unsigned long len) {
     long total_num_bytes_to_read = len;
-
     trace("%s(%p,%ld)", __func__, buf, len);
-
+    
     // Check for bad inputs
-    if (!io || !buf || len < 0) {
+    if (!uio || !buf || len < 0) {
         return -EINVAL;
     }
     
-    struct ktfs_file* f = (void*)io - offsetof(struct ktfs_file, io);
+    struct ktfs_file* f = (void*)uio - offsetof(struct ktfs_file, uio);
+    long pos = f->pos;
     int file_opened = f->flag & FILE_OPENED;
     if (!file_opened) {
         return -EBADFD;
@@ -262,13 +267,16 @@ long ktfs_readat(struct io *io, unsigned long long pos, void *buf, long len) {
         num_bytes_left_to_read -= read_len;
         pos += read_len;
     }
+    f->pos = pos;
 
     return num_bytes_read;
 }
 
-long ktfs_writeat(struct io* io, unsigned long long pos, const void* buf, long len){
-    struct ktfs_file* f = (void*) io - offsetof(struct ktfs_file, io);
+long ktfs_store(struct uio* uio, const void* buf, unsigned long len){
+    struct ktfs_file* f = (void*) uio - offsetof(struct ktfs_file, uio);
     int file_opened = f->flag & FILE_OPENED;
+    long pos = f->pos;
+
     if (!file_opened){
         return -EBADFD;
     }
@@ -295,10 +303,11 @@ long ktfs_writeat(struct io* io, unsigned long long pos, const void* buf, long l
         num_bytes_left_to_write -= write_len;
         pos += write_len;
     }
+    f->pos = pos;
     return num_bytes_written;
 }
 
-int ktfs_create(const char* name) {
+int ktfs_create(struct filesystem * fs, const char* name) {
     struct ktfs_inode root_directory;
     if (!name || strlen(name) > KTFS_MAX_FILENAME_LEN) {
         return -EINVAL;
@@ -319,7 +328,7 @@ int ktfs_create(const char* name) {
 
     // Create the new file
     struct ktfs_file* new_file = kmalloc(sizeof(struct ktfs_file));
-    ioinit0(&(new_file->io), &fs_intf);
+    uio_init0(&(new_file->uio), &file_intf);
     new_file->flag = 0;
     new_file->file_size = 0;
     memset(&(new_file->dentry), 0, sizeof(struct ktfs_dir_entry));
@@ -357,7 +366,7 @@ int ktfs_create(const char* name) {
     return 0;
 }
 
-int ktfs_delete(const char* name) {
+int ktfs_delete(struct filesystem * fs, const char* name) {
     struct ktfs_file* f;
     int i;
     uint32_t data_block_idx, data_block_offset, data_block_num;
@@ -459,20 +468,25 @@ int ktfs_delete(const char* name) {
  * @param arg the argument to pass in, maybe different for different control functions
  * @return depends on specific control functions
  */
-int ktfs_cntl(struct io *io, int cmd, void *arg) {
-    struct ktfs_file * f = (struct ktfs_file *)io;
+int ktfs_cntl(struct uio *uio, int cmd, void *arg) {
+    // struct ktfs_file * f = (struct ktfs_file *)uio;
+    struct ktfs_file* f = (void*) uio - offsetof(struct ktfs_file, uio);
     int file_opened = f->flag & FILE_OPENED;
     if (!file_opened) {
         return -EBADFD;
     }
 
     switch (cmd) {
-    case IOCTL_GETBLKSZ:
-        return ktfs_getblksz(f);
-    case IOCTL_GETEND:
+//    case FCNTL_GETBLKSZ:              wait on prof before putting back in
+//        return ktfs_getblksz(f);
+    case FCNTL_GETEND:
         return ktfs_getend(f, arg);
-    case IOCTL_SETEND:
+    case FCNTL_SETEND:
         return ktfs_setend(f, arg);
+    case FCNTL_SETPOS:
+        return ktfs_setpos(f, arg);
+    case FCNTL_GETPOS:
+        return ktfs_getpos(f, arg);
     default:
         return -EINVAL;
     }
@@ -536,15 +550,33 @@ int ktfs_setend(struct ktfs_file *fd, void *arg) {
     return 0;
 }
 
+int ktfs_getpos(struct ktfs_file * fd, void * arg){
+    if(arg == NULL)
+        return -EINVAL;
+
+    *((unsigned long*)arg) = fd->pos;
+    return 0;
+}
+
+int ktfs_setpos(struct ktfs_file * fd, void * arg){
+    if(arg == NULL)
+        return -EINVAL;
+
+    fd->pos = *((unsigned long*)arg);
+    return 0;
+}
+
 /**
  * @brief Flushes the cache to the backing device
  * @return 0 if flush successful, negative values if there's an error.
  */
-int ktfs_flush(void) {
+void ktfs_flush(struct filesystem * fs) {
     if (ktfs_block_cache == NULL) {
-        return -EINVAL;
+        return;
     }
-    return cache_flush(ktfs_block_cache);
+    
+    cache_flush(ktfs_block_cache);
+    return;
 }
 
 /// @brief Converts an inode number to its absolute position in the filesystem.
@@ -576,7 +608,7 @@ long arbitrary_read(unsigned long pos, void* buf, long bufsz) {
     
     // Get the size of the filesystem and truncate the read if necessary
     uint64_t fs_size;
-    ioctl(ktfs_backing_device, IOCTL_GETEND, &fs_size);
+    storage_cntl(ktfs_backing_device, FCNTL_GETEND, &fs_size);
     const unsigned long bytes_to_read = (pos >= fs_size) ? 0 : min(bufsz, fs_size - pos);
     unsigned long bytes_remaining = bytes_to_read;
 
@@ -619,7 +651,7 @@ long arbitrary_write(unsigned long pos, void* buf, long len) {
     
     // Get the size of the filesystem and truncate the write if necessary
     uint64_t fs_size;
-    ioctl(ktfs_backing_device, IOCTL_GETEND, &fs_size);
+    storage_cntl(ktfs_backing_device, FCNTL_GETEND, &fs_size);
     const unsigned long bytes_to_write = (pos >= fs_size) ? 0 : min(len, fs_size - pos);
     unsigned long bytes_remaining = bytes_to_write;
 

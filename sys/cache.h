@@ -8,9 +8,14 @@
 #define _CACHE_H_
 
 #define CACHE_BLKSZ 512UL // size of cache block
+#define CACHE_DIRTY 1
+#define CACHE_CLEAN 0
 
 struct storage; // external
 struct cache; // opaque decl.
+
+//helper function for ktfs
+extern int cache_get_backing_device(struct cache * cache, struct storage ** disk);
 
 extern int create_cache(struct storage * sto, struct cache ** cptr);
 

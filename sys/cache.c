@@ -101,21 +101,31 @@ static void cache_writeback_thrfn(struct cache * cache);
 // EXPORTED FUNCTION DEFINITIONS
 //
 
-int create_cache(struct io * bkgio, struct cache ** cptr) {
+
+//Helper for ktfs to get a reference to the backing device for arbitrary r/w.
+int cache_get_backing_device(struct cache * cache, struct storage ** disk){
+    if(cache == NULL)
+        return -EINVAL;
+
+    *(disk) = cache->disk;
+    return 0;
+}
+
+int create_cache(struct storage * disk, struct cache ** cptr) {
     struct cache * cache;
     int bkgblksz;
     int i;
 
-    trace("%s(%p)", __func__, bkgio);
+    trace("%s(%p)", __func__, disk);
 
     // Get backing device block size. Make sure it divides cache block size.
 
-    bkgblksz = ioblksz(bkgio);
+    bkgblksz = ioblksz(disk);
     assert (bkgblksz < 0 || CACHE_BLKSZ % bkgblksz == 0);
 
     cache = kcalloc(1, sizeof(struct cache));
 
-    cache->disk = xxx;
+    cache->disk = disk;
     condition_init(&cache->unlocked, "cache.unlocked");
     condition_init(&cache->evictable, "cache.evictable");
     condition_init(&cache->writable, "cache.writable");
@@ -240,7 +250,7 @@ int cache_get_block(struct cache * cache, unsigned long long pos, void ** pptr) 
 
     *pptr = blkidx_to_blkptr(cache, i);
     debug("Reading block from 0x%llx into cache at %d (pblk = %lp)", pos, i, *pptr);
-    rcnt = ioreadat(cache->bkgio, pos, *pptr, CACHE_BLKSZ);
+    rcnt = storage_fetch(cache->disk, pos, *pptr, CACHE_BLKSZ);
 
     debug("%08lx: "
         "%02x %02x %02x %02x %02x %02x %02x %02x "
@@ -312,11 +322,10 @@ void cache_release_block(struct cache * cache, void * pblk, int dirty) {
     i = blkptr_to_blkidx(cache, pblk);
     ent = cache->entries + i;
     assert (ent->locked == 1);
-    assert (ent->refcnt > 0);
-    
+    assert (ent->refcnt > 0);  
     debug("Releasing block %d (pos = %llx) at %p", i, ent->pos, pblk);
 
-    if (dirty && !ent->dirty) {
+   if (dirty && !ent->dirty) {
         cache->dirty_cnt += 1;
         ent->dirty = 1;
     }
@@ -402,7 +411,7 @@ void cache_writeback_thrfn(struct cache * cache) {
 
                 debug("Writing dirty block 0x%llx to storage", ents[i].pos);
 
-                wcnt = iowriteat(cache->bkgio,
+                wcnt = storage_store(cache->disk,
                     ents[i].pos, blkidx_to_blkptr(cache, i), CACHE_BLKSZ);
                 
                 if (wcnt != CACHE_BLKSZ) {
