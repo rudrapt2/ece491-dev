@@ -477,8 +477,6 @@ int ktfs_cntl(struct uio *uio, int cmd, void *arg) {
     }
 
     switch (cmd) {
-//    case FCNTL_GETBLKSZ:              wait on prof before putting back in
-//        return ktfs_getblksz(f);
     case FCNTL_GETEND:
         return ktfs_getend(f, arg);
     case FCNTL_SETEND:

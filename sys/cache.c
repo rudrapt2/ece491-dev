@@ -21,6 +21,7 @@
 #include "thread.h"
 #include "heap.h"
 #include "misc.h"
+#include "devimpl.h"
 
 #define CACHE_CAPACITY 64 // must be power of two
 
@@ -120,7 +121,7 @@ int create_cache(struct storage * disk, struct cache ** cptr) {
 
     // Get backing device block size. Make sure it divides cache block size.
 
-    bkgblksz = ioblksz(disk);
+    bkgblksz = disk->intf->blksz;
     assert (bkgblksz < 0 || CACHE_BLKSZ % bkgblksz == 0);
 
     cache = kcalloc(1, sizeof(struct cache));
