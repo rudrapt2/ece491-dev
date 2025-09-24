@@ -176,3 +176,25 @@ int nullfs_open (
 void nullfs_flush(struct filesystem * fs __attribute__ ((unused))) {
     // nothing
 }
+
+
+int parse_path(char * path, char ** mpnameptr, char ** flnameptr){
+if (path == NULL || mpnameptr == NULL || flnameptr == NULL) {
+        return -EINVAL; // invalid args
+    }
+
+    char *slash = strchr(path, '/');
+    if (slash == NULL) {
+        return -EINVAL;
+    }
+
+    *slash = '\0';
+
+    *mpnameptr = path;
+    *flnameptr = slash + 1;
+
+    return 0; // success
+}
+
+
+
