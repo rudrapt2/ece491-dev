@@ -291,7 +291,7 @@ int uart_serial_send(struct serial * ser, const void * buf, unsigned int buflen)
     long n = 0; // number of bytes written so far
     int pie;
    
-    trace("%s(len=%ld)", __func__, len);
+    trace("%s(len=%ld)", __func__, buflen);
     assert (uart->opened);
 
     if (buflen == 0)

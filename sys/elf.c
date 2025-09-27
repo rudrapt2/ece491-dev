@@ -131,7 +131,7 @@ int elf_load(struct uio * uio, void (**eptr)(void)) {
     int entry_ok = 0;
     size_t memsz;
 
-    trace("%s(elfio=%p,eptr=%p)", __func__, elfio, eptr);
+    trace("%s(elfio=%p,eptr=%p)", __func__, uio, eptr);
 
     // Get ELF file length
 

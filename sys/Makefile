@@ -49,7 +49,7 @@ CFLAGS += -fno-common -nostdlib -mno-relax -ffreestanding
 CFLAGS += -fno-asynchronous-unwind-tables -mno-riscv-attribute
 CFLAGS += -I.
 
-# CFLAGS += -DDEBUG -DTRACE # Everything!
+CFLAGS += -DDEBUG -DTRACE # Everything!
 #CFLAGS += -DMEMORY_DEBUG -DMEMORY_TRACE
 #CFLAGS += -DHEAP_DEBUG -DHEAP_TRACE
 #CFLAGS += -DEZFS_DEBUG -DEZFS_TRACE
@@ -83,7 +83,7 @@ QEMUOPTS += -serial mon:stdio
 QEMUOPTS += -serial pty
 QEMUOPTS += -serial pty
 QEMUOPTS += -serial pty
-QEMUOPTS += -drive file=/dev/null,id=blk0,if=none,format=raw,readonly=false
+QEMUOPTS += -drive file=ktfs.raw,id=blk0,if=none,format=raw,readonly=false
 QEMUOPTS += -device virtio-blk-device,drive=blk0
 #QEMUOPTS += -device virtio-gpu-device -display gtk
 

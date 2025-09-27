@@ -40,6 +40,8 @@ extern void __attribute__ ((noreturn)) assert_failed (
     } \
 } while (0)
 
+void debug_actual(const char * filename, int lineno, const char * fmt, ...);
+void trace_actual(const char * filename, int lineno, const char * fmt, ...);
 
 #ifdef DEBUG
 #define debug(...) debug_actual(__FILE__, __LINE__, __VA_ARGS__)

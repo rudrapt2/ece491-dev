@@ -22,7 +22,7 @@
 #define INITEXE "init"
 
 #define CMNTNAME "c"
-#define CDEVNAME "violblk"
+#define CDEVNAME "vioblk"
 #define CDEVINST 0
 
 #ifndef NUART // number of UARTs
