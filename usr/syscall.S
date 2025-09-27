@@ -50,17 +50,10 @@ _usleep:
         ecall
         ret
 
-        .global _devopen
-        .type   _devopen, @function
-_devopen:
-        li      a7, SYSCALL_DEVOPEN
-        ecall
-        ret
-
-        .global _fsopen
-        .type   _fsopen, @function
-_fsopen:
-        li      a7, SYSCALL_FSOPEN
+        .global _open
+        .type   _open, @function
+_open:
+        li      a7, SYSCALL_OPEN
         ecall
         ret
 

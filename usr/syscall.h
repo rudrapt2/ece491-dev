@@ -57,14 +57,9 @@ extern void _print(const char * msg);
 */
 extern int _usleep(unsigned long us);
 
-/**
-* @brief Opens a device at the specified file descriptor and returns error code on failure
-* @param fd file descripter number
-* @param name device name
-* @param instno instance number of virtualized device
-* @return fd number if sucessful else return error that occured -EMFILE or -EBADFD
-*/
-extern int _devopen(int fd, const char * name, int instno);
+extern int _fsdelete(char * name);
+
+extern int _fscreate(char * name);
 
 /**
 * @brief Opens a file at the specified file descriptor and returns error code on failure
@@ -72,7 +67,7 @@ extern int _devopen(int fd, const char * name, int instno);
 * @param name string name of file
 * @return fd number if sucessful else return error on invalid file descriptor or empty file descriptor
 */
-extern int _fsopen(int fd, const char * name);
+extern int _open(int fd, const char * name);
 
 /**
 * @brief Closes the device at the specified file descriptor
@@ -123,9 +118,5 @@ extern int _pipe(int * wfdptr, int * rfdptr);
 * @return fd number if sucessful else return error that occured -EMFILE or -EBADFD
 */
 extern int _iodup(int oldfd, int newfd);
-
-extern int _fsdelete(char * name);
-
-extern int _fscreate(char * name);
 
 #endif // _SYSCALL_H_

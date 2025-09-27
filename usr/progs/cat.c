@@ -14,7 +14,7 @@ int main (int argc, char** argv)
         _exit();
     }
     
-    fd = _fsopen(-1, argv[1]);
+    fd = _open(-1, argv[1]);
     if (fd < 0) {
         printf("%s: File Not Found\n", argv[1]);
         _exit();

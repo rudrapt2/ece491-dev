@@ -19,7 +19,7 @@
 #include "error.h"
 #include "cache.h"
 
-#define INITEXE "init"
+#define INITEXE "hello"
 
 #define CMNTNAME "c"
 #define DEVMNTNAME "dev"

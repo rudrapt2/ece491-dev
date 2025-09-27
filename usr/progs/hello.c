@@ -5,7 +5,7 @@
 
 void main(void) {
     #ifdef UMODE
-        dprintf(1, "Hello, world!\n");
+        _print("Hello, world!\n");
         _exit();
     #endif
 }

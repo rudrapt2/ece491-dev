@@ -8,7 +8,7 @@
 #define PIPE '|'
 
 void exec(int c, char** v) {
-	int fd = _fsopen(-1, v[0]);
+	int fd = _open(-1, v[0]);
 	if(fd < 0) {
 		printf("Unable to access %s (Error Code: %d)\n", v[0], fd);
 		_exit();
@@ -45,7 +45,7 @@ int parse_and_open(int fd, char** filename, int create) {
 	temp = *end;
 	*end = '\0';
 	if (create) _fscreate(start);
-	result = _fsopen(fd, start);
+	result = _open(fd, start);
 	if (result < 0) {
 		printf("Could not open file: %s\n", start);
 		return result;
@@ -129,7 +129,7 @@ int main()
 	char* v[MAXARGS + 1]; 
 	int child;
 
-	_devopen(2, "uart", 1); // this shouldnt be here
+	_open(2, "/dev/uart1"); // this shouldnt be here
     printf("Starting 391 Shell\n");
 
     for(;;) {
