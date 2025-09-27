@@ -16,17 +16,15 @@
 
 #include "virtio.h"
 #include "intr.h"
-#include "assert.h"
 #include "heap.h"
-#include "io.h"
 #include "device.h"
 #include "thread.h"
 #include "error.h"
 #include "string.h"
-#include "assert.h"
-#include "ioimpl.h"
-#include "io.h"
 #include "conf.h"
+#include "misc.h"
+#include "console.h"
+#include "uio.h" // FCNTL
 
 #include <limits.h>
 
@@ -239,7 +237,7 @@ void vioblk_attach(volatile struct virtio_mmio_regs * regs, int irqno) {
 
     // Initialize interface after getting blksz
     static struct storage_intf vioblk_intf = {
-        .blksz = blksz,
+        .blksz = 512,
         .open = vioblk_storage_open,
         .close = vioblk_storage_close,
         .fetch = vioblk_storage_fetch,
@@ -473,7 +471,7 @@ static long vioblk_storage_store (
 
     switch (vbd->vq.req_status) {
     case VIRTIO_BLK_S_OK:
-        return len;
+        return bytecnt;
     case VIRTIO_BLK_S_IOERR:
         return -EIO;
     case VIRTIO_BLK_S_UNSUPP:
@@ -483,25 +481,23 @@ static long vioblk_storage_store (
     }
 }
 
-int vioblk_storage_cntl (struct storage * sto, int op, void * arg); {
+int vioblk_storage_cntl (struct storage * sto, int op, void * arg) {
     struct vioblk_storage * const vbd = 
         (void*)sto - offsetof(struct vioblk_storage, base);
     
     trace("%s(op=%d,arg=%p)", __func__, op, arg);
     
     switch (op) {
-    case IOCTL_GETEND:
+    case FCNTL_GETEND:
         *(unsigned long long*)arg = vbd->size;
         return 0;
-    case IOCTL_GETBLKSZ:
-        return vbd->blksz;
     default:
         return -ENOTSUP;
     }
 }
 
 void vioblk_isr(int irqno, void * aux) {
-    struct vioblk_device * const vbd = aux;
+    struct vioblk_storage * const vbd = aux;
     uint32_t intr_status;
 
     intr_status = vbd->regs->interrupt_status;

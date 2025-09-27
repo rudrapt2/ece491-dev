@@ -101,7 +101,7 @@ int mount_nullfs(const char * name) {
     return attach_filesystem(name, (struct filesystem*)&nullfs);
 }
 
-int attach_filesystem(const char * mpname, const struct filesystem * fs) {
+int attach_filesystem(const char * mpname, struct filesystem * fs) {
     struct mountpoint ** mpptr;
     struct mountpoint * mp;
     size_t namelen;
@@ -178,19 +178,22 @@ void nullfs_flush(struct filesystem * fs __attribute__ ((unused))) {
 }
 
 
-int parse_path(char * path, char ** mpnameptr, char ** flnameptr){
-if (path == NULL || mpnameptr == NULL || flnameptr == NULL) {
+int parse_path(const char * path, char ** mpnameptr, char ** flnameptr){
+    if (path == NULL || mpnameptr == NULL || flnameptr == NULL) {
         return -EINVAL; // invalid args
     }
 
-    char *slash = strchr(path, '/');
+    char* cppath = kcalloc(1, strlen(path));
+    strncpy(cppath, path, strlen(path));
+
+    char *slash = strchr(cppath, '/');
     if (slash == NULL) {
         return -EINVAL;
     }
 
     *slash = '\0';
 
-    *mpnameptr = path;
+    *mpnameptr = cppath;
     *flnameptr = slash + 1;
 
     return 0; // success

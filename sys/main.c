@@ -17,6 +17,7 @@
 #include "string.h"
 #include "filesys.h"
 #include "error.h"
+#include "cache.h"
 
 #define INITEXE "init"
 
@@ -64,7 +65,7 @@ void attach_devices(void) {
 }
 
 void mount_cdrive(void) {
-#if 0
+#if 1
     struct storage * hd;
     struct cache * cache;
     int result;
@@ -95,12 +96,12 @@ void mount_cdrive(void) {
 }
 
 void run_init(void) {
-#if 0
+#if 1
     char * argv[] = { NULL };
     struct uio * initexe;
     int result;
     
-    result = open_file(CMNTNAME "/" INITEXE, &initexe);
+    result = open_file(CMNTNAME, INITEXE, &initexe);
 
     if (result != 0) {
         kprintf(INITEXE ": %s; terminating\n", error_name(result));

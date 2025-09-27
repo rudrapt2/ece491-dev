@@ -25,6 +25,7 @@
 #include "thread.h"
 #include "process.h"
 #include "misc.h"
+#include "console.h"
 
 // EXPORTED FUNCTION DECLARATIONS
 //

@@ -22,6 +22,7 @@
 #include "heap.h"
 #include "misc.h"
 #include "devimpl.h"
+#include "console.h"
 
 #define CACHE_CAPACITY 64 // must be power of two
 

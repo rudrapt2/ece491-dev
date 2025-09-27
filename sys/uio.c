@@ -4,6 +4,10 @@
 #include "uio.h"
 #include "uioimpl.h"
 #include "error.h"
+#include "thread.h"
+#include "memory.h"
+#include "string.h"
+#include "heap.h"
 #include "misc.h"
 
 #include <stddef.h> // for NULL

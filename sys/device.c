@@ -57,7 +57,7 @@ struct storage_uio {
     struct storage * sto;
     unsigned long pos;
 
-}
+};
 
 // INTERNAL FUNCTION DECLARATIONS
 //

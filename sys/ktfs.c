@@ -19,6 +19,7 @@
 #include "device.h"
 #include "devimpl.h"
 #include "fsimpl.h"
+#include "misc.h"
 
 // INTERNAL TYPE DEFINITIONS
 //
@@ -41,7 +42,6 @@ struct ktfs_file {
 // INTERNAL FUNCTION DECLARATIONS
 //
 
-int ktfs_mount(struct cache * cache);
 int ktfs_open(struct filesystem * fs, const char * name, struct uio ** uioptr);
 void ktfs_close(struct uio* uio);
 int ktfs_cntl(struct uio* uio, int cmd, void* arg);
@@ -106,11 +106,9 @@ static const struct uio_intf file_intf = {
     .cntl = &ktfs_cntl,
     .read = &ktfs_fetch,
     .write = &ktfs_store
-    // .readat = &ktfs_readat,
-    // .writeat = &ktfs_writeat
 };
 
-static const struct filesystem fs_intf = {
+static struct filesystem fs_intf = {
     .open = &ktfs_open,
     .create = &ktfs_create,
     .delete = &ktfs_delete,
@@ -126,7 +124,7 @@ static const struct filesystem fs_intf = {
 int mount_ktfs(const char * name, struct cache * cache) {
     struct ktfs_inode root_directory;
     if(cache == NULL)
-        return -ENODEV;
+        return -ENOENT;
 
     if(name == NULL)
         return -EINVAL;

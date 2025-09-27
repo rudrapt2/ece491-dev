@@ -35,12 +35,11 @@ OBJS = \
 	thread.o \
 	timer.o \
 	trap.o \
-	syscall.o 
-#	dev/viogpu.o \
-#	dev/viorng.o \
-#	dev/vioblk.o \
-#	cache.o \
-#	ktfs.o
+	syscall.o \
+	dev/viorng.o \
+	dev/vioblk.o \
+	cache.o \
+	ktfs.o
 #   tarfs.o 
 
 CFLAGS = -Wall -Werror=implicit-function-declaration

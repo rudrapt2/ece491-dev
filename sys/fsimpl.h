@@ -13,6 +13,6 @@ struct filesystem {
     void (*flush)(struct filesystem * fs);
 };
 
-extern int attach_filesystem(const char * name, const struct filesystem * fs);
+extern int attach_filesystem(const char * name, struct filesystem * fs);
 
 #endif // _FSIMPL_H_
