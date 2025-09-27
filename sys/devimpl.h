@@ -67,9 +67,10 @@ struct storage {
 };
 
 static inline void storage_init (
-    struct storage * sto, const struct storage_intf * intf)
+    struct storage * sto, const struct storage_intf * intf, unsigned long long cap)
 {
     sto->intf = intf;
+    sto->capacity = cap;
 }
 
 // VIDEO DEVICE
