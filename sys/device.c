@@ -502,6 +502,7 @@ int storage_open_uio(struct storage * sto, struct uio ** uioptr) {
     suio = kcalloc(1, sizeof(*suio));
 
     suio->sto = sto;
+    suio->pos = 0;
     *uioptr = uio_init1(&suio->base, &storage_uio_intf);
     return 0;
     
