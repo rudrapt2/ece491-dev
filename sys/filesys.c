@@ -70,6 +70,8 @@ void fsmgr_flushall(void) {
 int open_file(const char * mpname, const char * flname, struct uio ** uioptr) {
     struct filesystem * fs;
 
+    trace("%s(%s/%s)", __func__, mpname, flname);
+
     assert (mpname != NULL && flname != NULL);
 
     fs = getfs(mpname);

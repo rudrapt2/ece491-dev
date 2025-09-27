@@ -22,6 +22,7 @@
 #define INITEXE "init"
 
 #define CMNTNAME "c"
+#define DEVMNTNAME "dev"
 #define CDEVNAME "vioblk"
 #define CDEVINST 0
 
@@ -71,6 +72,7 @@ void mount_cdrive(void) {
     int result;
 
     hd = find_storage(CDEVNAME, CDEVINST);
+    storage_open(hd);
 
     if (hd == NULL) {
         kprintf("Storage device %s%d not found\n", CDEVNAME, CDEVINST);

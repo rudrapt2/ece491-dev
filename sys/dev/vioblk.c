@@ -310,7 +310,7 @@ void vioblk_attach(volatile struct virtio_mmio_regs * regs, int irqno) {
 
     // Register device
     storage_init(&vbd->base, &vioblk_intf, vbd->size);
-    vbd->irqno = register_device(VIOBLK_NAME, DEV_STORAGE, vbd);
+    register_device(VIOBLK_NAME, DEV_STORAGE, vbd);
     
     // Signal initialization complete
 
@@ -364,7 +364,7 @@ long vioblk_storage_fetch (
         (void*)sto - offsetof(struct vioblk_storage, base);
     int pie;
 
-    trace("%s(buf=%p,bytecnt=%ld)", __func__, buf, bytecnt);
+    trace("%s(pos=%ld,buf=%p,bytecnt=%ld)", __func__, pos, buf, bytecnt);
 
     // check that buf is not in user memory space
     // assert(buf < (void *)UMEM_START_VMA);
