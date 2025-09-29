@@ -127,7 +127,7 @@ void handle_umode_exception(unsigned int cause, struct trap_frame * tfr) {
         handled = handle_umode_page_fault(tfr, csrr_stval());
         break;
     case RISCV_SCAUSE_ECALL_FROM_UMODE:
-        // FIXME handle_syscall(tfr);
+        handle_syscall(tfr);
         handled = 1;
         break;
     }
