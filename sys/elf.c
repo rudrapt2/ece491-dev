@@ -208,7 +208,7 @@ int elf_load(struct uio * uio, void (**eptr)(void)) {
     for (phidx = 0; phidx < ehdr.e_phnum; phidx++) {
         pos = ehdr.e_phoff + (uint64_t)phidx * ehdr.e_phentsize;
         
-        result = uio_cntl(uio, FCNTL_GETPOS, &pos);
+        result = uio_cntl(uio, FCNTL_SETPOS, &pos);
 
         if (result != 0)
             return result;
