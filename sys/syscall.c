@@ -26,6 +26,8 @@
 #include "process.h"
 #include "misc.h"
 #include "console.h"
+#include "string.h"
+#include "heap.h"
 
 // EXPORTED FUNCTION DECLARATIONS
 //
@@ -231,38 +233,46 @@ int sysusleep(unsigned long us)
     return 0;
 }
 
-int sysfscreate(const char *name)
+int sysfscreate(const char *path)
 {
-    int result = validate_vstr(name, PTE_U);
+    int result = validate_vstr(path, PTE_U);
     char *mpname;
     char *flname;
+    char *cppath;
 
     if (result != 0)
         return result;
 
-    result = parse_path(name, &mpname, &flname);
+    cppath = kcalloc(1, strlen(path) + 1);
+    strncpy(cppath, path, strlen(path));
+    result = parse_path(cppath, &mpname, &flname);
 
-    if (result != 0)
-        return result;
+    if (result == 0)
+        result = create_file(mpname, flname);
 
-    return create_file(mpname, flname);
+    kfree(cppath);
+    return result;
 }
 
-int sysfsdelete(const char *name)
+int sysfsdelete(const char *path)
 {
-    int result = validate_vstr(name, PTE_U);
+    int result = validate_vstr(path, PTE_U);
     char *mpname;
     char *flname;
+    char *cppath;
 
     if (result != 0)
         return result;
 
-    result = parse_path(name, &mpname, &flname);
+    cppath = kcalloc(1, strlen(path) + 1);
+    strncpy(cppath, path, strlen(path));
+    result = parse_path(cppath, &mpname, &flname);
 
-    if (result != 0)
-        return result;
+    if (result == 0)
+        result = delete_file(mpname, flname);
 
-    return delete_file(mpname, flname);
+    kfree(cppath);
+    return result;
 }
 
 /**
@@ -273,15 +283,16 @@ int sysfsdelete(const char *name)
  * @return fd number if sucessful else return error that occured -EMFILE or -EBADFD
  */
 
-int sysopen(int fd, const char *name)
+int sysopen(int fd, const char *path)
 {
     struct process *proc;
     struct uio *uio;
     int result;
     char *mpname;
     char *flname;
+    char *cppath;
 
-    trace("%s(fd=%d,name=%p)", __func__, fd, name);
+    trace("%s(fd=%d,path=%p)", __func__, fd, path);
 
     if (PROCESS_IOMAX <= fd)
         return -EBADFD;
@@ -303,23 +314,23 @@ int sysopen(int fd, const char *name)
 
 sysopen_fd_ok:
 
-    result = validate_vstr(name, PTE_U);
+    result = validate_vstr(path, PTE_U);
 
     if (result != 0)
         return result;
 
-    result = parse_path(name, &mpname, &flname);
+    cppath = kcalloc(1, strlen(path) + 1);
+    strncpy(cppath, path, strlen(path));
+    result = parse_path(cppath, &mpname, &flname);
 
-    if (result != 0)
-        return result;
+    if (result == 0)
+        result = open_file(mpname, flname, &uio);
 
-    result = open_file(mpname, flname, &uio);
+    if (result == 0)
+        proc->uiotab[fd] = uio;
 
-    if (result < 0)
-        return result;
-
-    proc->uiotab[fd] = uio;
-    return fd;
+    kfree(cppath);
+    return (result != 0) ? result : fd;
 }
 
 /**

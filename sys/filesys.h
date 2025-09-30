@@ -23,7 +23,7 @@ extern int delete_file(const char * mpname, const char * flname);
 extern int attach_filesystem(const char *name, struct filesystem *fs);
 
 // Splits a string path into two strings, the first being the mountpoint name and the seoncd
-extern int parse_path(const char * path, char ** mpnameptr, char ** flnameptr);
+extern int parse_path(char * path, char ** mpnameptr, char ** flnameptr);
 
 extern int mount_devfs(const char * name); // device.c
 extern int mount_ktfs(const char * name, struct cache * cache); // fs/ktfs.c

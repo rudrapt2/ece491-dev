@@ -19,7 +19,7 @@
 #include "error.h"
 #include "cache.h"
 
-#define INITEXE "hello"
+#define INITEXE "shell"
 
 #define CMNTNAME "c"
 #define DEVMNTNAME "dev"
@@ -27,7 +27,7 @@
 #define CDEVINST 0
 
 #ifndef NUART // number of UARTs
-#define NUART 0
+#define NUART 2
 #endif
 
 #ifndef NVIODEV // number of VirtIO devices
@@ -57,12 +57,21 @@ void main(void) {
 
 void attach_devices(void) {
     int i;
+    int result;
 
     for (i = 0; i < NUART; i++)
         attach_uart((void*)UART_MMIO_BASE(i), UART0_INTR_SRCNO+i);
     
     for (i = 0; i < NVIODEV; i++)
         attach_virtio((void*)VIRTIO_MMIO_BASE(i), VIRTIO0_INTR_SRCNO+i);
+
+    result = mount_devfs(DEVMNTNAME);
+
+    if (result != 0) {
+        kprintf("mount_devfs(%s) failed: %s\n",
+            CDEVNAME, error_name(result));
+        halt_failure();
+    }
 }
 
 void mount_cdrive(void) {

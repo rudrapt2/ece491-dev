@@ -81,8 +81,8 @@ QEMUOPTS += -object rng-random,filename=/dev/urandom,id=rng0
 QEMUOPTS += -device virtio-rng-device,rng=rng0
 QEMUOPTS += -serial mon:stdio
 QEMUOPTS += -serial pty
-QEMUOPTS += -serial pty
-QEMUOPTS += -serial pty
+# QEMUOPTS += -serial pty
+# QEMUOPTS += -serial pty
 QEMUOPTS += -drive file=ktfs.raw,id=blk0,if=none,format=raw,readonly=false
 QEMUOPTS += -device virtio-blk-device,drive=blk0
 #QEMUOPTS += -device virtio-gpu-device -display gtk
