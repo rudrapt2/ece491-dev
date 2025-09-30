@@ -44,7 +44,7 @@ static long nulluio_write (
 //
 
 void uio_close(struct uio * uio) {
-    if (uio->intf->close != NULL)
+    if (uio->refcnt == 0 && uio->intf->close != NULL)
         uio->intf->close(uio);
 }
 
