@@ -30,7 +30,8 @@ ALL_TARGETS = \
 	cat \
 	wc \
 	touch \
-	rm
+	rm \
+	echo 
 
 CFLAGS = -Wall -fno-omit-frame-pointer -ggdb -gdwarf-2
 CFLAGS += -mcmodel=medany -fno-pie -no-pie -march=rv64g -mabi=lp64d
@@ -46,21 +47,6 @@ all: $(addprefix bin/, $(ALL_TARGETS))
 
 bin/%: $(ULIB_OBJS) progs/%.o | bin
 	$(LD) -T $(ULIB_LD) -o $@ $^
-
-# hello: $(ULIB_OBJS) hello.o | bin
-# 	$(LD) -T $(ULIB_LD) -o bin/$@ $^
-	
-# shell: $(ULIB_OBJS) shell.o | bin
-# 	$(LD) -T $(ULIB_LD) -o bin/$@ $^
-
-# cat: $(ULIB_OBJS) cat.o | bin
-# 	$(LD) -T $(ULIB_LD) -o bin/$@ $^
-	
-# wc: $(ULIB_OBJS) wc.o | bin
-# 	$(LD) -T $(ULIB_LD) -o bin/$@ $^
-
-# pipetest: $(ULIB_OBJS) pipetest.o | bin
-# 	$(LD) -T $(ULIB_LD) -o bin/$@ $^
 
 bin: 
 	mkdir $@

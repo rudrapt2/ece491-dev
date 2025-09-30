@@ -10,7 +10,7 @@ int main (int argc, char** argv)
     int wc = 0;
     int cc = 0;
     
-    if (argc != 0) {
+    if (argc != 1) {
         printf("Usage: wc < file\n");
         _exit();
     }

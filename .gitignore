@@ -4,7 +4,8 @@
 *.dump
 *.elf
 *.raw
-util/mkfs_ktfs
-util/unmkfs_ktfs
+util/fs/mkfs_ktfs
+util/fs/unmkfs_ktfs
 .vscode
 .clang-format
+usr/bin
