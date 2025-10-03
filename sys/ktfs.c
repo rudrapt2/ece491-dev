@@ -39,6 +39,11 @@ struct ktfs_file {
     unsigned long pos;// add pos
 };
 
+struct ktfs_listing_uio {
+    struct uio base;
+    const struct ktfs_file * file;
+};
+
 // INTERNAL FUNCTION DECLARATIONS
 //
 
@@ -56,6 +61,11 @@ int ktfs_getend(struct ktfs_file *fd, void *arg);
 int ktfs_setend(struct ktfs_file *fd, void *arg);
 int ktfs_setpos(struct ktfs_file *fd, void *arg);
 int ktfs_getpos(struct ktfs_file *fd, void *arg);
+
+int ktfs_open_file(const char * name, struct uio ** uioptr);
+int ktfs_open_listing(struct uio ** uioptr);
+void ktfs_listing_close(struct uio * uio);
+long ktfs_listing_read (struct uio * uio, void * buf, unsigned long bufsz);
 
 // Interal helper functions
 uint64_t inode_number_to_absolute_position(uint16_t inode_number);
@@ -91,7 +101,6 @@ static struct cache * ktfs_block_cache;
 static struct storage * ktfs_backing_device;
 static struct ktfs_superblock superblock;
 
-static struct ktfs_free_inode_elem * free_inode_list;
 static struct ktfs_file * files_list;
 static uint16_t max_num_of_inodes;
 
@@ -115,6 +124,10 @@ static struct filesystem fs_intf = {
     .flush = &ktfs_flush
 };
 
+static const struct uio_intf ktfs_listing_uio_intf = {
+    .close = &ktfs_listing_close,
+    .read = &ktfs_listing_read
+};
 
 /**
  * @brief Mounts the hard drive represented by the io object as a filesystem
@@ -196,6 +209,13 @@ int mount_ktfs(const char * name, struct cache * cache) {
  * @return 0 if open successful, negative values if there's error.
  */
 int ktfs_open(struct filesystem * fs, const char * name, struct uio ** uioptr) {
+    if (name == NULL || *name == '\0')
+        return ktfs_open_listing(uioptr);
+    else
+        return ktfs_open_file(name, uioptr);
+}
+
+int ktfs_open_file(const char * name, struct uio ** uioptr) {
     for(struct ktfs_file* curr_file = files_list; curr_file != NULL; curr_file = curr_file->next){
         // found file in filesystem
         if (strncmp(name, curr_file->dentry.name, KTFS_MAX_FILENAME_LEN) == 0){
@@ -582,6 +602,34 @@ void ktfs_flush(struct filesystem * fs) {
     
     cache_flush(ktfs_block_cache);
     return;
+}
+
+int ktfs_open_listing(struct uio ** uioptr) {
+    struct ktfs_listing_uio * ls;
+
+    ls = kcalloc(1, sizeof(*ls));
+    ls->file = files_list;
+
+    *uioptr = uio_init1(&ls->base, &ktfs_listing_uio_intf);
+
+    return 0;
+}
+
+void ktfs_listing_close(struct uio * uio) {
+    struct ktfs_listing_uio * const ls = (struct ktfs_listing_uio*)uio;
+    kfree(ls);
+}
+
+long ktfs_listing_read(struct uio * uio, void * buf, unsigned long bufsz) {
+    struct ktfs_listing_uio * const ls = (struct ktfs_listing_uio*)uio;
+    size_t len = strlen(ls->file->dentry.name);
+
+    if (ls->file != NULL) {
+        strncpy(buf, ls->file->dentry.name, bufsz);
+        ls->file = ls->file->next;
+        return (len < bufsz) ? len : bufsz;
+    } else
+        return 0;
 }
 
 /// @brief Converts an inode number to its absolute position in the filesystem.

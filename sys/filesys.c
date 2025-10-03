@@ -27,7 +27,7 @@ struct mountpoint {
 
 static struct filesystem * getfs(const char * mpname);
 static int fsopen(struct filesystem * fs, const char * flname, struct uio ** uioptr);
-static int fscreat(struct filesystem * fs, const char * flname);
+static int fscreate(struct filesystem * fs, const char * flname);
 static int fsdelete(struct filesystem * fs, const char * flname);
 static void fsflush(struct filesystem * fs);
 
@@ -86,7 +86,7 @@ int create_file(const char * mpname, const char * flname) {
     
     fs = getfs(mpname);
 
-    return (fs != NULL) ? fscreat(fs, flname) : -ENOENT;
+    return (fs != NULL) ? fscreate(fs, flname) : -ENOENT;
 }
 
 int delete_file(const char * mpname, const char * flname) {
@@ -147,7 +147,7 @@ int fsopen(struct filesystem * fs, const char * flname, struct uio ** uioptr) {
         return -ENOTSUP;
 }
 
-int fscreat(struct filesystem * fs, const char * flname) {
+int fscreate(struct filesystem * fs, const char * flname) {
     if (fs->create != NULL)
         return fs->create(fs, flname);
     else
