@@ -11,12 +11,13 @@ OBJCOPY=$(PREFIX)objcopy
 OBJDUMP=$(PREFIX)objdump
 
 OBJS = \
-    misc.o \
+	misc.o \
 	console.o \
 	dev/uart.o \
 	dev/rtc.o \
 	dev/virtio.o \
 	dev/viorng.o \
+	dev/memio.o \
 	device.o \
 	filesys.o \
 	elf.o \
