@@ -8,12 +8,37 @@
 #define PIPE '|'
 
 void exec(int c, char** v) {
-	int fd = _open(-1, v[0]);
-	if(fd < 0) {
-		printf("Unable to access %s (Error Code: %d)\n", v[0], fd);
-		_exit();
-	}
-	_exec(fd, c, v);
+  char path[256];
+  int fd;
+
+  // Null-terminate the argument array
+  v[c] = NULL;
+
+  // If path doesn't start with '/', prepend '/c/' for relative paths
+  if (v[0][0] != '/')
+  {
+    path[0] = '/';
+    path[1] = 'c';
+    path[2] = '/';
+    strncpy(path + 3, v[0], sizeof(path) - 4);
+    path[sizeof(path) - 1] = '\0'; // Ensure null termination
+  }
+  else
+  {
+    strncpy(path, v[0], sizeof(path) - 1);
+    path[sizeof(path) - 1] = '\0';
+  }
+
+  // Open the executable file
+  fd = _open(3, path);
+
+  if (fd < 0)
+  {
+    printf("Unable to access %s (Error Code: %d)\n", v[0], fd);
+    _exit();
+  }
+
+  _exec(fd, c, v);
 }
 
 char* find_terminator(char* buf) {
@@ -129,29 +154,37 @@ int main()
 	char* v[MAXARGS + 1]; 
 	int child;
 
-	_open(2, "/dev/uart1"); // this shouldnt be here
-    printf("Starting 391 Shell\n");
+  _open(2, "/dev/uart1"); // console device
+  _close(0);              // close any existing stdin
+  _iodup(2, 0);           // stdin from console
+  _close(1);              // close any existing stdout
+  _iodup(2, 1);           // stdout to console
 
-    for(;;) {
-		printf("LUMON OS> ");
-		getsn(buf, BUFSIZE-1);
+  printf("Starting 391 Shell\n");
 
-		if(0 == strcmp(buf, "exit"))
-			_exit();
+  for (;;)
+  {
+    printf("LUMON OS> ");
+    getsn(buf, BUFSIZE - 1);
 
-		_iodup(2, 1); // stdout defaults to console
+    if (0 == strcmp(buf, "exit"))
+      _exit();
 
-		c = parse(buf, v);
-		if (c <= 0) continue;
-
-		child = _fork();
-		if(child) 
-			_wait(child);
-		else {
-			exec(c, v);
-		}
-
-		_close(0);
-		_close(1);
-	}
+    child = _fork();
+    if (child)
+    {
+      // Parent process: just wait for child
+      _wait(child);
+    }
+    else
+    {
+      // Child process: parse and execute
+      c = parse(buf, v);
+      if (c <= 0)
+      {
+        _exit();
+      }
+      exec(c, v);
+    }
+  }
 }

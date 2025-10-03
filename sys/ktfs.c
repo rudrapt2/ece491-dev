@@ -199,11 +199,17 @@ int ktfs_open(struct filesystem * fs, const char * name, struct uio ** uioptr) {
     for(struct ktfs_file* curr_file = files_list; curr_file != NULL; curr_file = curr_file->next){
         // found file in filesystem
         if (strncmp(name, curr_file->dentry.name, KTFS_MAX_FILENAME_LEN) == 0){
-            if(curr_file->flag & FILE_OPENED){ // do not allow opening a file multiple times simultaneously
-                return -EBUSY;
-            }
+          debug("ktfs_open: file=%s, flag=%d, pos=%ld, refcnt=%d",
+                name, curr_file->flag, curr_file->pos, curr_file->uio.refcnt);
+          if (curr_file->flag & FILE_OPENED)
+          { // do not allow opening a file multiple times simultaneously
+            debug("ktfs_open: EBUSY - file already opened");
+            return -EBUSY;
+          }
             curr_file->flag |= FILE_OPENED;
-            // ioaddref(&curr_file->io);
+            curr_file->pos = 0;        // Reset file position to beginning when opening
+            curr_file->uio.refcnt = 1; // Initialize refcnt to 1 for the initial reference
+            debug("ktfs_open: SUCCESS - file=%s, reset pos=0, refcnt=1", name);
             // wrap in a seekio
             *uioptr = &curr_file->uio;
             return 0;
@@ -222,7 +228,10 @@ int ktfs_open(struct filesystem * fs, const char * name, struct uio ** uioptr) {
  */
 void ktfs_close(struct uio* uio) {
     struct ktfs_file* curr_file = (void*)uio - offsetof(struct ktfs_file, uio);
+    debug("ktfs_close: file=%s, flag=%d, pos=%ld, refcnt=%d",
+          curr_file->dentry.name, curr_file->flag, curr_file->pos, uio->refcnt);
     curr_file->flag &= ~FILE_OPENED;
+    debug("ktfs_close: DONE - file=%s, flag now=%d", curr_file->dentry.name, curr_file->flag);
 }
 
 long ktfs_fetch(struct uio *uio, void *buf, unsigned long len) {

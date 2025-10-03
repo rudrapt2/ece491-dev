@@ -160,6 +160,7 @@ int sysexec(int fd, int argc, char **argv)
     // process_exec, but we need to clear iotab[fd] here.
 
     exeio = self->uiotab[fd];
+    debug("sysexec: fd=%d, refcnt before clear=%lu", fd, uio_refcnt(exeio));
     self->uiotab[fd] = 0;
 
     return process_exec(exeio, argc, argv);

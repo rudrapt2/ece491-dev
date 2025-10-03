@@ -216,8 +216,11 @@ void process_exit(void) {
     discard_active_mspace();
 
     for (i = 0; i < PROCESS_UIOMAX; i++) {
-        if (self->uiotab[i] != NULL)
-            uio_close(self->uiotab[i]);
+      if (self->uiotab[i] != NULL)
+      {
+        debug("process_exit: closing fd=%d, refcnt=%lu", i, uio_refcnt(self->uiotab[i]));
+        uio_close(self->uiotab[i]);
+      }
     }
     
     // Free process struct. First, though, remove references to it from thread

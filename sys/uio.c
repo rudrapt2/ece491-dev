@@ -1,6 +1,14 @@
 // uio.c - Uniform I/O interface
 //
 
+#ifdef UIO_DEBUG
+#define DEBUG
+#endif
+
+#ifdef UIO_TRACE
+#define TRACE
+#endif
+
 #include "uio.h"
 #include "uioimpl.h"
 #include "error.h"
@@ -44,8 +52,25 @@ static long nulluio_write (
 //
 
 void uio_close(struct uio * uio) {
-    if (uio->refcnt == 0 && uio->intf->close != NULL)
-        uio->intf->close(uio);
+  debug("uio_close: refcnt=%d, has_close=%d", uio->refcnt, (uio->intf->close != NULL));
+
+  // Decrement reference count if it's greater than 0
+  if (uio->refcnt > 0)
+  {
+    uio->refcnt--;
+    debug("uio_close: decremented refcnt to %d", uio->refcnt);
+  }
+
+  // Only call the actual close method when refcnt reaches 0
+  if (uio->refcnt == 0 && uio->intf->close != NULL)
+  {
+    debug("uio_close: calling close method");
+    uio->intf->close(uio);
+  }
+  else if (uio->refcnt > 0)
+  {
+    debug("uio_close: NOT calling close (refcnt=%d still has references)", uio->refcnt);
+  }
 }
 
 long uio_read(struct uio * uio, void * buf, unsigned long bufsz) {
