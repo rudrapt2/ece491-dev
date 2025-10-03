@@ -10,6 +10,7 @@
 #include "string.h"
 #include "misc.h"
 #include "heap.h"
+#include "uioimpl.h"
 
 #include <stddef.h>
 
@@ -31,11 +32,26 @@ static int fscreate(struct filesystem * fs, const char * flname);
 static int fsdelete(struct filesystem * fs, const char * flname);
 static void fsflush(struct filesystem * fs);
 
+static int fs_open_listing(struct uio ** uioptr);
+static void fs_listing_close(struct uio * uio);
+static long fs_listing_read (struct uio * uio, void * buf, unsigned long bufsz);
+
 static int nullfs_open(struct filesystem * fs, const char * flname, struct uio ** uioptr);
 static void nullfs_flush(struct filesystem * fs);
 
 // INTERNAL GLOBAL VARIABLES
 //
+
+// listing interface for uio
+struct fs_listing_uio {
+    struct uio base;
+    const struct mountpoint * fs;
+};
+
+static const struct uio_intf fs_listing_uio_intf = {
+    .close = &fs_listing_close,
+    .read = &fs_listing_read
+};
 
 static const struct filesystem nullfs = {
     .open = &nullfs_open,
@@ -72,7 +88,10 @@ int open_file(const char * mpname, const char * flname, struct uio ** uioptr) {
 
     trace("%s(%s/%s)", __func__, mpname, flname);
 
-    assert (mpname != NULL && flname != NULL);
+    assert (mpname != NULL || flname == NULL);
+
+    if (mpname == NULL || *mpname == '\0')
+        return fs_open_listing(uioptr);
 
     fs = getfs(mpname);
 
@@ -97,6 +116,38 @@ int delete_file(const char * mpname, const char * flname) {
     fs = getfs(mpname);
 
     return (fs != NULL) ? fsdelete(fs, flname) : -ENOENT;
+}
+
+int fs_open_listing(struct uio ** uioptr) {
+    struct fs_listing_uio * ls;
+
+    ls = kcalloc(1, sizeof(*ls));
+    ls->fs = mplist;
+
+    // Note: The listing uio_intf is at index DEV_UNDEF in /devfs_uio_intfs/.
+    *uioptr = uio_init1(&ls->base, &fs_listing_uio_intf);
+
+    return 0;
+}
+
+void fs_listing_close(struct uio * uio) {
+    struct fs_listing_uio * const ls = (struct fs_listing_uio*)uio;
+    kfree(ls);
+}
+
+long fs_listing_read (
+    struct uio * uio, void * buf, unsigned long bufsz)
+{
+    struct fs_listing_uio * const ls = (struct fs_listing_uio*)uio;
+    size_t len;
+
+    if (ls->fs != NULL) {
+        len = strlen(ls->fs->name);
+        strncpy(buf, ls->fs->name, bufsz);
+        ls->fs = ls->fs->next;
+        return (len < bufsz) ? len : bufsz;
+    } else
+        return 0;
 }
 
 int mount_nullfs(const char * name) {
@@ -185,17 +236,16 @@ int parse_path(char * path, char ** mpnameptr, char ** flnameptr){
         return -EINVAL; // invalid args
     }
 
-    if (*path == '/') path++; // ignore leading slash
+    while (*path == '/') path++; // ignore all leading slashes
 
     char *slash = strchr(path, '/');
-    if (slash == NULL) {
-        return -EINVAL;
-    }
-
-    *slash = '\0';
+    if (slash != NULL) { // no slashes indicates mp only
+        *flnameptr = slash + 1;
+        *slash = '\0';
+    } else
+        *flnameptr = '\0';
 
     *mpnameptr = path;
-    *flnameptr = slash + 1;
 
     return 0; // success
 }

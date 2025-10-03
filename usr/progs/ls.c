@@ -9,7 +9,11 @@ void main (int argc, char** argv)
     char buffer[BUFSZ+1];
     buffer[BUFSZ] = '\0';
     
-    fd = _open(-1, argv[1]);
+    if (argc > 1)
+        fd = _open(-1, argv[1]);
+    else 
+        fd = _open(-1, "");
+        
     if (fd < 0) {
         printf("%s: Directory Not Found\n", argv[1]);
         return;
