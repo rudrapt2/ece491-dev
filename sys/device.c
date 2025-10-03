@@ -125,11 +125,10 @@ static const struct uio_intf storage_uio_intf = {
     .cntl = &storage_uio_cntl
 };
 
-static const struct uio_intf video_uio_intf = {
+static const struct uio_intf video_uio_intf __attribute__((unused)) = {
     .close = &video_uio_close,
     .write = &video_uio_write,
-    .cntl = &video_uio_cntl
-};
+    .cntl = &video_uio_cntl};
 
 // EXPORTED FUNCTION DEFINITIONS
 //

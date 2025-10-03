@@ -91,7 +91,7 @@ static struct cache * ktfs_block_cache;
 static struct storage * ktfs_backing_device;
 static struct ktfs_superblock superblock;
 
-static struct ktfs_free_inode_elem * free_inode_list;
+static struct ktfs_free_inode_elem *free_inode_list __attribute__((unused));
 static struct ktfs_file * files_list;
 static uint16_t max_num_of_inodes;
 
