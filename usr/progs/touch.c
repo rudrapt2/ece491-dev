@@ -26,7 +26,7 @@ void main (int argc, char** argv)
                 printf("No Inode Blocks\n");
                 break;
             default:
-                printf("Failed to Create File");
+                printf("Failed to Create File\n");
                 break;
         }
         return;

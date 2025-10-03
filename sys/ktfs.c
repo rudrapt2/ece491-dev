@@ -303,9 +303,19 @@ long ktfs_store(struct uio* uio, const void* buf, unsigned long len){
     struct ktfs_file* f = (void*) uio - offsetof(struct ktfs_file, uio);
     int file_opened = f->flag & FILE_OPENED;
     long pos = f->pos;
+    int result;
+    uint32_t end;
 
     if (!file_opened){
         return -EBADFD;
+    }
+
+    // extend file size of necessary
+    if (f->file_size - pos < len) {     
+        end = pos + len;
+        result = ktfs_setend(f, &end);
+        if (result != 0)
+            return result;
     }
 
     // we cannot write past the length of the file
