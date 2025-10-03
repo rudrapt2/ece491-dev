@@ -4,6 +4,8 @@
 #ifndef _UIO_H_
 #define _UIO_H_
 
+#include <stddef.h> // for size_t
+
 struct uio; // opaque decl.
 
 extern unsigned long uio_refcnt(const struct uio * uio);
@@ -38,5 +40,10 @@ extern void create_pipe(struct uio ** wptr, struct uio ** rptr);
 // its reference count and returns a pointer to it.
 
 extern struct uio * create_null_uio(void);
+
+// The create_memory_uio() function creates a memory-backed uio object that
+// supports read, write, and control operations on a block of memory.
+
+extern struct uio *create_memory_uio(void *buf, size_t size);
 
 #endif // _UIO_H_
