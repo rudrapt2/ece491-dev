@@ -117,7 +117,8 @@ void handle_smode_exception(unsigned int cause, struct trap_frame * tfr) {
  */
 void handle_umode_exception(unsigned int cause, struct trap_frame * tfr) {
     const char * name = NULL;
-    int handled;
+    int handled = 0;
+    trace("%s(cause=%d, tfr=%p)", __func__, cause, tfr);
 
     enable_interrupts(); // we can enable interrupts now
 
@@ -144,19 +145,19 @@ void handle_umode_exception(unsigned int cause, struct trap_frame * tfr) {
         case RISCV_SCAUSE_STORE_PAGE_FAULT:        
         case RISCV_SCAUSE_INSTR_PAGE_FAULT:
             kprintf (
-                "%s at %p for %p in thread <%s:%d>",
+                "%s at %p for %p in thread <%s:%d>\n",
                 name, (void*)tfr->sepc, (void*)csrr_stval(),
                 running_thread_name(), running_thread());
             break;
         default:
             kprintf (
-                "%s at %p in thread <%s:%d>",
+                "%s at %p in thread <%s:%d>\n",
                 name, (void*)tfr->sepc,
                 running_thread_name(), running_thread());
         }
     } else {
         kprintf (
-            "Exception %d at %p in thread <%s:%d>",
+            "Exception %d at %p in thread <%s:%d>\n",
             cause, (void*)tfr->sepc,
             running_thread_name(), running_thread());
     }
