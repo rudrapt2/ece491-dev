@@ -101,7 +101,8 @@ int open_file(const char * mpname, const char * flname, struct uio ** uioptr) {
 int create_file(const char * mpname, const char * flname) {
     struct filesystem * fs;
 
-    assert (mpname != NULL && flname != NULL);    
+    if(mpname == NULL || flname == NULL)
+        return -EINVAL;
     
     fs = getfs(mpname);
 
@@ -111,7 +112,8 @@ int create_file(const char * mpname, const char * flname) {
 int delete_file(const char * mpname, const char * flname) {
     struct filesystem * fs;
 
-    assert (mpname != NULL && flname != NULL);
+    if(mpname == NULL || flname == NULL)
+        return -EINVAL;
     
     fs = getfs(mpname);
 
