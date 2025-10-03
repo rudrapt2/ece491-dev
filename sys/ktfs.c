@@ -622,9 +622,10 @@ void ktfs_listing_close(struct uio * uio) {
 
 long ktfs_listing_read(struct uio * uio, void * buf, unsigned long bufsz) {
     struct ktfs_listing_uio * const ls = (struct ktfs_listing_uio*)uio;
-    size_t len = strlen(ls->file->dentry.name);
+    size_t len;
 
     if (ls->file != NULL) {
+        len = strlen(ls->file->dentry.name);
         strncpy(buf, ls->file->dentry.name, bufsz);
         ls->file = ls->file->next;
         return (len < bufsz) ? len : bufsz;

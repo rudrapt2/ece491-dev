@@ -26,4 +26,5 @@ void main (int argc, char** argv)
         }
         dprintf(1, "%s\n", buffer);
     }
+    _exit();
 }
