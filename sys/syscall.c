@@ -55,7 +55,7 @@ static long sysread(int fd, void *buf, size_t bufsz);
 static long syswrite(int fd, const void *buf, size_t len);
 static int sysioctl(int fd, int cmd, void *arg);
 static int syspipe(int *wfdptr, int *rfdptr);
-static int sysiodup(int oldfd, int newfd);
+static int sysuiodup(int oldfd, int newfd);
 
 // EXPORTED FUNCTION DEFINITIONS
 //
@@ -115,8 +115,8 @@ int64_t syscall(const struct trap_frame *tfr)
         return sysfscreate((char *)tfr->a0);
     case SYSCALL_FSDELETE:
         return sysfsdelete((char *)tfr->a0);
-    case SYSCALL_IODUP:
-        return sysiodup(tfr->a0, tfr->a1);
+    case SYSCALL_UIODUP:
+        return sysuiodup(tfr->a0, tfr->a1);
     default:
         return -ENOTSUP;
     }
@@ -550,7 +550,7 @@ syspipeopen_rfd_ok:
  * @return fd number if sucessful else return error on invalid file descriptor or empty file descriptor
  */
 
-int sysiodup(int oldfd, int newfd)
+int sysuiodup(int oldfd, int newfd)
 {
     struct process *self;
     trace("%s(oldfd=%d,newfd=%d)", __func__, oldfd, newfd);

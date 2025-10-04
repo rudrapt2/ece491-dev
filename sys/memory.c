@@ -198,9 +198,9 @@ void memory_init(void) {
 
     assert (RAM_START == _kimg_start);
 
-    kprintf("           RAM: [%p,%p): %zu MB\n",
+    debug("           RAM: [%p,%p): %zu MB\n",
         RAM_START, RAM_END, RAM_SIZE / 1024 / 1024);
-    kprintf("  Kernel image: [%p,%p)\n", _kimg_start, _kimg_end);
+    debug("  Kernel image: [%p,%p)\n", _kimg_start, _kimg_end);
 
     // Kernel must fit inside 2MB megapage (one level 1 PTE)
     
@@ -276,14 +276,14 @@ void memory_init(void) {
 
     heap_init(heap_start, heap_end);
 
-    kprintf("Heap allocator: [%p,%p): %zu KB free\n",
+    debug("Heap allocator: [%p,%p): %zu KB free\n",
         heap_start, heap_end, (heap_end - heap_start) / 1024);
 
     free_chunk_list = heap_end; // heap_end is page aligned
     free_chunk_list->pagecnt = (RAM_END - heap_end) / PAGE_SIZE;
     free_chunk_list->next = NULL;
 
-    kprintf("Page allocator: [%p,%p): %u pages free\n",
+    debug("Page allocator: [%p,%p): %u pages free\n",
         heap_end, RAM_END, free_chunk_list->pagecnt);
     
     // Allow supervisor to access user memory. We could be more precise by only

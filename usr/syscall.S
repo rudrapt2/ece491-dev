@@ -106,10 +106,10 @@ _pipe:
         ecall
         ret
 
-        .global _iodup
-        .type   _iodup, @function
-_iodup:
-        li      a7, SYSCALL_IODUP
+        .global _uiodup
+        .type   _uiodup, @function
+_uiodup:
+        li      a7, SYSCALL_UIODUP
         ecall
         ret
 

@@ -30,6 +30,6 @@
 #define SYSCALL_WRITE 18 // write to fd
 #define SYSCALL_IOCTL 19 // issue ioctl on fd
 #define SYSCALL_PIPE 20  // create a pipe
-#define SYSCALL_IODUP 21 // duplicate an fd
+#define SYSCALL_UIODUP 21 // duplicate an fd
 
 #endif // _SCNUM_H_

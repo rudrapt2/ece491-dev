@@ -117,6 +117,6 @@ extern int _pipe(int * wfdptr, int * rfdptr);
 * @param newfd new fd to allocate
 * @return fd number if sucessful else return error that occured -EMFILE or -EBADFD
 */
-extern int _iodup(int oldfd, int newfd);
+extern int _uiodup(int oldfd, int newfd);
 
 #endif // _SYSCALL_H_

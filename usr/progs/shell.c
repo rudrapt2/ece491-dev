@@ -15,7 +15,7 @@ void exec(int c, char** v) {
   v[c] = NULL;
 
   // If path doesn't start with '/', prepend '/c/' for relative paths
-  if (v[0][0] != '/')
+  if (v[0][0] != '/' || (v[0][0] != 'c' && v[0][1] != '/'))
   {
     path[0] = '/';
     path[1] = 'c';
@@ -118,7 +118,7 @@ int parse(char* buf, char** v) {
 					if (_fork()) { // reader
 						_close(stdin);
 						_close(wpipe);
-						_iodup(rpipe, stdin);
+						_uiodup(rpipe, stdin);
 						if (rpipe != stdin)
 							_close(rpipe);
 						c = 0;
@@ -128,7 +128,7 @@ int parse(char* buf, char** v) {
 					else { // writer
 						_close(stdout);
 						_close(rpipe);
-						_iodup(wpipe, stdout);
+						_uiodup(wpipe, stdout);
 						if (wpipe != stdout)
 							_close(wpipe);
 						exec(c, v);
@@ -156,9 +156,9 @@ int main()
 
   _open(2, "/dev/uart1"); // console device
   _close(0);              // close any existing stdin
-  _iodup(2, 0);           // stdin from console
+  _uiodup(2, 0);           // stdin from console
   _close(1);              // close any existing stdout
-  _iodup(2, 1);           // stdout to console
+  _uiodup(2, 1);           // stdout to console
 
   printf("Starting 391 Shell\n");
 
