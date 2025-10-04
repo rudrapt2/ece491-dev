@@ -4,13 +4,17 @@
 #ifndef _UIO_H_
 #define _UIO_H_
 
+#include <stddef.h> // for size_t
+
 struct uio; // opaque decl.
 
+extern unsigned long uio_refcnt(const struct uio * uio);
 extern int uio_addref(struct uio * uio);
 extern void uio_close(struct uio * uio);
 extern long uio_read(struct uio * uio, void * buf, unsigned long bufsz);
 extern long uio_write(struct uio * uio, const void * buf, unsigned long buflen);
 extern int uio_cntl(struct uio * uio, int op, void * arg);
+extern void create_pipe(struct uio ** wptr, struct uio ** rptr);
 
 // FNCTL OP CONSTANTS
 //
@@ -36,5 +40,10 @@ extern int uio_cntl(struct uio * uio, int op, void * arg);
 // its reference count and returns a pointer to it.
 
 extern struct uio * create_null_uio(void);
+
+// The create_memory_uio() function creates a memory-backed uio object that
+// supports read, write, and control operations on a block of memory.
+
+extern struct uio *create_memory_uio(void *buf, size_t size);
 
 #endif // _UIO_H_

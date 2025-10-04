@@ -22,6 +22,8 @@
 #define ENOMEM     13   ///< Out of memory
 #define EPIPE      14   ///< Broken pipe
 #define EEXIST     15   ///< Object exists
+#define ENODATABLKS  16 ///< No data blocks
+#define ENOINODEBLKS 17 ///< No Inode blocks
 
 
 // Returns a string with the error name (e.g. 2 => "EBUSY")

@@ -1,0 +1,11 @@
+.gdbhist
+.gdbinit
+*.o
+*.dump
+*.elf
+*.raw
+util/fs/mkfs_ktfs
+util/fs/unmkfs_ktfs
+.vscode
+.clang-format
+usr/bin

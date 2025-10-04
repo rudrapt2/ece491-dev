@@ -38,6 +38,7 @@ void debug_actual(const char * filename, int lineno, const char * fmt, ...) {
     
     kprintf("DEBUG at %s:%d: ", filename, lineno);
     kvprintf(fmt, ap);
+    kprintf("\n");
 
     restore_interrupts(pie);
     va_end(ap);
@@ -52,6 +53,7 @@ void trace_actual(const char * filename, int lineno, const char * fmt, ...) {
     
     kprintf("TRACE at %s:%d: ", filename, lineno);
     kvprintf(fmt, ap);
+    kprintf("\n");
 
     restore_interrupts(pie);
     va_end(ap);

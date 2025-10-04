@@ -1,0 +1,102 @@
+\ProvidesPackage{ece391}
+
+\usepackage{epsfig}
+\usepackage{times}
+\usepackage{graphicx}
+
+\oddsidemargin= 0in
+\evensidemargin= 0in
+\topmargin=0in
+\headheight= 0in
+\headsep=0in
+\parskip=6pt
+\parindent=0pt
+\setlength{\textheight}{9in}
+\setlength{\textwidth}{6.5in}
+\pagestyle{empty}
+
+% Use this for teletype font (monospace)
+\newcommand{\fix}{\tt \small}
+
+% Use these for document sectioning
+\newcommand{\classsect}[1]{{\section {#1}}}
+\newcommand{\classsubsect}[1]{\subsection {#1}}
+\newcommand{\assntitle}[1]{\centerline{\large \bf {#1}}}
+
+\newcommand{\cmd}[1]{\centerline{\fix {#1}}}
+\newcommand{\probnum}[2]{{\bf {#1}.  {#2}}}
+\newcommand{\subprob}[1]{{\bf {#1}.}}
+\newcommand{\reg}[1]{{\fix \%{#1}}}
+\newcommand{\lowsig}[1]{$\overline{\mbox{{#1}}}$}
+
+\newcommand{\outline}[1]{\mbox{\bf \small $>>$~~~{#1}~~~$<<$}}
+
+\newcommand{\classdir}{\mbox{\fix $\backslash\backslash$ece-serv-05$\backslash$classes$\backslash$ece391}}
+\newcommand{\homedir}{\mbox{{\fix $\backslash\backslash$ece-serv-05$\backslash$}$<$your Net ID$>$}}
+\newcommand{\winmenu}[1]{\mbox{\sc \small {#1}}}
+
+\newcommand{\ie}{{\em i.e.}}
+\newcommand{\eg}{{\em e.g.}}
+\newcommand{\etc}{{\em etc.}}
+
+\setcounter{topnumber}{4}
+\setcounter{bottomnumber}{4}
+\renewcommand{\topfraction}{.9}
+\renewcommand{\bottomfraction}{.9}
+\setcounter{totalnumber}{6}
+\renewcommand{\floatpagefraction}{.9}
+\renewcommand{\dblfloatpagefraction}{.9}
+\renewcommand{\dbltopfraction}{.9}
+\setcounter{dbltopnumber}{4}
+\renewcommand{\textfraction}{.1}
+
+\marginparwidth=.75in
+\marginparsep=.125in
+
+\newcommand{\twovert}[2]{\mbox{\arraycolsep 0pt \tabcolsep 0pt \begin{tabular}{c}{#1}\\{#2}\end{tabular}}}
+\newcommand{\threevert}[3]{\mbox{\arraycolsep 0pt \tabcolsep 0pt \begin{tabular}{c}{#1}\\{#2}\\{#3}\end{tabular}}}
+\newcommand{\fourvert}[4]{\mbox{\arraycolsep 0pt \tabcolsep 0pt \begin{tabular}{c}{#1}\\{#2}\\{#3}\\{#4}\end{tabular}}}
+\newcommand{\fivevert}[5]{\mbox{\arraycolsep 0pt \tabcolsep 0pt \begin{tabular}{c}{#1}\\{#2}\\{#3}\\{#4}\\{#5}\end{tabular}}}
+
+%% NOTE: You almost certainly don't want this in the future.
+%% What this command does is add a "checkpoint" indicator to the pages
+%% This makes it a little easier to see which version of the document students are using (both
+%% for their sake, and identifying potential sync issues in OH).
+
+%% Once we're at a point where the MP doc is "stable" this is pure noise and probably not worth keeping
+%% -ingi
+
+%% Stuff for graphics
+% https://www.sciencetronics.com/greenphotons/wp-content/uploads/2016/10/xcolor_names.pdf
+\usepackage[x11names]{xcolor}
+\usepackage{geometry}
+
+\newcommand{\ckptbox}[1]{
+	{\colorbox{green}{%
+				\hspace{0.5cm}\textcolor{black}{\texttt{#1}}\hspace{0.5cm}}}
+}
+\usepackage{silence}
+\WarningsOff[everypage]% Suppress warnings related to everypage
+\usepackage{everypage}
+% The author of background hasn't updated these hooks to everypage.
+\usepackage{background}
+\backgroundsetup{
+	position=current page.north west,
+	angle=0,
+	nodeanchor=north west,
+	vshift=-1cm,
+	hshift=1cm,
+	scale=1.1,
+	opacity=1,
+	% UPDATEME when the checkpoint number (or version) is otherwise bumped
+	contents={\ckptbox{CP3.1}}
+}
+
+\newcounter{daggerfootnote}
+\newcommand*{\daggerfootnote}[1]{%
+	\setcounter{daggerfootnote}{\value{footnote}}%
+	\renewcommand*{\thefootnote}{\fnsymbol{footnote}}%
+	\footnote[2]{#1}%
+	\setcounter{footnote}{\value{daggerfootnote}}%
+	\renewcommand*{\thefootnote}{\arabic{footnote}}%
+}

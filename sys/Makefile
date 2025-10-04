@@ -11,12 +11,13 @@ OBJCOPY=$(PREFIX)objcopy
 OBJDUMP=$(PREFIX)objdump
 
 OBJS = \
-    misc.o \
+	misc.o \
 	console.o \
 	dev/uart.o \
 	dev/rtc.o \
 	dev/virtio.o \
 	dev/viorng.o \
+	dev/memio.o \
 	device.o \
 	filesys.o \
 	elf.o \
@@ -34,13 +35,12 @@ OBJS = \
 	thrasm.o \
 	thread.o \
 	timer.o \
-	trap.o
-#	syscall.o \
-#	dev/viogpu.o \
-#	dev/viorng.o \
-#	dev/vioblk.o \
-#	cache.o \
-#	ktfs.o
+	trap.o \
+	syscall.o \
+	dev/viorng.o \
+	dev/vioblk.o \
+	cache.o \
+	ktfs.o
 #   tarfs.o 
 
 CFLAGS = -Wall -Werror=implicit-function-declaration
@@ -51,20 +51,21 @@ CFLAGS += -fno-asynchronous-unwind-tables -mno-riscv-attribute
 CFLAGS += -I.
 
 # CFLAGS += -DDEBUG -DTRACE # Everything!
-#CFLAGS += -DMEMORY_DEBUG -DMEMORY_TRACE
-#CFLAGS += -DHEAP_DEBUG -DHEAP_TRACE
-#CFLAGS += -DEZFS_DEBUG -DEZFS_TRACE
-#CFLAGS += -DLOCK_DEBUG -DLOCK_TRACE
-#CFLAGS += -DPROCESS_DEBUG -DPROCESS_TRACE
-#CFLAGS += -DMAIN_DEBUG -DMAIN_TRACE
-#CFLAGS += -DSYSCALL_DEBUG -DSYSCALL_TRACE
-#CFLAGS += -DTHREAD_DEBUG -DTHREAD_TRACE
-#CFLAGS += -DTIMER_DEBUG -DTIMER_TRACE
-#CFLAGS += -DVIOGPU_DEBUG -DVIOGPU_TRACE
-#CFLAGS += -DCACHE_DEBUG -DCACHE_TRACE
-#CFLAGS += -DKTFS_DEBUG -DKTFS_TRACE
-#CFLAGS += -DELF_DEBUG -DELF_TRACE
-#CFLAGS += -DTARFS_DEBUG -DTARFS_TRACE
+# CFLAGS += -DMEMORY_DEBUG -DMEMORY_TRACE
+# CFLAGS += -DHEAP_DEBUG -DHEAP_TRACE
+# CFLAGS += -DEZFS_DEBUG -DEZFS_TRACE
+# CFLAGS += -DLOCK_DEBUG -DLOCK_TRACE
+# CFLAGS += -DPROCESS_DEBUG -DPROCESS_TRACE
+# CFLAGS += -DMAIN_DEBUG -DMAIN_TRACE
+# CFLAGS += -DSYSCALL_DEBUG -DSYSCALL_TRACE
+# CFLAGS += -DUIO_DEBUG -DUIO_TRACE
+# CFLAGS += -DTHREAD_DEBUG -DTHREAD_TRACE
+# CFLAGS += -DTIMER_DEBUG -DTIMER_TRACE
+# CFLAGS += -DVIOGPU_DEBUG -DVIOGPU_TRACE
+# CFLAGS += -DCACHE_DEBUG -DCACHE_TRACE
+# CFLAGS += -DKTFS_DEBUG -DKTFS_TRACE
+# CFLAGS += -DELF_DEBUG -DELF_TRACE
+# CFLAGS += -DTARFS_DEBUG -DTARFS_TRACE
 
 
 ASFLAGS = -march=rv64imazicsr
@@ -82,9 +83,9 @@ QEMUOPTS += -object rng-random,filename=/dev/urandom,id=rng0
 QEMUOPTS += -device virtio-rng-device,rng=rng0
 QEMUOPTS += -serial mon:stdio
 QEMUOPTS += -serial pty
-QEMUOPTS += -serial pty
-QEMUOPTS += -serial pty
-QEMUOPTS += -drive file=/dev/null,id=blk0,if=none,format=raw,readonly=false
+# QEMUOPTS += -serial pty
+# QEMUOPTS += -serial pty
+QEMUOPTS += -drive file=ktfs.raw,id=blk0,if=none,format=raw,readonly=false
 QEMUOPTS += -device virtio-blk-device,drive=blk0
 #QEMUOPTS += -device virtio-gpu-device -display gtk
 
@@ -94,7 +95,7 @@ kernel.elf: $(OBJS) main.o blob.o
 	$(LD) $(LDFLAGS) -T kernel.ld -o $@ $^
 
 run: kernel.elf
-	$(QEMU) $(QEMUOPTS) -m 8M -kernel $<
+	$(QEMU) $(QEMUOPTS) -m 8M -kernel $< 2>&1 | tee qemu_output.log
 
 debug: kernel.elf
 	$(QEMU) $(QEMUOPTS) -m 8M -kernel $< -S -s

@@ -8,6 +8,7 @@
 #define _FILESYS_H_
 
 #include "cache.h"
+#include "fsimpl.h"
 #include "uio.h"
 
 extern char fsmgr_initialized;
@@ -18,6 +19,8 @@ extern void fsmgr_flushall(void);
 extern int open_file(const char * mpname, const char * flname, struct uio ** uioptr);
 extern int create_file(const char * mpname, const char * flname);
 extern int delete_file(const char * mpname, const char * flname);
+
+extern int attach_filesystem(const char *name, struct filesystem *fs);
 
 // Splits a string path into two strings, the first being the mountpoint name and the seoncd
 extern int parse_path(char * path, char ** mpnameptr, char ** flnameptr);

@@ -8,8 +8,9 @@
 #include "fsimpl.h"
 #include "error.h"
 #include "string.h"
-#include "heap.h"
 #include "misc.h"
+#include "heap.h"
+#include "uioimpl.h"
 
 #include <stddef.h>
 
@@ -27,15 +28,30 @@ struct mountpoint {
 
 static struct filesystem * getfs(const char * mpname);
 static int fsopen(struct filesystem * fs, const char * flname, struct uio ** uioptr);
-static int fscreat(struct filesystem * fs, const char * flname);
+static int fscreate(struct filesystem * fs, const char * flname);
 static int fsdelete(struct filesystem * fs, const char * flname);
 static void fsflush(struct filesystem * fs);
+
+static int fs_open_listing(struct uio ** uioptr);
+static void fs_listing_close(struct uio * uio);
+static long fs_listing_read (struct uio * uio, void * buf, unsigned long bufsz);
 
 static int nullfs_open(struct filesystem * fs, const char * flname, struct uio ** uioptr);
 static void nullfs_flush(struct filesystem * fs);
 
 // INTERNAL GLOBAL VARIABLES
 //
+
+// listing interface for uio
+struct fs_listing_uio {
+    struct uio base;
+    const struct mountpoint * fs;
+};
+
+static const struct uio_intf fs_listing_uio_intf = {
+    .close = &fs_listing_close,
+    .read = &fs_listing_read
+};
 
 static const struct filesystem nullfs = {
     .open = &nullfs_open,
@@ -70,7 +86,12 @@ void fsmgr_flushall(void) {
 int open_file(const char * mpname, const char * flname, struct uio ** uioptr) {
     struct filesystem * fs;
 
-    assert (mpname != NULL && flname != NULL);
+    trace("%s(%s/%s)", __func__, mpname, flname);
+
+    assert (mpname != NULL || flname == NULL);
+
+    if (mpname == NULL || *mpname == '\0')
+        return fs_open_listing(uioptr);
 
     fs = getfs(mpname);
 
@@ -80,21 +101,55 @@ int open_file(const char * mpname, const char * flname, struct uio ** uioptr) {
 int create_file(const char * mpname, const char * flname) {
     struct filesystem * fs;
 
-    assert (mpname != NULL && flname != NULL);    
+    if(mpname == NULL || flname == NULL)
+        return -EINVAL;
     
     fs = getfs(mpname);
 
-    return (fs != NULL) ? fscreat(fs, flname) : -ENOENT;
+    return (fs != NULL) ? fscreate(fs, flname) : -ENOENT;
 }
 
 int delete_file(const char * mpname, const char * flname) {
     struct filesystem * fs;
 
-    assert (mpname != NULL && flname != NULL);
+    if(mpname == NULL || flname == NULL)
+        return -EINVAL;
     
     fs = getfs(mpname);
 
     return (fs != NULL) ? fsdelete(fs, flname) : -ENOENT;
+}
+
+int fs_open_listing(struct uio ** uioptr) {
+    struct fs_listing_uio * ls;
+
+    ls = kcalloc(1, sizeof(*ls));
+    ls->fs = mplist;
+
+    // Note: The listing uio_intf is at index DEV_UNDEF in /devfs_uio_intfs/.
+    *uioptr = uio_init1(&ls->base, &fs_listing_uio_intf);
+
+    return 0;
+}
+
+void fs_listing_close(struct uio * uio) {
+    struct fs_listing_uio * const ls = (struct fs_listing_uio*)uio;
+    kfree(ls);
+}
+
+long fs_listing_read (
+    struct uio * uio, void * buf, unsigned long bufsz)
+{
+    struct fs_listing_uio * const ls = (struct fs_listing_uio*)uio;
+    size_t len;
+
+    if (ls->fs != NULL) {
+        len = strlen(ls->fs->name);
+        strncpy(buf, ls->fs->name, bufsz);
+        ls->fs = ls->fs->next;
+        return (len < bufsz) ? len : bufsz;
+    } else
+        return 0;
 }
 
 int mount_nullfs(const char * name) {
@@ -121,7 +176,7 @@ int attach_filesystem(const char * mpname, struct filesystem * fs) {
     mp->fs = fs;
     *mpptr = mp;
 
-    return -ENOTSUP;
+    return 0;
 }
 
 // INTERNAL FUNCTION DEFINITIONS
@@ -145,7 +200,7 @@ int fsopen(struct filesystem * fs, const char * flname, struct uio ** uioptr) {
         return -ENOTSUP;
 }
 
-int fscreat(struct filesystem * fs, const char * flname) {
+int fscreate(struct filesystem * fs, const char * flname) {
     if (fs->create != NULL)
         return fs->create(fs, flname);
     else
@@ -176,3 +231,26 @@ int nullfs_open (
 void nullfs_flush(struct filesystem * fs __attribute__ ((unused))) {
     // nothing
 }
+
+
+int parse_path(char * path, char ** mpnameptr, char ** flnameptr){
+    if (path == NULL || mpnameptr == NULL || flnameptr == NULL) {
+        return -EINVAL; // invalid args
+    }
+
+    while (*path == '/') path++; // ignore all leading slashes
+
+    char *slash = strchr(path, '/');
+    if (slash != NULL) { // no slashes indicates mp only
+        *flnameptr = slash + 1;
+        *slash = '\0';
+    } else
+        *flnameptr = '\0';
+
+    *mpnameptr = path;
+
+    return 0; // success
+}
+
+
+

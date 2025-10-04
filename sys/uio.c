@@ -1,12 +1,44 @@
 // uio.c - Uniform I/O interface
 //
 
+#ifdef UIO_DEBUG
+#define DEBUG
+#endif
+
+#ifdef UIO_TRACE
+#define TRACE
+#endif
+
 #include "uio.h"
 #include "uioimpl.h"
 #include "error.h"
+#include "thread.h"
+#include "memory.h"
+#include "string.h"
+#include "heap.h"
 #include "misc.h"
 
-#include <stddef.h> // for NULL
+#include <stddef.h> // for NULL and offsetof
+
+#define PIPE_BUFSZ PAGE_SIZE
+
+/**
+ * @brief Unidirectional pipe. Consists of a reader I/O interface which may only read from buffer,
+ * and a writer I/O interface which may only write to buffer
+ */
+struct pipe {
+    struct condition updated; ///< Wait condition for writer/reader to use if no data is available/buffer is full
+    struct uio wio; ///< I/O struct of writer
+    struct uio rio; ///< I/O struct of reader
+    void * buf; ///< Circular buffer where data is written/read
+    unsigned int hpos; ///< where next byte will be read
+    unsigned int tpos; ///< where next byte will be written
+};
+
+static void pipe_writer_close(struct uio * uio);
+static void pipe_reader_close(struct uio * uio);
+static long pipe_read(struct uio * uio, void * buf, unsigned long bufsz);
+static long pipe_write(struct uio * uio, const void * buf, unsigned long len);
 
 static void nulluio_close(struct uio * uio);
 
@@ -20,8 +52,25 @@ static long nulluio_write (
 //
 
 void uio_close(struct uio * uio) {
-    if (uio->intf->close != NULL)
-        uio->intf->close(uio);
+  debug("uio_close: refcnt=%d, has_close=%d", uio->refcnt, (uio->intf->close != NULL));
+
+  // Decrement reference count if it's greater than 0
+  if (uio->refcnt > 0)
+  {
+    uio->refcnt--;
+    debug("uio_close: decremented refcnt to %d", uio->refcnt);
+  }
+
+  // Only call the actual close method when refcnt reaches 0
+  if (uio->refcnt == 0 && uio->intf->close != NULL)
+  {
+    debug("uio_close: calling close method");
+    uio->intf->close(uio);
+  }
+  else if (uio->refcnt > 0)
+  {
+    debug("uio_close: NOT calling close (refcnt=%d still has references)", uio->refcnt);
+  }
 }
 
 long uio_read(struct uio * uio, void * buf, unsigned long bufsz) {
@@ -51,9 +100,24 @@ int uio_cntl(struct uio * uio, int op, void * arg) {
         return -ENOTSUP;
 }
 
+unsigned long uio_refcnt(const struct uio * uio) {
+    assert (uio != NULL);
+    return uio->refcnt;
+}
+
 int uio_addref(struct uio * uio) {
     return ++uio->refcnt;
 }
+
+static const struct uio_intf pipe_writer_intf = {
+    .close = &pipe_writer_close,
+    .write = &pipe_write
+};
+
+static const struct uio_intf pipe_reader_intf = {
+    .close = &pipe_reader_close,
+    .read = &pipe_read
+};
 
 struct uio * create_null_uio(void) {
     static const struct uio_intf nulluio_intf = {
@@ -86,4 +150,101 @@ static long nulluio_write (
 {
     // ...
     return -ENOTSUP;
+}
+
+// pipes
+void create_pipe(struct uio ** wptr, struct uio ** rptr) {
+    struct pipe * pipe;
+
+    pipe = kcalloc(1, sizeof(struct pipe));
+
+    condition_init(&pipe->updated, "pipe.updated");
+    pipe->buf = alloc_phys_page();
+
+    *wptr = uio_init1(&pipe->wio, &pipe_writer_intf);
+    *rptr = uio_init1(&pipe->rio, &pipe_reader_intf);
+}
+
+void pipe_writer_close(struct uio * uio) {
+	struct pipe * const pipe = (void*)uio - offsetof(struct pipe, wio);
+	assert (uio_refcnt(&pipe->wio) == 0);
+	
+	if (uio_refcnt(&pipe->rio) == 0) {
+		free_phys_page(pipe->buf);
+		kfree(pipe);
+	}
+}
+
+void pipe_reader_close(struct uio * uio) {
+    struct pipe * const pipe = (void*)uio - offsetof(struct pipe, rio);
+	assert (uio_refcnt(&pipe->rio) == 0);
+	
+	if (uio_refcnt(&pipe->wio) == 0) {
+		free_phys_page(pipe->buf);
+		kfree(pipe);
+	}
+}
+
+long pipe_read(struct uio * uio, void * buf, unsigned long bufsz) {
+    struct pipe * const pipe = (void*)uio - offsetof(struct pipe, rio);
+	const void * src;
+	long n;
+	
+	if (bufsz == 0)
+		return 0;
+	
+	while (uio_refcnt(&pipe->wio) != 0 && pipe->tpos == 0)
+		condition_wait(&pipe->updated);
+	
+	src = pipe->buf + pipe->hpos;
+	
+	if (pipe->tpos - pipe->hpos <= bufsz) {
+		n = pipe->tpos - pipe->hpos;
+		pipe->hpos = 0;
+		pipe->tpos = 0;
+	} else {
+		n = bufsz;
+		pipe->hpos += n;
+	}
+
+	memcpy(buf, src, n);
+	condition_broadcast(&pipe->updated);
+	return n;
+}
+
+long pipe_write(struct uio * uio, const void * buf, unsigned long len) {
+	struct pipe * const pipe = (void*)uio - offsetof(struct pipe, wio);
+	long n;
+	
+	if (len == 0)
+		return 0;
+
+    // Fast path: we can append the entire write buffer contents to the buffer.
+    // However, if there are no readers left, we need to return -EPIPE and not
+    // accept the data.
+
+    if (len <= PIPE_BUFSZ - pipe->tpos) {
+        if (uio_refcnt(&pipe->rio) == 0)
+            return -EPIPE;
+        memcpy(pipe->buf + pipe->tpos, buf, len);
+        pipe->tpos += len;
+        return len;
+    }
+
+    // Otherwise, wait until buffer is empty or there are no readers left.
+
+	while (uio_refcnt(&pipe->rio) != 0 && pipe->tpos != 0)
+		condition_wait(&pipe->updated);
+
+    // If there are no readers left, return broken pipe error.
+
+	if (uio_refcnt(&pipe->rio) == 0)
+		return -EPIPE;
+	
+	n = (PIPE_BUFSZ - pipe->tpos < len) ? PIPE_BUFSZ - pipe->tpos : len;
+	memcpy(pipe->buf + pipe->tpos, buf, n);
+	pipe->tpos += n;
+
+    condition_broadcast(&pipe->updated);
+	return n;
 }

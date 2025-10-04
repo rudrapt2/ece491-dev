@@ -17,15 +17,17 @@
 #include "string.h"
 #include "filesys.h"
 #include "error.h"
+#include "cache.h"
 
-#define INITEXE "init"
+#define INITEXE "shell"
 
 #define CMNTNAME "c"
-#define CDEVNAME "violblk"
+#define DEVMNTNAME "dev"
+#define CDEVNAME "vioblk"
 #define CDEVINST 0
 
 #ifndef NUART // number of UARTs
-#define NUART 0
+#define NUART 2
 #endif
 
 #ifndef NVIODEV // number of VirtIO devices
@@ -55,21 +57,31 @@ void main(void) {
 
 void attach_devices(void) {
     int i;
+    int result;
 
     for (i = 0; i < NUART; i++)
         attach_uart((void*)UART_MMIO_BASE(i), UART0_INTR_SRCNO+i);
     
     for (i = 0; i < NVIODEV; i++)
         attach_virtio((void*)VIRTIO_MMIO_BASE(i), VIRTIO0_INTR_SRCNO+i);
+
+    result = mount_devfs(DEVMNTNAME);
+
+    if (result != 0) {
+        kprintf("mount_devfs(%s) failed: %s\n",
+            CDEVNAME, error_name(result));
+        halt_failure();
+    }
 }
 
 void mount_cdrive(void) {
-#if 0
+#if 1
     struct storage * hd;
     struct cache * cache;
     int result;
 
     hd = find_storage(CDEVNAME, CDEVINST);
+    storage_open(hd);
 
     if (hd == NULL) {
         kprintf("Storage device %s%d not found\n", CDEVNAME, CDEVINST);
@@ -95,12 +107,12 @@ void mount_cdrive(void) {
 }
 
 void run_init(void) {
-#if 0
+#if 1
     char * argv[] = { NULL };
     struct uio * initexe;
     int result;
     
-    result = open_file(CMNTNAME "/" INITEXE, &initexe);
+    result = open_file(CMNTNAME, INITEXE, &initexe);
 
     if (result != 0) {
         kprintf(INITEXE ": %s; terminating\n", error_name(result));

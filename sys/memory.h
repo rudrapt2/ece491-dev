@@ -19,6 +19,11 @@
 #define PAGE_ORDER 12
 #define PAGE_SIZE (1UL << PAGE_ORDER)
 
+// The ROUND_UP and ROUND_DOWN macros round argument _n_ to a multiple of _k_.
+
+#define ROUND_UP(n,k) (((n)+(k)-1)/(k)*(k))
+#define ROUND_DOWN(n,k) ((n)/(k)*(k))
+
 // Flags for alloc_and_map_range() and set_range_flags()
 
 #define PTE_V (1 << 0) // internal use only

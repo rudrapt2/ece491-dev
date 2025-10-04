@@ -52,6 +52,13 @@ struct video_uio {
     // ...
 };
 
+struct storage_uio {
+    struct uio base;
+    struct storage * sto;
+    unsigned long pos;
+
+};
+
 // INTERNAL FUNCTION DECLARATIONS
 //
 
@@ -118,11 +125,10 @@ static const struct uio_intf storage_uio_intf = {
     .cntl = &storage_uio_cntl
 };
 
-static const struct uio_intf video_uio_intf = {
+static const struct uio_intf video_uio_intf __attribute__((unused)) = {
     .close = &video_uio_close,
     .write = &video_uio_write,
-    .cntl = &video_uio_cntl
-};
+    .cntl = &video_uio_cntl};
 
 // EXPORTED FUNCTION DEFINITIONS
 //
@@ -133,7 +139,7 @@ void devmgr_init(void) {
 }
 
 int register_device(const char * name, enum device_type type, void * device_struct) {
-    struct device_record ** dptr;
+    struct device_record ** dptr = &devlist;
     struct device_record * dev;
     size_t namelen;
     int instno = 0;
@@ -482,26 +488,48 @@ long serial_uio_write(struct uio * uio, const void * buf, unsigned long buflen) 
 }
 
 int storage_open_uio(struct storage * sto, struct uio ** uioptr) {
-    return -ENOTSUP;
+    struct storage_uio * suio;
+    int result;
+
+    // Try to open device
+
+    result = storage_open(sto);
+
+    if (result != 0)
+        return result;
+    
+    suio = kcalloc(1, sizeof(*suio));
+
+    suio->sto = sto;
+    suio->pos = 0;
+    *uioptr = uio_init1(&suio->base, &storage_uio_intf);
+    return 0;
+    
 }
 
 void storage_uio_close(struct uio * uio) {
-    // ...
+    struct storage_uio * suio = (struct storage_uio*)uio;
+    storage_close(suio->sto);
+
+    kfree(suio);
 }
 
 long storage_uio_read(struct uio * uio, void * buf, unsigned long bufsz) {
-    // ...
-    return -ENOTSUP;
+    struct storage_uio * suio = (struct storage_uio*)uio;
+
+    return storage_fetch(suio->sto, suio->pos, buf, bufsz);
 }
 
 long storage_uio_write(struct uio * uio, const void * buf, unsigned long buflen) {
-    // ...
-    return -ENOTSUP;
+    struct storage_uio * suio = (struct storage_uio*)uio;
+
+    return storage_store(suio->sto, suio->pos, buf, buflen);
 }
 
 int storage_uio_cntl(struct uio * uio, int op, void * arg) {
-    // ...
-    return -ENOTSUP;
+    struct storage_uio * suio = (struct storage_uio*)uio;
+
+    return storage_cntl(suio->sto, op, arg);
 }
 
 int video_open_uio(struct video * vid, struct uio ** uioptr) {
@@ -509,7 +537,6 @@ int video_open_uio(struct video * vid, struct uio ** uioptr) {
 }
 
 void video_uio_close(struct uio * uio) {
-    // ...
 }
 
 long video_uio_write(struct uio * uio, const void * buf, unsigned long buflen) {
