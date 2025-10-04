@@ -9,17 +9,33 @@
 
 #include <stddef.h>
 
-struct uio; // forward declaration
+struct storage; // forward declaration
 
 // EXPORTED FUNCTION DECLARATIONS
 //
 
 /**
- * @brief Creates a memory-backed UIO object that supports read, write, and control operations
- * @param buf Pointer to memory buffer that will back the I/O operations
+ * @brief Creates and registers a memory-backed storage device
+ * @param name Device name to register with
+ * @param buf Pointer to memory buffer that will back the storage operations
  * @param size Size of memory buffer in bytes
- * @return Pointer to newly created UIO object
+ * @return 0 on success, negative error code on failure
  */
-extern struct uio * create_memory_uio(void * buf, size_t size);
+extern int attach_memory_storage(const char *name, void *buf, size_t size);
+
+/**
+ * @brief Creates and registers a blob-backed storage device using embedded kernel blob data
+ * @param name Device name to register with
+ * @return 0 on success, negative error code on failure
+ */
+extern int attach_blob_storage(const char *name);
+
+/**
+ * @brief Creates a memory-backed storage device that supports fetch, store, and control operations
+ * @param buf Pointer to memory buffer that will back the storage operations
+ * @param size Size of memory buffer in bytes
+ * @return Pointer to newly created storage device
+ */
+extern struct storage *create_memory_storage(void *buf, size_t size);
 
 #endif // _MEMIO_H_

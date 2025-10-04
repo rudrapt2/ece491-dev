@@ -12,12 +12,12 @@
 #define TRACE
 #endif
 
-#include "uio.h"
-#include "uioimpl.h"
+#include "devimpl.h"
 #include "error.h"
 #include "string.h"
 #include "heap.h"
 #include "misc.h"
+#include "uio.h"
 
 #include <stddef.h>
 
@@ -25,111 +25,168 @@
 //
 
 /**
- * @brief I/O endpoint backed by a block of memory. Allows modification of the backing memory block.
+ * @brief Storage device backed by a block of memory. Allows modification of the backing memory block.
  */
-struct memuio {
-    struct uio uio; ///< I/O struct of memory I/O
-    void * buf; ///< Block of memory
-    size_t size; ///< Size of memory block
+struct memstorage
+{
+  struct storage storage; ///< Storage struct of memory storage
+  void *buf;              ///< Block of memory
+  size_t size;            ///< Size of memory block
 };
 
 // INTERNAL FUNCTION DECLARATIONS
 //
 
-static int memuio_cntl(struct uio * uio, int cmd, void * arg);
-static long memuio_read(struct uio * uio, void * buf, unsigned long bufsz);
-static long memuio_write(struct uio * uio, const void * buf, unsigned long len);
+static int memstorage_open(struct storage *sto);
+static void memstorage_close(struct storage *sto);
+static long memstorage_fetch(struct storage *sto, unsigned long long pos, void *buf, unsigned long bytecnt);
+static int memstorage_cntl(struct storage *sto, int cmd, void *arg);
 
 // INTERNAL GLOBAL CONSTANTS
 //
 
-static const struct uio_intf memuio_intf = {
-    .close = (void(*)(struct uio*))&kfree,
-    .read = &memuio_read,
-    .write = &memuio_write,
-    .cntl = &memuio_cntl
-};
+static const struct storage_intf memstorage_intf = {
+    .blksz = 1,
+    .open = &memstorage_open,
+    .close = &memstorage_close,
+    .fetch = &memstorage_fetch,
+    .store = NULL, // Read-only storage (blob data in .rodata)
+    .cntl = &memstorage_cntl};
 
 // EXPORTED FUNCTION DEFINITIONS
 //
 
-struct uio * create_memory_uio(void * buf, size_t size) {
-    struct memuio * muio;
+int attach_memory_storage(const char *name, void *buf, size_t size)
+{
+  struct memstorage *msto;
+  int result;
 
-    muio = kmalloc(sizeof(struct memuio));
+  msto = kmalloc(sizeof(struct memstorage));
+  if (!msto)
+  {
+    return -ENOMEM;
+  }
 
-    muio->buf = buf;
-    muio->size = size;
+  msto->buf = buf;
+  msto->size = size;
 
-    return uio_init1(&muio->uio, &memuio_intf);
+  storage_init(&msto->storage, &memstorage_intf, size);
+
+  result = register_device(name, DEV_STORAGE, msto);
+  if (result != 0)
+  {
+    kfree(msto);
+    return result;
+  }
+
+  return 0;
+}
+
+int attach_blob_storage(const char *name)
+{
+  // External symbols from linker script for embedded blob data
+  extern char _kimg_blob_start[], _kimg_blob_end[];
+
+  size_t blob_size = _kimg_blob_end - _kimg_blob_start;
+
+  if (blob_size == 0)
+  {
+    return -ENOENT;
+  }
+
+  // Use the embedded blob data as the storage buffer
+  // Note: This creates a read-only storage device since blob data is in .rodata
+  return attach_memory_storage(name, _kimg_blob_start, blob_size);
+}
+
+struct storage *create_memory_storage(void *buf, size_t size)
+{
+  struct memstorage *msto;
+
+  msto = kmalloc(sizeof(struct memstorage));
+  if (!msto)
+  {
+    return NULL;
+  }
+
+  msto->buf = buf;
+  msto->size = size;
+
+  storage_init(&msto->storage, &memstorage_intf, size);
+  return &msto->storage;
 }
 
 // INTERNAL FUNCTION DEFINITIONS
 //
 
 /**
- * @brief _read_ implementation for mem I/O.
+ * @brief _open_ implementation for memory storage.
+ * @param sto Storage struct pointer for memory storage
+ * @return 0 on success
+ */
+static int memstorage_open(struct storage *sto)
+{
+  return 0; // Always successful for memory storage
+}
+
+/**
+ * @brief _close_ implementation for memory storage.
+ * @param sto Storage struct pointer for memory storage
+ */
+static void memstorage_close(struct storage *sto)
+{
+  kfree((void *)sto - offsetof(struct memstorage, storage));
+}
+
+/**
+ * @brief _fetch_ implementation for memory storage.
  * @details Performs proper bounds checks, then copies data from memory block to passed buffer
- * @param uio I/O struct pointer for memory I/O backend
+ * @param sto Storage struct pointer for memory storage
+ * @param pos Position in storage to read from
  * @param buf Buffer to copy data from memory to
- * @param bufsz Number of bytes to read from memory
+ * @param bytecnt Number of bytes to read from memory
  * @return Number of bytes successfully read
  */
-long memuio_read(struct uio * uio, void * buf, unsigned long bufsz) {
-    struct memuio * const muio = (void*)uio - offsetof(struct memuio, uio);
-    unsigned long len;
+static long memstorage_fetch(struct storage *sto, unsigned long long pos, void *buf, unsigned long bytecnt)
+{
+  struct memstorage *const msto = (void *)sto - offsetof(struct memstorage, storage);
+  unsigned long len;
 
-    if (muio->size < bufsz)
-        len = muio->size;
-    else
-        len = bufsz;
-    
-    memcpy(buf, muio->buf, len);
-    return len;
+  // Check bounds
+  if (pos >= msto->size)
+    return 0;
+
+  if (pos + bytecnt > msto->size)
+    len = msto->size - pos;
+  else
+    len = bytecnt;
+
+  memcpy(buf, (char *)msto->buf + pos, len);
+  return len;
 }
 
 /**
- * @brief _write_ implementation for mem I/O. 
- * @details Performs proper bounds checks, then copies data from passed buffer to memory block.
- * Writes should **not** exceed size of backing memory.
- * @param uio I/O struct pointer for memory I/O
- * @param buf Buffer containing data to write into memory
- * @param len Number of bytes to write to memory
- * @return Number of bytes successfully written
- */
-long memuio_write(struct uio * uio, const void * buf, unsigned long len) {
-    struct memuio * const muio = (void*)uio - offsetof(struct memuio, uio);
-
-    if (muio->size < len)
-        len = muio->size;
-
-    memcpy(muio->buf, buf, len);
-    return len;
-}
-
-/**
- * @brief _cntl_ functions for mem I/O.
- * @details Memory I/O supports the following _cntl_ commands:
- * FCNTL_GETEND, FCNTL_SETEND (new size should **not** exceed size of backing memory)
- * @param uio I/O struct pointer for memory I/O
+ * @brief _cntl_ functions for memory storage.
+ * @details Memory storage supports basic control operations
+ * @param sto Storage struct pointer for memory storage
  * @param cmd command to run
- * @param arg Argument for commands; size of backing memory is returned via arg for FCNTL_GETEND, new end is passed via arg for FCNTL_SETEND
- * @return 0 on success for FCNTL_GETEND or FCNTL_SETEND, error on failure or unsupported command
+ * @param arg Argument for commands
+ * @return 0 on success, error on failure or unsupported command
  */
-int memuio_cntl(struct uio * uio, int cmd, void * arg) {
-    struct memuio * const muio = (void*)uio - offsetof(struct memuio, uio);
-    unsigned long long * const ullarg = arg;
+static int memstorage_cntl(struct storage *sto, int cmd, void *arg)
+{
+  struct memstorage *const msto = (void *)sto - offsetof(struct memstorage, storage);
+  (void)msto; // Mark as used to avoid warnings
+  (void)arg;  // Mark as used to avoid warnings
 
-    switch (cmd) {
-    case FCNTL_GETEND:
-        *ullarg = muio->size;
-        return 0;
-    case FCNTL_SETEND:
-        if (muio->size < *ullarg)
-            return -EINVAL;
-        muio->size = (size_t)*ullarg;
-        return 0;
-    default:
-        return -ENOTSUP;
-    }
+  switch (cmd)
+  {
+  case FCNTL_GETEND:
+    if (arg == NULL)
+      return -EINVAL;
+    *((unsigned long long *)arg) = msto->size;
+    return 0;
+  default:
+    return -ENOTSUP;
+  }
 }
