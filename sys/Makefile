@@ -17,7 +17,7 @@ OBJS = \
 	dev/rtc.o \
 	dev/virtio.o \
 	dev/viorng.o \
-	dev/memio.o \
+	dev/memstorage.o \
 	device.o \
 	filesys.o \
 	elf.o \
