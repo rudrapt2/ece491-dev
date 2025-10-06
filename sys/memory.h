@@ -96,6 +96,14 @@ extern mtag_t discard_active_mspace(void);
  */
 extern void * map_page(uintptr_t vma, void * pp, int rwxug_flags);
 
+/**
+ * @brief Adds a range of contiguous pages with provided virtual memory address, size, and flags to page table
+ * @param vma Virtual memory address for page (must be a PAGE_SIZE increment)
+ * @param size Number of bytes to be mapped as pages
+ * @param pp Pointer to the first page to be added to page table
+ * @param rwxug_flags Flags to set on page
+ * @return Newly mapped virtual memory address
+ */
 extern void * map_range (
     uintptr_t vma, size_t size, void * pp, int rwxug_flags);
 
