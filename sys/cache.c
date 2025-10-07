@@ -29,6 +29,14 @@
 // INTERNAL TYPE DEFINITIONS
 //
 
+/** \brief An entry in a cache
+ *
+ * Think of a cache as an array (or linkedlist or red-black tree? Do your design) of cache entries.
+ * Each cache entry should store some helpful information about every block cached.
+ * Hint: At least we need a mechanism for race condition
+ * 
+ *
+ */
 struct cache_entry {
     unsigned long long pos; // position of cached block on device
     unsigned int refcnt; // number of references to this entry
@@ -37,6 +45,13 @@ struct cache_entry {
     char dirty; // needs to be written to disk
 };
 
+/** \brief Literally the cache itself
+ *
+ *  There's a huge room for your creative design. 
+ *  As long as you satisfy the update/eviction functionality, it is a good cache.
+ * 
+ *
+ */
 struct cache {
     struct storage * disk;
     struct condition unlocked; // an entry has been unlocked
@@ -112,7 +127,8 @@ int cache_get_backing_device(struct cache * cache, struct storage ** disk){
     *(disk) = cache->disk;
     return 0;
 }
-
+/// @brief Creates/initializes a cache with the passed backing storage device (disk) and makes it available through cptr. 
+/// @return Return 0 if successful.
 int create_cache(struct storage * disk, struct cache ** cptr) {
     struct cache * cache;
     int bkgblksz;
@@ -153,6 +169,15 @@ int create_cache(struct storage * disk, struct cache ** cptr) {
     return 0;
 }
 
+
+/** \brief
+ *
+ *  
+ *  Reads a CACHE_BLKSZ sized block from the backing interface into the cache. 
+ *  pos is the position in the backing device. pos must be aligned to a multiple of the block size of the backing interface. Makes a pointer to this block available through pptr. Assume that CACHE_BLKSZ will always be equal to the block size of the storage disk. Any replacement policy is permitted, as long as your design meets the above specifications. Return 0 if successful.
+ * 
+ *
+ */
 int cache_get_block(struct cache * cache, unsigned long long pos, void ** pptr) {
     struct cache_entry * ent; // cache entry for block
     long rcnt; // return value from ioread
@@ -289,6 +314,13 @@ int cache_get_block(struct cache * cache, unsigned long long pos, void ** pptr) 
     return 0;
 }
 
+/** \brief
+ *
+ *  
+ *  pblk is a pointer to a block that was made available in cache_get_block() (which means that pblk == *pptr for some pptr). If dirty==1, the block has been written to. If dirty==0, the block has not been written to.
+ *  
+ *
+ */
 void cache_release_block(struct cache * cache, void * pblk, int dirty) {
     struct cache_entry * ent;
     int i;
@@ -348,6 +380,13 @@ void cache_release_block(struct cache * cache, void * pblk, int dirty) {
     }
 }
 
+
+/** \brief
+ *
+ *  
+ *  This function flushes the cache. Any dirty blocks that have not yet been written to the backing interface must be written to the backing interface. Returns 0 if successful.
+ *
+ */
 int cache_flush(struct cache * cache) {
     while (cache->dirty_cnt > 0)
         condition_wait(&cache->nodirty);

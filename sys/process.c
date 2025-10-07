@@ -200,6 +200,13 @@ int process_fork(const struct trap_frame * tfr) {
     return ctid;
 }
 
+/** \brief
+ *
+ *  
+ *  Discard memory space, close your associated uio, free the memory you're supposed to free.
+ *  
+ *
+ */
 void process_exit(void) {
     struct process * self;
     int i;
@@ -243,6 +250,23 @@ void process_exit(void) {
 // INTERNAL FUNCTION DEFINITIONS
 //
 
+/**
+ * \brief Builds the initial user stack for a new process.
+ *
+ * Builds the stack for a new process, including the argument vector (\p argv)
+ * and the strings it points to. Note that \p argv must contain \p argc + 1
+ * elements (the last one is a NULL pointer).
+ *
+ * Remember to round the final stack size up to a multiple of 16 bytes
+ * (RISC-V ABI requirement).
+ *
+ * \param[in,out] stack  Pointer to the stack page (destination buffer).
+ * \param[in]     argc   Number of arguments in \p argv.
+ * \param[in]     argv   Array of argument pointers; length is \p argc+1 and
+ *                       \p argv[argc] must be NULL.
+ *
+ * \return Size of the stack page on success; negative error code on failure.
+ */
 int build_stack(void * stack, int argc, char ** argv) {
     size_t stksz, argsz;
     uintptr_t * newargv;
@@ -294,6 +318,16 @@ int build_stack(void * stack, int argc, char ** argv) {
     return stksz;
 }
 
+/**
+ * \brief Function to be executed by the child process after fork.
+ * This is a very beautiful function. 
+ * Tell the parent process that it is done with the trap frame, then jumps to user space (hint: which function should we use?)
+ * 
+ * \param[in] done  Pointer to a condition variable to signal parent
+ * \param[in] tfr   Pointer to a trap frame
+ *
+ * \return NONE (very important, this is a hint)
+ */
 void fork_func(struct condition * done, struct trap_frame * tfr) {
     condition_broadcast(done); // signal parent we're done using trap frame
 

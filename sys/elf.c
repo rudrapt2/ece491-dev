@@ -118,7 +118,28 @@ struct elf64_phdr {
 // ELF header e_machine values (short list)
 
 #define  EM_RISCV   243
-
+/**
+ * \brief Validates and loads an ELF file into memory.
+ *
+ * This function validates an ELF file, then loads its contents into memory,
+ * returning the start of the entry point through \p eptr.
+ *
+ * The loader processes only program header entries of type `PT_LOAD`. The layouts
+ * of structures and magic values can be found in the Linux ELF header file
+ * `<uapi/linux/elf.h>`
+ * The implementation should ensure that all loaded sections of the program are
+ * mapped within the memory range `0x80100000` to `0x81000000`.
+ *
+ * Let's do some reading! The following documentation will be very helpful!
+ * [Helpful doc](https://linux.die.net/man/5/elf)
+ * Good luck!
+ * [Educational video](https://www.youtube.com/watch?v=dQw4w9WgXcQ)
+ *
+ * \param[in]  uio  Pointer to an user I/O corresponding to the ELF file.
+ * \param[out] eptr   Double pointer used to return the ELF file's entry point.
+ *
+ * \return 0 on success, or a negative error code on failure.
+ */
 int elf_load(struct uio * uio, void (**eptr)(void)) {
     static const uint32_t MAGIC_LSB = 0x464c457f;
     struct elf64_ehdr ehdr;
