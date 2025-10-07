@@ -234,6 +234,13 @@ int sysusleep(unsigned long us)
     return 0;
 }
 
+/**
+ * @brief Creates a new file in the filesystem specified by the path.
+ * @details Validates and parses the user provided path for mountpoint name, file name and calls create_file.
+ * @param path User provided path string.
+ * @return 0 on success, negative value on error.
+ */
+
 int sysfscreate(const char *path)
 {
     int result = validate_vstr(path, PTE_U);
@@ -254,6 +261,13 @@ int sysfscreate(const char *path)
     kfree(cppath);
     return result;
 }
+
+/**
+ * @brief Deletes a file in the filesystem specified by the path.
+ * @details Validates and parses the user provided path for mountpoint name, file name and calls delete_file.
+ * @param path User provided path string.
+ * @return 0 on success, negative value on error.
+ */
 
 int sysfsdelete(const char *path)
 {
@@ -278,9 +292,9 @@ int sysfsdelete(const char *path)
 
 /**
  * @brief Opens a file or device of specified fd for given process
- * @details gets current process, allocates file descriptor (if fd = -1) or uses valid file descriptor given, validates name of device/file, calls open_file
+ * @details gets current process, allocates file descriptor (if fd = -1) or uses valid file descriptor given, validates and parses user provided path, calls open_file
  * @param fd file descriptor number
- * @param name string name of device or file
+ * @param path User provided path string
  * @return fd number if sucessful else return error that occured -EMFILE or -EBADFD
  */
 
