@@ -46,6 +46,14 @@ extern long uio_read(struct uio * uio, void * buf, unsigned long bufsz);
  * @return Number of bytes successfully written to backing endpoint, error if backing endpoint doesn't support _write_ or buflen < 0
  */
 extern long uio_write(struct uio * uio, const void * buf, unsigned long buflen);
+
+/**
+ * @brief Calls backing endpoint's _cntl_
+ * @param uio Pointer to uio struct of backing endpoint to perform I/O cntl operation on
+ * @param op Operation to perform
+ * @param arg Additional argument for operation (if needed)
+ * @return Output of _cntl_ if successfully called, error if backing doesn't support _cntl_
+ */
 extern int uio_cntl(struct uio * uio, int op, void * arg);
 extern void create_pipe(struct uio ** wptr, struct uio ** rptr);
 
