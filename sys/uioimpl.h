@@ -46,7 +46,7 @@ struct uio_intf {
 };
 
 /**
- * @brief User Input/Output abstraction for devices, files, etc.
+ * @brief User Input/Output abstraction for devices, files, pipes, etc.
  */
 struct uio {
     const struct uio_intf * intf; ///< I/O interface for backing endpoint 
