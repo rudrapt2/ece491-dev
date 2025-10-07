@@ -8,9 +8,27 @@
 
 struct uio; // opaque decl.
 
+/**
+ * @brief Returns reference count of passed uio struct
+ * @param uio Pointer to uio struct to check reference count on
+ * @return Reference count of passed uio struct
+ */
 extern unsigned long uio_refcnt(const struct uio * uio);
+
+/**
+ * @brief Increments reference count of passed uio struct
+ * @param uio Pointer to uio struct to increment reference count on
+ * @return Incremented reference count
+ */
 extern int uio_addref(struct uio * uio);
+
+/**
+ * @brief Decrements reference count of passed uio struct, calling backing endpoint's _close_ if reference count is 0
+ * @param uio Pointer to uio struct of backing endpoint to close
+ * @return None
+ */
 extern void uio_close(struct uio * uio);
+
 extern long uio_read(struct uio * uio, void * buf, unsigned long bufsz);
 extern long uio_write(struct uio * uio, const void * buf, unsigned long buflen);
 extern int uio_cntl(struct uio * uio, int op, void * arg);
