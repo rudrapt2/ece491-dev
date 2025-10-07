@@ -29,7 +29,22 @@ extern int uio_addref(struct uio * uio);
  */
 extern void uio_close(struct uio * uio);
 
+/**
+ * @brief Calls backing endpoint's _read_
+ * @param uio Pointer to uio struct of backing endpoint to read from
+ * @param buf Buffer for backing endpoint to copy data into
+ * @param bufsz Size of passed buffer in bytes
+ * @return Number of bytes read from backing endpoint, error if backing endpoint doesn't support _read_ or bufsz < 0
+ */
 extern long uio_read(struct uio * uio, void * buf, unsigned long bufsz);
+
+/**
+ * @brief Calls backing endpoint's _write_
+ * @param uio Pointer to uio struct of backing endpoint to write to
+ * @param buf Buffer for backing endpoint to copy data from
+ * @param buflen Number of bytes for backing endpoint to write from buf
+ * @return Number of bytes successfully written to backing endpoint, error if backing endpoint doesn't support _write_ or buflen < 0
+ */
 extern long uio_write(struct uio * uio, const void * buf, unsigned long buflen);
 extern int uio_cntl(struct uio * uio, int op, void * arg);
 extern void create_pipe(struct uio ** wptr, struct uio ** rptr);
