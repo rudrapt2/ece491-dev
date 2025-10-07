@@ -55,6 +55,14 @@ extern long uio_write(struct uio * uio, const void * buf, unsigned long buflen);
  * @return Output of _cntl_ if successfully called, error if backing doesn't support _cntl_
  */
 extern int uio_cntl(struct uio * uio, int op, void * arg);
+
+/**
+ * @brief Creates a unidirectional pipe
+ * @details Allocates memory for the pipe struct and initializes all necessary parts for the pipe
+ * @param wptr Double pointer to return write uio struct to caller
+ * @param rptr Double pointer to return read uio struct to caller
+ * @return None
+ */
 extern void create_pipe(struct uio ** wptr, struct uio ** rptr);
 
 // FNCTL OP CONSTANTS
