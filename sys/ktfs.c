@@ -29,16 +29,31 @@
 //     struct ktfs_free_inode_elem * next; 
 // };
 
+/// @brief File struct for a file in 
 struct ktfs_file {
+    /// uio struct for accessing file
     struct uio uio;
+
+    /// directory entry attached to file
     struct ktfs_dir_entry dentry;
+
+    /// Previous file in linked list
     struct ktfs_file * prev;
+
+    /// Next file in linked list
     struct ktfs_file * next;
+
+    /// Size of file in bytes
     uint32_t file_size;
+
+    /// Flags related to the file
     uint8_t flag;
+
+    /// Position in file
     unsigned long pos;// add pos
 };
 
+/// @brief Wrapper struct for uio and attached file
 struct ktfs_listing_uio {
     struct uio base;
     const struct ktfs_file * file;
@@ -130,8 +145,8 @@ static const struct uio_intf ktfs_listing_uio_intf = {
 };
 
 /**
- * @brief Mounts the hard drive represented by the io object as a filesystem
- * @param io the io object to get the raw filesystem image from (e.g. block device io)
+ * @brief Mounts the file system with associated backing cache 
+ * @param cache Pointer to cache struct for the file system
  * @return 0 if mount successful, negative values if there's error.
  */
 int mount_ktfs(const char * name, struct cache * cache) {
@@ -203,9 +218,9 @@ int mount_ktfs(const char * name, struct cache * cache) {
 
 
 /**
- * @brief Opens a file with the given name and returns a pointer to the file io through double pointer
- * @param name the name of the file to open
- * @param ioptr will return a pointer to a file io object through this double pointer 
+ * @brief Opens a file or ls with the given name and returns a pointer to the uio through double pointer
+ * @param name The name of the file to open or "\" for ls
+ * @param uioptr Will return a pointer to a file or ls uio pointer through this double pointer
  * @return 0 if open successful, negative values if there's error.
  */
 int ktfs_open(struct filesystem * fs, const char * name, struct uio ** uioptr) {
@@ -215,6 +230,13 @@ int ktfs_open(struct filesystem * fs, const char * name, struct uio ** uioptr) {
         return ktfs_open_file(name, uioptr);
 }
 
+
+/**
+ * @brief Opens a device and returns a pointer to the file through the uio
+ * @param name the name of the file to open
+ * @param uioptr will return a pointer to a file through the uio double pointer
+ * @return 0 if successful or negative values for errors
+ */
 int ktfs_open_file(const char * name, struct uio ** uioptr) {
     for(struct ktfs_file* curr_file = files_list; curr_file != NULL; curr_file = curr_file->next){
         // found file in filesystem
@@ -242,8 +264,8 @@ int ktfs_open_file(const char * name, struct uio ** uioptr) {
 
 
 /**
- * @brief Closes the file that is represented by the io object
- * @param io the file io of the file to close
+ * @brief Closes the file that is represented by the uio struct
+ * @param uio The file io to be closed
  * @return None
  */
 void ktfs_close(struct uio* uio) {
@@ -254,6 +276,13 @@ void ktfs_close(struct uio* uio) {
     debug("ktfs_close: DONE - file=%s, flag now=%d", curr_file->dentry.name, curr_file->flag);
 }
 
+/**
+ * @brief Reads data from file attached to uio into provided buffer
+ * @param uio uio of file to be read
+ * @param buf Buffer to be filled
+ * @param len Number of bytes to read
+ * @return Number of bytes read
+ */
 long ktfs_fetch(struct uio *uio, void *buf, unsigned long len) {
     long total_num_bytes_to_read = len;
     trace("%s(%p,%ld)", __func__, buf, len);
@@ -299,6 +328,13 @@ long ktfs_fetch(struct uio *uio, void *buf, unsigned long len) {
     return num_bytes_read;
 }
 
+/**
+ * @brief Write data from buffer into file attached to uio
+ * @param uio The file to be written to 
+ * @param buf The buffer to be read from
+ * @param len Number of bytes to write from the buffer to the file
+ * @return Number of bytes written from the buffer to the file system
+ */
 long ktfs_store(struct uio* uio, const void* buf, unsigned long len){
     struct ktfs_file* f = (void*) uio - offsetof(struct ktfs_file, uio);
     int file_opened = f->flag & FILE_OPENED;
@@ -344,6 +380,12 @@ long ktfs_store(struct uio* uio, const void* buf, unsigned long len){
     return num_bytes_written;
 }
 
+/**
+ * @brief Create a new file in the file system
+ * @param fs The file system in which to create the file
+ * @param name The name of the file
+ * @return 0 if successful, error code if not
+ */
 int ktfs_create(struct filesystem * fs, const char* name) {
     struct ktfs_inode root_directory;
     if (!name || strlen(name) > KTFS_MAX_FILENAME_LEN) {
@@ -403,6 +445,12 @@ int ktfs_create(struct filesystem * fs, const char* name) {
     return 0;
 }
 
+/**
+ * @brief Deletes a certain file from the file system with the given name
+ * @param fs The file system to delete the file from
+ * @param name The name of the file to be deleted
+ * @return 0 if successful, error code if not
+ */
 int ktfs_delete(struct filesystem * fs, const char* name) {
     struct ktfs_file* f;
     int i;
@@ -500,7 +548,7 @@ int ktfs_delete(struct filesystem * fs, const char* name) {
 /**
  * @brief Given a file io object, a specific command, and possibly some arguments, execute the 
  * corresponding functions
- * @param io the file io object of the file to perform the control function
+ * @param uio the uio object of the file to perform the control function
  * @param cmd the io command to execute. Should support IOCTL_GETBUFSZ, IOCTL_GETEND, IOCTL_GETPOS, IOCTL_SETPOS
  * @param arg the argument to pass in, maybe different for different control functions
  * @return depends on specific control functions
@@ -540,8 +588,8 @@ int ktfs_getblksz(struct ktfs_file *fd) {
 
 /**
  * @brief Get the length of the given file, result will be returned through the pointer in argument
- * @param fd the pointer to the file that you want to find the length 
- * @param arg interpreted as an (unsigned long long *), which is used to store the result 
+ * @param fd The pointer to the file that you want to find the length 
+ * @param arg Interpreted as an (unsigned long long *), which is used to store the result 
  * @return 0 if successful, negative values if there's an error.
  */
 int ktfs_getend(struct ktfs_file *fd, void *arg) {
@@ -552,6 +600,12 @@ int ktfs_getend(struct ktfs_file *fd, void *arg) {
     return 0;
 }
 
+/**
+ * @brief Set the size of a given file, allocates new data blocks to the inode if needed
+ * @param fd The pointer ot the file that you wish to resize
+ * @param arg Interpreted as uint32_t and used as the new file size 
+ * @return 0 if successful, negative values if there's an error
+ */
 int ktfs_setend(struct ktfs_file *fd, void *arg) {
     int result;
     uint32_t amt, excess;
@@ -585,6 +639,12 @@ int ktfs_setend(struct ktfs_file *fd, void *arg) {
     return 0;
 }
 
+/**
+ * @brief Get the current position in a file and pass it back through arg
+ * @param fd The pointer of the file to inspect the current position of
+ * @param arg The pointer to a unsigned long variable where the current position of the file to be written to
+ * @return 0 if successful, negative value if not
+ */
 int ktfs_getpos(struct ktfs_file * fd, void * arg){
     if(arg == NULL)
         return -EINVAL;
@@ -593,6 +653,12 @@ int ktfs_getpos(struct ktfs_file * fd, void * arg){
     return 0;
 }
 
+/**
+ * @brief Set the current position in a file to provided argument
+ * @param fd The pointer of the file to set the position of
+ * @param arg The pointer to an unsigned long which represents the new position we want to set for the file
+ * @return 0 if successful, negative value if not
+ */
 int ktfs_setpos(struct ktfs_file * fd, void * arg){
     if(arg == NULL)
         return -EINVAL;
@@ -614,6 +680,11 @@ void ktfs_flush(struct filesystem * fs) {
     return;
 }
 
+/**
+ * @brief Opens the listing (ls) uio and passes it back through the uioptr
+ * @param uioptr will return the listing uio through this double pointer
+ * @return 0 if successful 
+ */
 int ktfs_open_listing(struct uio ** uioptr) {
     struct ktfs_listing_uio * ls;
 
@@ -625,11 +696,23 @@ int ktfs_open_listing(struct uio ** uioptr) {
     return 0;
 }
 
+/**
+ * @brief Closes the listing device represented by the uio pointer
+ * @param uio The uio pointer of ls
+ * @return None
+ */
 void ktfs_listing_close(struct uio * uio) {
     struct ktfs_listing_uio * const ls = (struct ktfs_listing_uio*)uio;
     kfree(ls);
 }
 
+/**
+ * @brief Reads all of the files names in the file system using ls and copies them into the providied buffer
+ * @param uio The uio pointer of ls
+ * @param buf The buffer to copy the file names to
+ * @param bufsz The size of the buffer
+ * @return The size written to the buffer
+ */
 long ktfs_listing_read(struct uio * uio, void * buf, unsigned long bufsz) {
     struct ktfs_listing_uio * const ls = (struct ktfs_listing_uio*)uio;
     size_t len;
@@ -767,12 +850,16 @@ uint32_t get_free_bit(uint32_t start_block_idx, uint32_t max_val){
     return -1;
 }
 
+/// @brief Gets the first free data block using the block availability bitmap
+/// @return The location of the free block
 uint32_t get_free_data_block() {
     uint32_t result = get_free_bit(1 + superblock.inode_bitmap_block_count, superblock.block_count);
     if (result == (uint32_t)(-1)) return -ENODATABLKS;
     return result - (1 + superblock.inode_bitmap_block_count + superblock.bitmap_block_count + superblock.inode_block_count);
 }
 
+/// @brief Gets the free inode using the inode bitmap
+/// @return the number of the inode
 uint32_t get_free_inode() {
     uint32_t result = get_free_bit(1, max_num_of_inodes);
     if (result == (uint32_t)(-1)) return -ENOINODEBLKS;

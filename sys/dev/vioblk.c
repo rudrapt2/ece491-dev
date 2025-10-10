@@ -172,6 +172,13 @@ static long vioblk_storage_store (
     const void * buf,
     unsigned long bytecnt);
 
+/**
+ * @brief Perform operations to get information about the block device 
+ * @param sto Storage IO struct for the storage device
+ * @param op Operation to perform
+ * @param arg Argument specific to the oepration being performed
+ * @return Status code on the operation performed
+ */
 static int vioblk_storage_cntl (struct storage * sto, int op, void * arg);
 
 /**
@@ -188,7 +195,12 @@ static void vioblk_isr(int srcno, void * aux);
 //
 
 // Attaches a VirtIO block device. Declared and called directly from virtio.c.
-
+/**
+ * @brief Initializes virtio block device with the necessary IO operation functions and sets the required feature bits.
+ * @param regs Memory mapped register of Virtio
+ * @param irqno Interrupt request number of the device
+ * @return None
+ */
 void vioblk_attach(volatile struct virtio_mmio_regs * regs, int irqno) {
     virtio_featset_t enabled_features, wanted_features, needed_features;
     struct vioblk_storage * vbd;

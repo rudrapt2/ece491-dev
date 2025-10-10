@@ -57,15 +57,26 @@ there is no padding between the members or struct alignment requirements.
 */
 
 // Superblock
+/// @brief Struct representing KTFS superblock make-up
 struct ktfs_superblock {
+    /// Number of blocks
     uint32_t block_count;
-    uint32_t inode_bitmap_block_count;
-    uint32_t bitmap_block_count;
-    uint32_t inode_block_count;
-    uint16_t root_directory_inode;
+
+    /// Number of blocks allocated for inode bitmap
+    uint32_t inode_bitmap_block_count;  
+    
+    /// Number of blocks allocated for available block bitmap
+    uint32_t bitmap_block_count; 
+
+    /// Number of blocks allocated for inodes
+    uint32_t inode_block_count; 
+
+    /// The root directory inode number
+    uint16_t root_directory_inode; 
 } __attribute__((packed));
 
 // Inode with indirect and doubly-indirect blocks
+/// @brief Struct representing a KTFS inode
 struct ktfs_inode {
     uint32_t size;                              // Size in bytes
     uint32_t block[KTFS_NUM_DIRECT_DATA_BLOCKS];     // Direct block indices
@@ -74,17 +85,21 @@ struct ktfs_inode {
 } __attribute__((packed));
 
 // Directory entry
+/// @brief Struct representing file entry in directory
 struct ktfs_dir_entry {
-    uint16_t inode;                                     // Inode number
-    char     name[KTFS_MAX_FILENAME_LEN+sizeof(uint8_t)];    // File name (plus null terminator)
+    /// Inode number
+    uint16_t inode;                    
+    /// File name (plus null terminator)
+    char     name[KTFS_MAX_FILENAME_LEN+sizeof(uint8_t)]; 
 } __attribute__((packed));
 
 // Bitmap block
+/// @brief Struct representing available block/inode bitmap
 struct ktfs_bitmap {
     uint8_t bytes[KTFS_BLKSZ];
 } __attribute__((packed));
 
-
+/// @brief Struct representing raw data block
 struct ktfs_data_block {
     uint8_t data[KTFS_BLKSZ];
 }__attribute__((packed));
