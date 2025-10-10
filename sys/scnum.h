@@ -28,7 +28,7 @@
 #define SYSCALL_CLOSE 16 // close fd
 #define SYSCALL_READ 17  // read from fd
 #define SYSCALL_WRITE 18 // write to fd
-#define SYSCALL_IOCTL 19 // issue ioctl on fd
+#define SYSCALL_FCNTL 19 // issue fcntl on fd
 #define SYSCALL_PIPE 20  // create a pipe
 #define SYSCALL_UIODUP 21 // duplicate an fd
 

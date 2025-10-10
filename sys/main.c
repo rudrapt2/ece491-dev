@@ -60,13 +60,14 @@ void attach_devices(void) {
     int i;
     int result;
 
+    rtc_attach((void*)RTC_MMIO_BASE);
+
     for (i = 0; i < NUART; i++)
         attach_uart((void*)UART_MMIO_BASE(i), UART0_INTR_SRCNO+i);
     
     for (i = 0; i < NVIODEV; i++)
         attach_virtio((void*)VIRTIO_MMIO_BASE(i), VIRTIO0_INTR_SRCNO+i);
 
-    rtc_attach((void*)RTC_MMIO_BASE);
     result = mount_devfs(DEVMNTNAME);
 
     if (result != 0) {

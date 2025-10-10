@@ -46,14 +46,14 @@ static int syswait(int tid);
 static int sysprint(const char *msg);
 static int sysusleep(unsigned long us);
 
-static int sysfsdelete(const char *name);
-static int sysfscreate(const char *name);
+static int sysfsdelete(const char *path);
+static int sysfscreate(const char *path);
 
-static int sysopen(int fd, const char *name);
+static int sysopen(int fd, const char *path);
 static int sysclose(int fd);
 static long sysread(int fd, void *buf, size_t bufsz);
 static long syswrite(int fd, const void *buf, size_t len);
-static int sysioctl(int fd, int cmd, void *arg);
+static int sysfcntl(int fd, int cmd, void *arg);
 static int syspipe(int *wfdptr, int *rfdptr);
 static int sysuiodup(int oldfd, int newfd);
 
@@ -107,8 +107,8 @@ int64_t syscall(const struct trap_frame *tfr)
         return sysread(tfr->a0, (void *)tfr->a1, tfr->a2);
     case SYSCALL_WRITE:
         return syswrite(tfr->a0, (void *)tfr->a1, tfr->a2);
-    case SYSCALL_IOCTL:
-        return sysioctl(tfr->a0, tfr->a1, (void *)tfr->a2);
+    case SYSCALL_FCNTL:
+        return sysfcntl(tfr->a0, tfr->a1, (void *)tfr->a2);
     case SYSCALL_PIPE:
         return syspipe((int *)tfr->a0, (int *)tfr->a1);
     case SYSCALL_FSCREATE:
@@ -444,21 +444,20 @@ long syswrite(int fd, const void *buf, size_t len)
 
 /**
  * @brief Calls device input output commands for a given device instance
- * @details get current process, valid file descriptor checks, find io struct via file descriptor, ensure that ioctl type exists, validate argument pointer, issue ioctl
+ * @details get current process, valid file descriptor checks, find io struct via file descriptor, ensure that fcntl type exists, validate argument pointer, issue fcntl
  * @param fd file descriptor number
- * @param cmd selection of ioctl
+ * @param cmd selection of fcntl
  * @param arg pointer to arguments
  * @return number of bytes written
  */
 
-int sysioctl(int fd, int cmd, void *arg)
+int sysfcntl(int fd, int cmd, void *arg)
 {
     static const struct
     {
         uint8_t size;  ///< size of argument
         uint8_t flags; ///< permissions
     } argdef[] = {     ///< definition of arguments for each ioctal
-                  // [IOCTL_GETBLKSZ] = {0, 0},
                   [FCNTL_GETPOS] = {sizeof(unsigned long long), PTE_W},
                   [FCNTL_SETPOS] = {sizeof(unsigned long long), PTE_R},
                   [FCNTL_GETEND] = {sizeof(unsigned long long), PTE_W},
@@ -484,7 +483,7 @@ int sysioctl(int fd, int cmd, void *arg)
     if (cmd < 0)
         return uio_cntl(self->uiotab[fd], cmd, arg);
 
-    // Check if we know the IOCTL type
+    // Check if we know the fcntl type
     if (sizeof(argdef) / sizeof(argdef[0]) <= cmd)
         return -ENOTSUP;
 
@@ -496,7 +495,7 @@ int sysioctl(int fd, int cmd, void *arg)
     if (result != 0)
         return result;
 
-    // Issue the ioctl
+    // Issue the fcntl
 
     return uio_cntl(self->uiotab[fd], cmd, arg);
 }

@@ -92,10 +92,10 @@ _write:
         ecall
         ret
 
-        .global _ioctl
-        .type   _ioctl, @function
-_ioctl:
-        li      a7, SYSCALL_IOCTL
+        .global _fcntl
+        .type   _fcntl, @function
+_fcntl:
+        li      a7, SYSCALL_FCNTL
         ecall
         ret
 

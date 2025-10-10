@@ -8,4 +8,6 @@ util/fs/mkfs_ktfs
 util/fs/unmkfs_ktfs
 .vscode
 .clang-format
+.clangd
+*.log
 usr/bin

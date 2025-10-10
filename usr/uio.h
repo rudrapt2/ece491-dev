@@ -68,7 +68,7 @@ extern int uio_cntl(struct uio * uio, int op, void * arg);
  */
 extern void create_pipe(struct uio ** wptr, struct uio ** rptr);
 
-// FCNTL OP CONSTANTS
+// fcntl OP CONSTANTS
 //
 
 #define FCNTL_GETEND 0 // arg is unsigned long long *

@@ -12,7 +12,6 @@ OBJDUMP=$(TOOLPREFIX)objdump
 UMODE := 1
 
 ULIB_OBJS = \
-	io.o \
 	string.o \
 	syscall.o \
 	heap.o

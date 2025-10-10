@@ -57,17 +57,27 @@ extern void _print(const char * msg);
 */
 extern int _usleep(unsigned long us);
 
-extern int _fsdelete(char * name);
+/**
+* @brief Deletes a file at a specified path
+* @param path string path to file
+* @return 0 if successful else error code
+*/
+extern int _fsdelete(char * path);
 
-extern int _fscreate(char * name);
+/**
+* @brief Creates a file at a specified path
+* @param path string path to file
+* @return 0 if successful else error code
+*/
+extern int _fscreate(char * path);
 
 /**
 * @brief Opens a file at the specified file descriptor and returns error code on failure
 * @param fd file descriptor number
-* @param name string name of file
+* @param path string path to file
 * @return fd number if sucessful else return error on invalid file descriptor or empty file descriptor
 */
-extern int _open(int fd, const char * name);
+extern int _open(int fd, const char * path);
 
 /**
 * @brief Closes the device at the specified file descriptor
@@ -95,13 +105,13 @@ extern long _read(int fd, void * buf, size_t bufsz);
 extern long _write(int fd, const void * buf, size_t len);
 
 /**
-* @brief Performs desired ioctl based on cmd
+* @brief Performs desired fcntl based on cmd
 * @param fd file descriptor number
-* @param cmd ioctl command
+* @param cmd fcntl command
 * @param arg pointer to arguments
-* @return ioctl result
+* @return fcntl result
 */
-extern int _ioctl(int fd, const int cmd, void * arg);
+extern int _fcntl(int fd, const int cmd, void * arg);
 
 /**
 * @brief Opens a pipe at the specified file descriptor and returns error code on failure
