@@ -17,10 +17,13 @@
 // INTERNAL TYPE DEFINITIONS
 //
 
+/**
+ * @brief Defines the mountpoints within the root file system.
+ */
 struct mountpoint {
-    struct mountpoint * next;
-    struct filesystem * fs;
-    char name[];
+    struct mountpoint * next; ///< Next mountpoint in linked list
+    struct filesystem * fs; ///< Filesystem function interface
+    char name[]; ///< Path alias for mountpoint
 };
 
 // INTERNAL FUNCTION PROTOTYPES
@@ -42,10 +45,12 @@ static void nullfs_flush(struct filesystem * fs);
 // INTERNAL GLOBAL VARIABLES
 //
 
-// listing interface for uio
+/**
+ * @brief listing interface for uio.
+ */
 struct fs_listing_uio {
-    struct uio base;
-    const struct mountpoint * fs;
+    struct uio base; ///< uio base
+    const struct mountpoint * fs; ///< listing object position
 };
 
 static const struct uio_intf fs_listing_uio_intf = {
