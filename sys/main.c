@@ -11,6 +11,7 @@
 #include "thread.h"
 #include "memory.h"
 #include "process.h"
+#include "dev/rtc.h"
 #include "dev/uart.h"
 #include "dev/virtio.h"
 #include "timer.h"
@@ -65,6 +66,7 @@ void attach_devices(void) {
     for (i = 0; i < NVIODEV; i++)
         attach_virtio((void*)VIRTIO_MMIO_BASE(i), VIRTIO0_INTR_SRCNO+i);
 
+    rtc_attach((void*)RTC_MMIO_BASE);
     result = mount_devfs(DEVMNTNAME);
 
     if (result != 0) {

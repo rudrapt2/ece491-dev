@@ -452,6 +452,12 @@ int devfs_open_file(const char * name, struct uio ** uioptr) {
     return -ENOENT;
 }
 
+/**
+ * @brief Opens a serial device and wraps it in a uio object
+ * @param ser pointer to serial device struct
+ * @param uioptr pointer to uio struct pointer to be populated
+ * @return 0 if successful, negative error code if error
+ */
 int serial_open_uio(struct serial * ser, struct uio ** uioptr) {
     struct serial_uio * suio;
     int result;
@@ -470,6 +476,10 @@ int serial_open_uio(struct serial * ser, struct uio ** uioptr) {
     return 0;
 }
 
+/**
+ * @brief Closes a serial uio object and the underlying serial device
+ * @param uio pointer to uio object to be closed
+ */
 void serial_uio_close(struct uio * uio) {
     struct serial_uio * suio = (struct serial_uio*)uio;
 
@@ -477,16 +487,36 @@ void serial_uio_close(struct uio * uio) {
     kfree(suio);
 }
 
+/**
+ * @brief Reads data from a serial device into a buffer
+ * @param uio pointer to serial uio object
+ * @param buf pointer to buffer to read data into
+ * @param bufsz size of buffer in bytes
+ * @return number of bytes read, negative error code if error
+ */
 long serial_uio_read(struct uio * uio, void * buf, unsigned long bufsz) {
     struct serial_uio * suio = (struct serial_uio*)uio;
     return serial_recv(suio->ser, buf, bufsz);
 }
 
+/**
+ * @brief Writes data from a buffer to a serial device
+ * @param uio pointer to serial uio object
+ * @param buf pointer to buffer containing data to write
+ * @param buflen size of buffer in bytes
+ * @return number of bytes written, negative error code if error
+ */
 long serial_uio_write(struct uio * uio, const void * buf, unsigned long buflen) {
     struct serial_uio * suio = (struct serial_uio*)uio;
     return serial_send(suio->ser, buf, buflen);
 }
 
+/**
+ * @brief Opens a storage device and wraps it in a uio object
+ * @param sto pointer to storage device struct
+ * @param uioptr pointer to uio struct pointer to be filled in
+ * @return 0 if successful, negative error code if error
+ */
 int storage_open_uio(struct storage * sto, struct uio ** uioptr) {
     struct storage_uio * suio;
     int result;
@@ -507,6 +537,10 @@ int storage_open_uio(struct storage * sto, struct uio ** uioptr) {
     
 }
 
+/**
+ * @brief Closes a storage uio object and the underlying storage device
+ * @param uio pointer to uio object to be closed
+ */
 void storage_uio_close(struct uio * uio) {
     struct storage_uio * suio = (struct storage_uio*)uio;
     storage_close(suio->sto);
@@ -514,18 +548,39 @@ void storage_uio_close(struct uio * uio) {
     kfree(suio);
 }
 
+/**
+ * @brief Reads data from a storage device into a buffer
+ * @param uio pointer to storage uio object
+ * @param buf pointer to buffer to read data into
+ * @param bufsz size of buffer in bytes
+ * @return number of bytes read, negative error code if error
+ */
 long storage_uio_read(struct uio * uio, void * buf, unsigned long bufsz) {
     struct storage_uio * suio = (struct storage_uio*)uio;
 
     return storage_fetch(suio->sto, suio->pos, buf, bufsz);
 }
 
+/**
+ * @brief Writes data from a buffer to a storage device
+ * @param uio pointer to storage uio object
+ * @param buf pointer to buffer containing data to write
+ * @param buflen size of buffer in bytes
+ * @return number of bytes written, negative error code if error
+ */
 long storage_uio_write(struct uio * uio, const void * buf, unsigned long buflen) {
     struct storage_uio * suio = (struct storage_uio*)uio;
 
     return storage_store(suio->sto, suio->pos, buf, buflen);
 }
 
+/**
+ * @brief Performs a control operation on a storage device
+ * @param uio pointer to storage uio object
+ * @param op control operation code
+ * @param arg pointer to argument for control operation
+ * @return 0 if successful, negative error code if error
+ */
 int storage_uio_cntl(struct uio * uio, int op, void * arg) {
     struct storage_uio * suio = (struct storage_uio*)uio;
 

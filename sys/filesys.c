@@ -76,6 +76,9 @@ int fsmgr_init(void) {
     return 0;
 }
 
+/**
+ * @brief Flushes all mounted filesystems
+ */
 void fsmgr_flushall(void) {
     struct mountpoint * mp;
 
@@ -83,6 +86,13 @@ void fsmgr_flushall(void) {
         fsflush(mp->fs);
 }
 
+/**
+ * @brief Opens a file or directory and wraps it in a uio object
+ * @param mpname mount point name (NULL or empty string for listing all mount points)
+ * @param flname file name within the mount point (NULL or empty string for listing all files)
+ * @param uioptr pointer to uio struct pointer to be filled in
+ * @return 0 if successful, negative error code if error
+ */
 int open_file(const char * mpname, const char * flname, struct uio ** uioptr) {
     struct filesystem * fs;
 
@@ -98,6 +108,12 @@ int open_file(const char * mpname, const char * flname, struct uio ** uioptr) {
     return (fs != NULL) ? fsopen(fs, flname, uioptr) : -ENOENT;
 }
 
+/**
+ * @brief Create a file in the filesystem specified by the path.
+ * @param mpname mount point name
+ * @param flname file name within the mount point
+ * @return 0 on success, negative value on error.
+ */
 int create_file(const char * mpname, const char * flname) {
     struct filesystem * fs;
 
@@ -109,6 +125,12 @@ int create_file(const char * mpname, const char * flname) {
     return (fs != NULL) ? fscreate(fs, flname) : -ENOENT;
 }
 
+/**
+ * @brief Deletes a file in the filesystem specified by the path.
+ * @param mpname mount point name
+ * @param flname file name within the mount point
+ * @return 0 on success, negative value on error.
+ */
 int delete_file(const char * mpname, const char * flname) {
     struct filesystem * fs;
 
@@ -120,6 +142,11 @@ int delete_file(const char * mpname, const char * flname) {
     return (fs != NULL) ? fsdelete(fs, flname) : -ENOENT;
 }
 
+/**
+ * @brief Opens a uio object that lists all mounted filesystems
+ * @param uioptr pointer to uio struct pointer to be filled in
+ * @return 0 if successful, negative error code if error
+ */
 int fs_open_listing(struct uio ** uioptr) {
     struct fs_listing_uio * ls;
 
@@ -132,11 +159,22 @@ int fs_open_listing(struct uio ** uioptr) {
     return 0;
 }
 
+/**
+ * @brief Closes a filesystem listing uio object
+ * @param uio pointer to uio object to be closed
+ */
 void fs_listing_close(struct uio * uio) {
     struct fs_listing_uio * const ls = (struct fs_listing_uio*)uio;
     kfree(ls);
 }
 
+/**
+ * @brief Reads the next filesystem name into the buffer
+ * @param uio pointer to filesystem listing uio object
+ * @param buf buffer to read the filesystem name into
+ * @param bufsz size of the buffer
+ * @return number of bytes read, 0 if no more filesystems,
+ */
 long fs_listing_read (
     struct uio * uio, void * buf, unsigned long bufsz)
 {
@@ -152,10 +190,21 @@ long fs_listing_read (
         return 0;
 }
 
+/**
+ * @brief Mounts the null filesystem at the specified mount point name
+ * @param name mount point name
+ * @return 0 if successful, negative error code if error
+ */
 int mount_nullfs(const char * name) {
     return attach_filesystem(name, (struct filesystem*)&nullfs);
 }
 
+/**
+ * @brief Attaches a filesystem to a mount point name
+ * @param mpname mount point name
+ * @param fs pointer to filesystem
+ * @return 0 if successful, -EEXIST if mount point already exists
+ */
 int attach_filesystem(const char * mpname, struct filesystem * fs) {
     struct mountpoint ** mpptr;
     struct mountpoint * mp;
@@ -182,6 +231,11 @@ int attach_filesystem(const char * mpname, struct filesystem * fs) {
 // INTERNAL FUNCTION DEFINITIONS
 //
 
+/**
+ * @brief Finds the filesystem mounted at the specified mount point name
+ * @param mpname mount point name
+ * @return pointer to filesystem if found, NULL if not found
+ */
 struct filesystem * getfs(const char * mpname) {
     struct mountpoint * mp;
 
@@ -193,6 +247,13 @@ struct filesystem * getfs(const char * mpname) {
     return NULL;
 }
 
+/**
+ * @brief Opens a file in the specified filesystem
+ * @param fs pointer to filesystem
+ * @param flname file name within the filesystem
+ * @param uioptr pointer to uio struct pointer to be filled in
+ * @return 0 if successful, -ENOTSUP if not supported
+ */
 int fsopen(struct filesystem * fs, const char * flname, struct uio ** uioptr) {
     if (fs->open != NULL)
         return fs->open(fs, flname, uioptr);
@@ -200,6 +261,12 @@ int fsopen(struct filesystem * fs, const char * flname, struct uio ** uioptr) {
         return -ENOTSUP;
 }
 
+/**
+ * @brief Creates a file in the specified filesystem
+ * @param fs pointer to filesystem
+ * @param flname file name within the filesystem
+ * @return 0 if successful, -ENOTSUP if not supported
+ */
 int fscreate(struct filesystem * fs, const char * flname) {
     if (fs->create != NULL)
         return fs->create(fs, flname);
@@ -207,6 +274,12 @@ int fscreate(struct filesystem * fs, const char * flname) {
         return -ENOTSUP;
 }
 
+/**
+ * @brief Deletes a file in the specified filesystem
+ * @param fs pointer to filesystem
+ * @param flname file name within the filesystem
+ * @return 0 if successful, -ENOTSUP if not supported
+ */
 int fsdelete(struct filesystem * fs, const char * flname) {
     if (fs->delete != NULL)
         return fs->delete(fs, flname);
@@ -214,12 +287,20 @@ int fsdelete(struct filesystem * fs, const char * flname) {
         return -ENOTSUP;
 }
 
+/**
+ * @brief Flushes the specified filesystem
+ * @param fs pointer to filesystem
+ */
 void fsflush(struct filesystem * fs) {
     if (fs->flush != NULL)
         fs->flush(fs);
 }
 
 
+/**
+ * @brief Opens a file in the null filesystem (always fails)
+ * @return -ENOENT (always fails)
+ */
 int nullfs_open (
     struct filesystem * fs __attribute__ ((unused)),
     const char * flname,
@@ -228,11 +309,21 @@ int nullfs_open (
     return -ENOENT;
 }
 
+/**
+ * @brief Flushes the null filesystem (does nothing)
+ */
 void nullfs_flush(struct filesystem * fs __attribute__ ((unused))) {
     // nothing
 }
 
 
+/**
+ * @brief Parses a path into mount point name and file name
+ * @param path string to be parsed
+ * @param mpnameptr pointer to which the mount point name will be stored
+ * @param flnameptr pointer to which the file name will be stored
+ * @return 0 on success, -EINVAL on invalid arguments.
+ */
 int parse_path(char * path, char ** mpnameptr, char ** flnameptr){
     if (path == NULL || mpnameptr == NULL || flnameptr == NULL) {
         return -EINVAL; // invalid args
@@ -251,6 +342,3 @@ int parse_path(char * path, char ** mpnameptr, char ** flnameptr){
 
     return 0; // success
 }
-
-
-
