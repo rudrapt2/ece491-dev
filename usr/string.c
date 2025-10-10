@@ -15,16 +15,12 @@
 # include "string.h"
 # include "syscall.h"
 # include "heap.h"
+# include "shell.h"
 
 #include <stdint.h>
 #include <limits.h>
 #include <stddef.h>
 #include <stdarg.h>
-
-/**
- * @brief Main UART file descriptor
- */
-#define UART_DESC 2
 
 /**
  * @brief Maximum number of open devices
@@ -97,15 +93,15 @@ static void dvprintf_putc(char c, void * aux);
 // 
 
 void putc(char c) {
-    dputc(UART_DESC, c);
+    dputc(CONSOLEOUT, c);
 }
 
 char getc(void) {
-   return dgetc(UART_DESC);
+   return dgetc(CONSOLEOUT);
 }
 
 void puts(const char * str) {
-    dputs(UART_DESC, str);
+    dputs(CONSOLEOUT, str);
 }
 
 void dputc(int fd, char c) {

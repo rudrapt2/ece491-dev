@@ -1,5 +1,6 @@
 #include "syscall.h"
 #include "string.h"
+#include "shell.h"
 
 #define BUFSZ 512
 
@@ -28,7 +29,7 @@ void main (int argc, char** argv)
         if (result == 0) {
             return;
         }
-        dprintf(1, "%s\n", buffer);
+        dprintf(STDOUT, "%s\n", buffer);
     }
     _exit();
 }

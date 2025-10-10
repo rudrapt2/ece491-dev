@@ -1,5 +1,6 @@
 #include "syscall.h"
 #include "string.h"
+#include "shell.h"
 
 int main (int argc, char** argv)
 {
@@ -16,13 +17,17 @@ int main (int argc, char** argv)
     }
     
     while (1) {
-        result = _read(0, &buffer, 1);
+        result = _read(STDIN, &buffer, 1);
         if (result < 0) {
             printf("Read failed!\n");
             _exit();
         }
+        if (buffer == 3) {
+            printf("Program Killed\n");
+            _exit();
+        }
         if (result == 0) {
-            dprintf(1, "\t%d\t%d\t%d\n", nc, wc, cc);
+            dprintf(STDOUT, "\t%d\t%d\t%d\n", nc, wc, cc);
             _exit();
         }
         cc++;

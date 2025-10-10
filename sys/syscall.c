@@ -307,7 +307,7 @@ int sysopen(int fd, const char *path)
     char *flname;
     char *cppath;
 
-    trace("%s(fd=%d,path=%p)", __func__, fd, path);
+    trace("%s(fd=%d,path=%s)", __func__, fd, path);
 
     if (PROCESS_IOMAX <= fd)
         return -EBADFD;

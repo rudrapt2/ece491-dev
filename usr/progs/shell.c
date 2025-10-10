@@ -1,11 +1,9 @@
 #include "syscall.h"
 #include "string.h"
+#include "shell.h"
 
 #define BUFSIZE 1024
 #define MAXARGS 8
-#define FIN '<'
-#define FOUT '>'
-#define PIPE '|'
 
 void exec(int c, char** v) {
   char path[256];
@@ -15,26 +13,21 @@ void exec(int c, char** v) {
   v[c] = NULL;
 
   // If path doesn't start with '/', prepend '/c/' for relative paths
-  if (v[0][0] != '/' || (v[0][0] != 'c' && v[0][1] != '/'))
+  if (strncmp(v[0], "/", 1) != 0 && strncmp(v[0], "c/", 2) != 0)
   {
-    path[0] = '/';
-    path[1] = 'c';
-    path[2] = '/';
-    strncpy(path + 3, v[0], sizeof(path) - 4);
-    path[sizeof(path) - 1] = '\0'; // Ensure null termination
+	snprintf(path, sizeof(path), "/c/%s", v[0]);
   }
   else
   {
     strncpy(path, v[0], sizeof(path) - 1);
-    path[sizeof(path) - 1] = '\0';
   }
 
   // Open the executable file
-  fd = _open(3, path);
+  fd = _open(-1, path);
 
   if (fd < 0)
   {
-    printf("Unable to access %s (Error Code: %d)\n", v[0], fd);
+    printf("Unable to access %s (Error Code: %d)\n", path, fd);
     _exit();
   }
 
@@ -82,8 +75,6 @@ int parse_and_open(int fd, char** filename, int create) {
 
 int parse(char* buf, char** v) {
 	int c = 0;
-	int stdin = 0;
-	int stdout = 1;
 	char temp;
 	int wpipe, rpipe;
 
@@ -99,13 +90,13 @@ int parse(char* buf, char** v) {
 					return (v[c-1][0] == '\0' ? c-1 : c); // remove terminating char
 
 				case FOUT:
-					_close(stdout);
-					if (parse_and_open(stdout, &buf, 1) < 0) return -1; 
+					_close(STDOUT);
+					if (parse_and_open(STDOUT, &buf, 1) < 0) return -1; 
 					continue;
 					
 				case FIN:
-					_close(stdin);
-					if (parse_and_open(stdin, &buf, 0) < 0) return -1;
+					_close(STDIN);
+					if (parse_and_open(STDIN, &buf, 0) < 0) return -1;
 					continue;
 
 				case PIPE:
@@ -116,20 +107,20 @@ int parse(char* buf, char** v) {
 						return -1;
 					}
 					if (_fork()) { // reader
-						_close(stdin);
+						_close(STDIN);
 						_close(wpipe);
-						_uiodup(rpipe, stdin);
-						if (rpipe != stdin)
+						_uiodup(rpipe, STDIN);
+						if (rpipe != STDIN)
 							_close(rpipe);
 						c = 0;
 						buf++;
 						break;
 					}
 					else { // writer
-						_close(stdout);
+						_close(STDOUT);
 						_close(rpipe);
-						_uiodup(wpipe, stdout);
-						if (wpipe != stdout)
+						_uiodup(wpipe, STDOUT);
+						if (wpipe != STDOUT)
 							_close(wpipe);
 						exec(c, v);
 					}
@@ -154,11 +145,11 @@ int main()
 	char* v[MAXARGS + 1]; 
 	int child;
 
-  _open(2, "/dev/uart1"); // console device
-  _close(0);              // close any existing stdin
-  _uiodup(2, 0);           // stdin from console
-  _close(1);              // close any existing stdout
-  _uiodup(2, 1);           // stdout to console
+  _open(CONSOLEOUT, "/dev/uart1");	// console device
+  _close(STDIN);              		// close any existing stdin
+  _uiodup(CONSOLEOUT, STDIN);       // stdin from console
+  _close(STDOUT);              		// close any existing stdout
+  _uiodup(CONSOLEOUT, STDOUT);      // stdout to console
 
   printf("Starting 391 Shell\n");
 

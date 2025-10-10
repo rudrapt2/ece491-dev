@@ -1,6 +1,7 @@
 #ifdef UMODE
     #include "string.h"
     #include "syscall.h"
+    #include "shell.h"
 #endif
 
 void main(void) {

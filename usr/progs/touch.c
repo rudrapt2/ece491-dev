@@ -1,6 +1,7 @@
 #include "syscall.h"
 #include "string.h"
 #include "error.h"
+#include "shell.h"
 
 void main (int argc, char** argv)
 {
@@ -32,6 +33,6 @@ void main (int argc, char** argv)
         return;
     }
     
-    dprintf(1, "Successfully created %s\n", argv[1]);
+    dprintf(STDOUT, "Successfully created %s\n", argv[1]);
     return;
 }

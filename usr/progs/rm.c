@@ -1,6 +1,7 @@
 #include "syscall.h"
 #include "string.h"
 #include "error.h"
+#include "shell.h"
 
 void main (int argc, char** argv)
 {
@@ -26,6 +27,6 @@ void main (int argc, char** argv)
         return;
     }
     
-    dprintf(1, "Successfully removed %s\n", argv[1]);
+    dprintf(STDOUT, "Successfully removed %s\n", argv[1]);
     return;
 }
