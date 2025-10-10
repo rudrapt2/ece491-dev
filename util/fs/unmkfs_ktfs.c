@@ -67,7 +67,7 @@ void write_file(FILE *image, struct ktfs_inode *inode, const char *filename) {
 void extract_directory(FILE *image, struct ktfs_superblock *sb, uint16_t dir_inode, const char *path) {
     uint8_t buf[KTFS_BLKSZ];
     // read the inode block
-    read_block(image, &buf, 1 + sb->bitmap_block_count + dir_inode / (KTFS_BLKSZ / KTFS_INOSZ));
+    read_block(image, &buf, 1 + sb->inode_bitmap_block_count + sb->bitmap_block_count + dir_inode / (KTFS_BLKSZ / KTFS_INOSZ));
 
     struct ktfs_inode root_inode;
     // copy the inode from the inode block to root_inode
@@ -83,7 +83,7 @@ void extract_directory(FILE *image, struct ktfs_superblock *sb, uint16_t dir_ino
         sprintf(entry_path, "%s/%s", path, entry->name);
 
         struct ktfs_inode inode_buf[KTFS_BLKSZ / KTFS_INOSZ];
-        read_block(image, &inode_buf, 1 + sb->bitmap_block_count + entry->inode / (KTFS_BLKSZ / KTFS_INOSZ));
+        read_block(image, &inode_buf, 1 + sb->inode_bitmap_block_count + sb->bitmap_block_count + entry->inode / (KTFS_BLKSZ / KTFS_INOSZ));
 
         struct ktfs_inode entry_inode;
         memcpy(&entry_inode, &inode_buf[entry->inode % (KTFS_BLKSZ / KTFS_INOSZ)], KTFS_INOSZ);
@@ -111,7 +111,7 @@ int main(int argc, char *argv[]) {
     struct ktfs_superblock sb;
     fread(&sb, sizeof(struct ktfs_superblock), 1, image);
 
-    num_starter_blocks = 1 + sb.bitmap_block_count + sb.inode_block_count;
+    num_starter_blocks = 1 + sb.inode_bitmap_block_count + sb.bitmap_block_count + sb.inode_block_count;
 
     mkdir(argv[1], 0755);
     extract_directory(image, &sb, sb.root_directory_inode, argv[1]);

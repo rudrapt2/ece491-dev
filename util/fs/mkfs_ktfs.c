@@ -136,7 +136,7 @@ int write_inode(FILE* fp, struct ktfs_inode* inode) {
         return -1;
     }
 
-    fseek(fp, (1 + num_inode_bitmap_blocks + num_bitmap_blocks) * KTFS_BLKSZ + inode_offset * KTFS_INOSZ, SEEK_SET);
+    fseek(fp, (1 + num_inode_bitmap_blocks + num_bitmap_blocks + inode_index) * KTFS_BLKSZ + inode_offset * KTFS_INOSZ, SEEK_SET);
     fwrite(inode, KTFS_INOSZ, 1, fp);
     fflush(fp);
     current_inode++;
