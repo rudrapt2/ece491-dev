@@ -122,7 +122,7 @@ static const struct uio_intf serial_uio_intf = {
 };
 
 /**
- * @brief UIO interface containing read/write/close functions for storage devices.
+ * @brief UIO interface containing read/write/cntl/close functions for storage devices.
  */
 static const struct uio_intf storage_uio_intf = {
     .close = &storage_uio_close,
@@ -132,7 +132,7 @@ static const struct uio_intf storage_uio_intf = {
 };
 
 /**
- * @brief UIO interface containing read/write/close functions for video devices.
+ * @brief UIO interface containing write/cntl/close functions for video devices.
  */
 static const struct uio_intf video_uio_intf __attribute__((unused)) = {
     .close = &video_uio_close,
