@@ -112,12 +112,18 @@ static const struct uio_intf devfs_listing_uio_intf = {
     .read = &devfs_listing_read
 };
 
+/**
+ * @brief UIO interface containing read/write/close functions for serial devices.
+ */
 static const struct uio_intf serial_uio_intf = {
     .close = &serial_uio_close,
     .read = &serial_uio_read,
     .write = &serial_uio_write
 };
 
+/**
+ * @brief UIO interface containing read/write/close functions for storage devices.
+ */
 static const struct uio_intf storage_uio_intf = {
     .close = &storage_uio_close,
     .read = &storage_uio_read,
@@ -125,6 +131,9 @@ static const struct uio_intf storage_uio_intf = {
     .cntl = &storage_uio_cntl
 };
 
+/**
+ * @brief UIO interface containing read/write/close functions for video devices.
+ */
 static const struct uio_intf video_uio_intf __attribute__((unused)) = {
     .close = &video_uio_close,
     .write = &video_uio_write,
@@ -479,6 +488,7 @@ int serial_open_uio(struct serial * ser, struct uio ** uioptr) {
 /**
  * @brief Closes a serial uio object and the underlying serial device
  * @param uio pointer to uio object to be closed
+ * @return None
  */
 void serial_uio_close(struct uio * uio) {
     struct serial_uio * suio = (struct serial_uio*)uio;
