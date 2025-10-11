@@ -32,7 +32,7 @@ struct uio_intf {
      * @brief Writes to sequential access I/O endpoint
      * @param uio A sequential access I/O endpoint
      * @param buf Buffer to read from
-     * @param buflen Number of bytes to read
+     * @param buflen Number of bytes to write
      */
     long (*write)(struct uio * uio, const void * buf, unsigned long buflen);
 
