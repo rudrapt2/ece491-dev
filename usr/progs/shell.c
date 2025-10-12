@@ -7,7 +7,7 @@
 
 void exec(int c, char** v) {
   char path[256];
-  int fd;
+  int fd, result;
 
   // Null-terminate the argument array
   v[c] = NULL;
@@ -31,7 +31,9 @@ void exec(int c, char** v) {
     _exit();
   }
 
-  _exec(fd, c, v);
+  result = _exec(fd, c, v);
+  printf("Failed to exec file (Error Code: %d)", result);
+  _exit();
 }
 
 char* find_terminator(char* buf) {
