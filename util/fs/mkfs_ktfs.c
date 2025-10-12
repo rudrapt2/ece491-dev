@@ -102,26 +102,115 @@ void update_bitmap(FILE* fp, uint32_t offset_start, uint32_t block_index, uint8_
         return;
     }
     fflush(fp);
-    
-    remaining_disk_size += (value == KTFS_FILE_IN_USE) ? -KTFS_BLKSZ : (value == KTFS_FILE_FREE) ? KTFS_BLKSZ : 0;
+}
+
+static uint32_t alloc_block(FILE* fp) {
+    uint32_t idx = current_data_block++;
+    update_bitmap(fp, 1 + num_inode_bitmap_blocks, num_starter_blocks + idx, KTFS_FILE_IN_USE);
+    return idx;
+}
+
+static uint32_t get_block_for_lbn(FILE* fp, struct ktfs_inode* inode, uint32_t lbn) {
+    uint32_t bpi = KTFS_BLKSZ / sizeof(uint32_t);
+    if (lbn < KTFS_NUM_DIRECT_DATA_BLOCKS) {
+        return inode->block[lbn];
+    }
+    uint32_t remaining = lbn - KTFS_NUM_DIRECT_DATA_BLOCKS;
+    if (remaining < bpi) {
+        uint32_t table[bpi];
+        fseek(fp, (num_starter_blocks + inode->indirect) * KTFS_BLKSZ, SEEK_SET);
+        fread(table, sizeof(uint32_t), bpi, fp);
+        return table[remaining];
+    }
+    remaining -= bpi;
+    uint32_t bpdi = bpi * bpi;
+    uint32_t dind_idx = remaining / bpdi;
+    uint32_t dind_off = remaining % bpdi;
+    uint32_t ind_idx = dind_off / bpi;
+    uint32_t ind_off = dind_off % bpi;
+    uint32_t dind_block[bpi];
+    fseek(fp, (num_starter_blocks + inode->dindirect[dind_idx]) * KTFS_BLKSZ, SEEK_SET);
+    fread(dind_block, sizeof(uint32_t), bpi, fp);
+    uint32_t ind_block[bpi];
+    fseek(fp, (num_starter_blocks + dind_block[ind_idx]) * KTFS_BLKSZ, SEEK_SET);
+    fread(ind_block, sizeof(uint32_t), bpi, fp);
+    return ind_block[ind_off];
+}
+
+static uint32_t alloc_block_for_lbn(FILE* fp, struct ktfs_inode* inode, uint32_t lbn) {
+    uint32_t bpi = KTFS_BLKSZ / sizeof(uint32_t);
+    if (lbn < KTFS_NUM_DIRECT_DATA_BLOCKS) {
+        inode->block[lbn] = alloc_block(fp);
+        return inode->block[lbn];
+    }
+    uint32_t remaining = lbn - KTFS_NUM_DIRECT_DATA_BLOCKS;
+    if (remaining < bpi) {
+        // entering indirect region on the first indirect block
+        if (lbn == KTFS_NUM_DIRECT_DATA_BLOCKS) {
+            inode->indirect = alloc_block(fp);
+        }
+        uint32_t table[bpi];
+        fseek(fp, (num_starter_blocks + inode->indirect) * KTFS_BLKSZ, SEEK_SET);
+        fread(table, sizeof(uint32_t), bpi, fp);
+        table[remaining] = alloc_block(fp);
+        fseek(fp, (num_starter_blocks + inode->indirect) * KTFS_BLKSZ, SEEK_SET);
+        fwrite(table, sizeof(uint32_t), bpi, fp);
+        return table[remaining];
+    }
+    remaining -= bpi;
+    uint32_t bpdi = bpi * bpi;
+    uint32_t dind_idx = remaining / bpdi;
+    uint32_t dind_off = remaining % bpdi;
+    uint32_t ind_idx = dind_off / bpi;
+    uint32_t ind_off = dind_off % bpi;
+    // entering a new dindirect region boundary
+    if (dind_off == 0) {
+        inode->dindirect[dind_idx] = alloc_block(fp);
+    }
+    uint32_t dind_block[bpi];
+    fseek(fp, (num_starter_blocks + inode->dindirect[dind_idx]) * KTFS_BLKSZ, SEEK_SET);
+    fread(dind_block, sizeof(uint32_t), bpi, fp);
+    if (ind_off == 0) {
+        dind_block[ind_idx] = alloc_block(fp);
+        fseek(fp, (num_starter_blocks + inode->dindirect[dind_idx]) * KTFS_BLKSZ, SEEK_SET);
+        fwrite(dind_block, sizeof(uint32_t), bpi, fp);
+    }
+    uint32_t ind_block[bpi];
+    fseek(fp, (num_starter_blocks + dind_block[ind_idx]) * KTFS_BLKSZ, SEEK_SET);
+    fread(ind_block, sizeof(uint32_t), bpi, fp);
+    ind_block[ind_off] = alloc_block(fp);
+    fseek(fp, (num_starter_blocks + dind_block[ind_idx]) * KTFS_BLKSZ, SEEK_SET);
+    fwrite(ind_block, sizeof(uint32_t), bpi, fp);
+    return ind_block[ind_off];
+}
+
+// Generic writer that appends 'size' bytes from 'data' into the given inode.
+// It allocates data and pointer blocks as needed and writes data to disk.
+static void wdata_to_inode(FILE* fp, struct ktfs_inode* inode, const uint8_t* data, uint32_t size) {
+    if (size == 0) return;
+    uint32_t written = 0;
+
+    while (written < size) {
+        uint32_t cur_off = inode->size;
+        uint32_t lbn = cur_off / KTFS_BLKSZ;
+        uint32_t off_in_blk = cur_off % KTFS_BLKSZ;
+        uint32_t blk_idx = (off_in_blk == 0)
+            ? alloc_block_for_lbn(fp, inode, lbn)
+            : get_block_for_lbn(fp, inode, lbn);
+        uint32_t can_write = KTFS_BLKSZ - off_in_blk;
+        uint32_t remain = size - written;
+        uint32_t chunk = (remain < can_write) ? remain : can_write;
+
+        fseek(fp, (num_starter_blocks + blk_idx) * KTFS_BLKSZ + off_in_blk, SEEK_SET);
+        fwrite(data + written, 1, chunk, fp);
+
+        written += chunk;
+        inode->size += chunk;
+    }
 }
 
 int write_dentry(FILE* fp, struct ktfs_dir_entry* dentry) {
-    // Check if the root inode has enough space for another directory entry
-    if (root_inode.size % KTFS_BLKSZ == 0) {
-        uint32_t new_data_block = current_data_block++;
-        update_bitmap(fp, 1 + num_inode_bitmap_blocks, num_starter_blocks + new_data_block, KTFS_FILE_IN_USE);
-
-        root_inode.block[root_inode.size / KTFS_BLKSZ] = new_data_block;
-        root_inode.size += KTFS_DENSZ;
-
-        fseek(fp, (num_starter_blocks + new_data_block) * KTFS_BLKSZ, SEEK_SET);
-        fwrite(dentry, sizeof(struct ktfs_dir_entry), 1, fp);
-    } else {
-        fseek(fp, (num_starter_blocks + root_inode.block[root_inode.size / KTFS_BLKSZ]) * KTFS_BLKSZ + root_inode.size % KTFS_BLKSZ, SEEK_SET);
-        fwrite(dentry, sizeof(struct ktfs_dir_entry), 1, fp);
-        root_inode.size += KTFS_DENSZ;
-    }
+    wdata_to_inode(fp, &root_inode, (const uint8_t*)dentry, sizeof(struct ktfs_dir_entry));
     fflush(fp);
     return 0;
 }
@@ -181,83 +270,24 @@ void load_binary(FILE* fp, const char* binary_path) {
     write_dentry(fp, &dentry);
 
     struct ktfs_inode inode = {0};
-    inode.size = file_size;
 
-    // Create an array to hold the block indices necessary for the file
-    uint32_t num_data_blocks = (file_size + KTFS_BLKSZ - 1) / KTFS_BLKSZ;
-    uint32_t* data_block_indices = (uint32_t*)calloc(num_data_blocks, sizeof(uint32_t));
-
-    for (uint32_t i = 0; i < num_data_blocks; i++) {
-        data_block_indices[i] = current_data_block++;
-        update_bitmap(fp, 1 + num_inode_bitmap_blocks, num_starter_blocks + data_block_indices[i], KTFS_FILE_IN_USE);
-    }
-
-    if (RANDOMIZE_ON) {
-        shuffle(data_block_indices, num_data_blocks);
-    }
-
-    for (uint32_t i = 0; i < num_data_blocks; i++) {
-        fseek(fp, (num_starter_blocks + data_block_indices[i]) * KTFS_BLKSZ, SEEK_SET);
-        uint8_t buffer[KTFS_BLKSZ] = {0};
-        fread(buffer, 1, KTFS_BLKSZ, binary_fp);
-        fwrite(buffer, 1, KTFS_BLKSZ, fp);
-    }
-
-    uint32_t data_block_idx = 0;
-
-    // Write the direct block indices to the inode
-    for (uint32_t i = 0; i < KTFS_NUM_DIRECT_DATA_BLOCKS && i < num_data_blocks; i++) {
-        inode.block[i] = data_block_indices[data_block_idx++];
-    }
-
-    // Write the indirect block
-    if (data_block_idx < num_data_blocks) {
-        uint32_t indirect_block = current_data_block++;
-        update_bitmap(fp, 1 + num_inode_bitmap_blocks, num_starter_blocks + indirect_block, KTFS_FILE_IN_USE);
-
-        uint32_t indirect_block_buf[KTFS_BLKSZ / sizeof(uint32_t)] = {0};
-        for (uint32_t i = 0; i < KTFS_BLKSZ / sizeof(uint32_t) && data_block_idx < num_data_blocks; i++) {
-            indirect_block_buf[i] = data_block_indices[data_block_idx++];
-        }
-
-        fseek(fp, (num_starter_blocks + indirect_block) * KTFS_BLKSZ, SEEK_SET);
-        fwrite(indirect_block_buf, 1, KTFS_BLKSZ, fp);
-        inode.indirect = indirect_block;
-    }
-
-    // Write the doubly-indirect blocks
-    for (int k = 0; k < KTFS_NUM_DINDIRECT_BLOCKS; k++) {
-        if (data_block_idx < num_data_blocks) {
-            uint32_t dindirect_block = current_data_block++;
-            update_bitmap(fp, 1 + num_inode_bitmap_blocks, num_starter_blocks + dindirect_block, KTFS_FILE_IN_USE);
-
-            uint32_t dindirect_block_buf[KTFS_BLKSZ / sizeof(uint32_t)] = {0};
-            for (uint32_t i = 0; i < KTFS_BLKSZ / sizeof(uint32_t) && data_block_idx < num_data_blocks; i++) {
-                uint32_t indirect_block = current_data_block++;
-                update_bitmap(fp, 1 + num_inode_bitmap_blocks, num_starter_blocks + indirect_block, KTFS_FILE_IN_USE);
-
-                uint32_t indirect_block_buf[KTFS_BLKSZ / sizeof(uint32_t)] = {0};
-                for (uint32_t j = 0; j < KTFS_BLKSZ / sizeof(uint32_t) && data_block_idx < num_data_blocks; j++) {
-                    indirect_block_buf[j] = data_block_indices[data_block_idx++];
-                }
-
-                fseek(fp, (num_starter_blocks + indirect_block) * KTFS_BLKSZ, SEEK_SET);
-                fwrite(indirect_block_buf, 1, KTFS_BLKSZ, fp);
-
-                dindirect_block_buf[i] = indirect_block;
-            }
-
-            fseek(fp, (num_starter_blocks + dindirect_block) * KTFS_BLKSZ, SEEK_SET);
-            fwrite(dindirect_block_buf, 1, KTFS_BLKSZ, fp);
-            inode.dindirect[k] = dindirect_block;
+    // Stream the binary in KTFS_BLKSZ increments to avoid full-file buffering
+    uint8_t buffer[KTFS_BLKSZ];
+    uint32_t total_written = 0;
+    while (total_written < file_size) {
+        size_t n = fread(buffer, 1, KTFS_BLKSZ, binary_fp);
+        if (n > 0) {
+            wdata_to_inode(fp, &inode, buffer, (uint32_t)n);
+            total_written += (uint32_t)n;
+        } else {
+            break;
         }
     }
 
-    // Mark the inode as in use
+    // Mark the inode as in use and persist it
     update_bitmap(fp, 1, current_inode, KTFS_FILE_IN_USE);
-
     write_inode(fp, &inode);
-    free(data_block_indices);
+
     fflush(fp);
     fclose(binary_fp);
 
