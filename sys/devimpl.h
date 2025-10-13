@@ -65,7 +65,13 @@ struct serial_intf {
 // the device in the system are a pointer to this struct. The struct may be
 // embedded in a larger struct, containing additional device-specific members.
 
+/**
+* @brief Represents a serial device instance. All references to a serial device in the system are a pointer to this struct. The struct may be embedded in a larger struct, containing additional device-specific members.
+**/
 struct serial {
+    /**
+     * @brief Pointer to the serial device interface
+     */
     const struct serial_intf * intf;
 };
 
@@ -134,8 +140,18 @@ struct storage_intf {
     int (*cntl)(struct storage * sto, int op, void * arg);
 };
 
+/**
+* @brief Represents a storage device instance. All references to a storage device in the system are a pointer to this struct. The struct may be embedded in a larger struct, containing additional device-specific members.
+**/
 struct storage {
+    /**
+     * @brief Pointer to the storage device interface
+     */
     const struct storage_intf * intf;
+
+    /**
+     * @brief Capacity in bytes of storage device
+     */
     unsigned long long capacity;
 };
 
@@ -202,7 +218,13 @@ struct video_intf {
     int (*cntl)(struct video * vid, int op, void * arg);
 };
 
+/**
+* @brief Represents a video device instance. All references to a video device in the system are a pointer to this struct. The struct may be embedded in a larger struct, containing additional device-specific members.
+**/
 struct video {
+    /**
+     * @brief Pointer to the video device interface
+     */
     const struct video_intf * intf;
 };
 
