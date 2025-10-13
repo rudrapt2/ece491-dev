@@ -19,7 +19,9 @@ extern int register_device(const char * name, enum device_type type, void * devi
 * @brief Table of low-level operations of serial device. Backing endpoint of all higher level serial operations. Defines the interface to the device: the block size and function pointers for operations on the device.
 **/
 struct serial_intf {
-
+    /**
+     * @brief mimimum block size in bytes for I/O operations
+     */
     unsigned int blksz;
 
     /**
@@ -80,6 +82,9 @@ struct serial * ser, const struct serial_intf * intf)
 * @brief Table of low-level operations of storage device. Backing endpoint of all higher level storage operations. Defines the interface to the device: the block size and function pointers for operations on the device.
 **/
 struct storage_intf {
+    /**
+     * @brief block size in bytes
+     */
     unsigned int blksz;
 
     /**
@@ -154,6 +159,9 @@ struct video_mode {
     unsigned char bshift, bdepth;
 };
 
+/**
+* @brief Table of low-level operations of video device. Backing endpoint of all higher level storage operations. Defines the interface to the device: the modes, mode count, and function pointers for operations on the device.
+**/
 struct video_intf {
     unsigned short modecnt;
     const struct video_mode * modes;
