@@ -75,6 +75,11 @@ struct serial {
     const struct serial_intf * intf;
 };
 
+/**
+* @brief Initializes the serial device interface
+* @param ser Pointer to serial device instance
+* @param intf Pointer to I/O interface to define the serial device's low level operations
+**/
 static inline void serial_init (
 struct serial * ser, const struct serial_intf * intf)
 {
@@ -155,6 +160,12 @@ struct storage {
     unsigned long long capacity;
 };
 
+/**
+* @brief Initializes the storage device interface
+* @param sto Pointer to storage device instance
+* @param intf Pointer to I/O interface to define the storage device's low level operations
+* @param cap Capacity for storage device in bytes
+**/
 static inline void storage_init (
     struct storage * sto, const struct storage_intf * intf, unsigned long long cap)
 {
@@ -228,6 +239,11 @@ struct video {
     const struct video_intf * intf;
 };
 
+/**
+* @brief Initializes the video device interface
+* @param vid Pointer to video device instance
+* @param intf Pointer to I/O interface to define the video device's low level operations
+**/
 static inline void video_init (
     struct video * vid, const struct video_intf * intf)
 {
