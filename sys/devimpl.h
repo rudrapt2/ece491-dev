@@ -15,12 +15,47 @@ extern int register_device(const char * name, enum device_type type, void * devi
 // and function pointers for operations on the device. Use the functions
 // /serial_open/, /serial_close/, etc. defined below to operate on the device.
 
+/**
+* @brief Table of low-level operations of serial device. Backing endpoint of all higher level serial operations. Defines the interface to the device: the block size and function pointers for operations on the device.
+**/
 struct serial_intf {
+
     unsigned int blksz;
+
+    /**
+     * @brief Opens the device
+     * @param ser Pointer to serial device instance
+     */
     int (*open)(struct serial * ser);
+
+    /**
+     * @brief Closes the device
+     * @param ser Pointer to serial device instance
+     */
     void (*close)(struct serial * ser);
+
+    /**
+     * @brief Reads from the device
+     * @param ser Pointer to serial device instance
+     * @param buf buffer to read into
+     * @param bufsz buffer size in bytes
+     */
     int (*recv)(struct serial * ser, void * buf, unsigned int bufsz);
+
+    /**
+     * @brief Writes to the device
+     * @param ser Pointer to serial device instance
+     * @param buf buffer to read from
+     * @param buflen buffer size in bytes to send to device
+     */
     int (*send)(struct serial * ser, const void * buf, unsigned int buflen);
+
+    /**
+     * @brief Control operation on device
+     * @param ser Pointer to serial device instance
+     * @param op Contorl operation 
+     * @param arg Argument for operation
+     */
     int (*cntl)(struct serial * ser, int op, void * arg);
 };
 
@@ -41,23 +76,56 @@ struct serial * ser, const struct serial_intf * intf)
 // STORAGE DEVICES
 //
 
+/**
+* @brief Table of low-level operations of storage device. Backing endpoint of all higher level storage operations. Defines the interface to the device: the block size and function pointers for operations on the device.
+**/
 struct storage_intf {
     unsigned int blksz;
+
+    /**
+     * @brief Opens the storage device
+     * @param sto Pointer to storage device instance
+     */
     int (*open)(struct storage * sto);
+
+    /**
+     * @brief Closes the storage device
+     * @param sto Pointer to storage device instance
+     */
     void (*close)(struct storage * sto);
     
+    /**
+     * @brief Fetches data from the storage device
+     * @param sto Pointer to storage device instance
+     * @param pos Byte offset into the block device
+     * @param buf Buffer to read into
+     * @param bytecnt Number of bytes to fetch
+     */
     long (*fetch) (
         struct storage * sto,
         unsigned long long pos,
         void * buf,
         unsigned long bytecnt);
     
+    /**
+     * @brief Stores data into the storage device
+     * @param sto Pointer to storage device instance
+     * @param pos Byte offset into the block device
+     * @param buf Buffer to read from
+     * @param bytecnt Number of bytes to store
+     */
     long (*store) (
         struct storage * sto,
         unsigned long long pos,
         const void * buf,
         unsigned long bytecnt);
         
+    /**
+     * @brief Control operation on device
+     * @param sto Pointer to storage device instance
+     * @param op Contorl operation 
+     * @param arg Argument for operation
+     */
     int (*cntl)(struct storage * sto, int op, void * arg);
 };
 
