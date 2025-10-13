@@ -163,11 +163,42 @@ struct video_mode {
 * @brief Table of low-level operations of video device. Backing endpoint of all higher level storage operations. Defines the interface to the device: the modes, mode count, and function pointers for operations on the device.
 **/
 struct video_intf {
+    /**
+     * @brief number of modes
+     */
     unsigned short modecnt;
+
+    /**
+     * @brief pointer to modes
+     */
     const struct video_mode * modes;
+
+    /**
+     * @brief Opens the video device
+     * @param vid Pointer to video device instance
+     * @param mode Mode of video device
+     * @param fbufptr Double pointer to frame buffer
+     */
     int (*open)(struct video * vid, int mode, void ** fbufptr);
+
+    /**
+     * @brief Close the video device
+     * @param vid Pointer to video device instance
+     */
     void (*close)(struct video * vid);
+
+    /**
+     * @brief Flush to display with the video device
+     * @param vid Pointer to video device instance
+     */
     void (*flush)(struct video * vid);
+
+    /**
+     * @brief Control operation on device
+     * @param vid Pointer to video device instance
+     * @param op Contorl operation 
+     * @param arg Argument for operation
+     */
     int (*cntl)(struct video * vid, int op, void * arg);
 };
 
