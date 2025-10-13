@@ -176,6 +176,9 @@ static inline void storage_init (
 // VIDEO DEVICE
 //
 
+/**
+* @brief Describes video mode for frame buffer, including horizontal and vertical resolution, horizontal and vertical stride, size of a pixel in bytes, and RGB position and depth.
+*/
 struct video_mode {
     unsigned int width, height;
     unsigned int horiz_stride;
