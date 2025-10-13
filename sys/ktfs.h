@@ -23,6 +23,12 @@ Overall filesystem image layout
 +------------------+
 |     Padding      |
 +------------------+
+|  Inode Bitmap 0  |
++------------------+
+|  Inode Bitmap 1  |
++------------------+
+|      ...         |
++------------------+
 |   Bitmap Blk 0   |
 +------------------+
 |   Bitmap Blk 1   |
@@ -47,6 +53,7 @@ Imagining this layout as a struct, it would look like this:
 struct filesystem {
     struct ktfs_superblock superblock;
     uint8_t padding[BLOCK_SIZE - sizeof(ktfs_superblock)];
+    struct ktfs_bitmap inode_bitmaps[];
     struct ktfs_bitmap bitmaps[];
     struct ktfs_inode inodes[];
     struct ktfs_data_block data_blocks[];
@@ -90,7 +97,7 @@ struct ktfs_dir_entry {
     /// Inode number
     uint16_t inode;                    
     /// File name (plus null terminator)
-    char     name[KTFS_MAX_FILENAME_LEN+sizeof(uint8_t)]; 
+    char name[KTFS_MAX_FILENAME_LEN+sizeof(uint8_t)]; 
 } __attribute__((packed));
 
 // Bitmap block

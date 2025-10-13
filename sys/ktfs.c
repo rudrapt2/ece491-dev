@@ -53,10 +53,16 @@ struct ktfs_file {
     unsigned long pos;// add pos
 };
 
+/// @brief Elem struct for listing deep copies
+struct ktfs_listing_elem {
+    struct ktfs_listing_elem * next;
+    char name[KTFS_MAX_FILENAME_LEN+sizeof(uint8_t)];
+};
+
 /// @brief Wrapper struct for uio and attached file
 struct ktfs_listing_uio {
     struct uio base;
-    const struct ktfs_file * file;
+    struct ktfs_listing_elem * file;
 };
 
 // INTERNAL FUNCTION DECLARATIONS
@@ -687,9 +693,19 @@ void ktfs_flush(struct filesystem * fs) {
  */
 int ktfs_open_listing(struct uio ** uioptr) {
     struct ktfs_listing_uio * ls;
+    struct ktfs_listing_elem** e;
+    struct ktfs_file * f = files_list;
 
+    // note we need to deep copy all filenames to
+    // avoid use after free if a file is deleted
     ls = kcalloc(1, sizeof(*ls));
-    ls->file = files_list;
+    e = &ls->file;
+    while (f != NULL) {
+        *e = kcalloc(1, sizeof(struct ktfs_listing_elem));
+        strncpy((*e)->name, f->dentry.name, KTFS_MAX_FILENAME_LEN);
+        e = &(*e)->next;
+        f = f->next;
+    }
 
     *uioptr = uio_init1(&ls->base, &ktfs_listing_uio_intf);
 
@@ -703,6 +719,15 @@ int ktfs_open_listing(struct uio ** uioptr) {
  */
 void ktfs_listing_close(struct uio * uio) {
     struct ktfs_listing_uio * const ls = (struct ktfs_listing_uio*)uio;
+    struct ktfs_listing_elem *cur, *next;
+    
+    // free remaining deep copied names
+    cur = ls->file;
+    while (cur != NULL) {
+        next = cur->next;
+        kfree(cur);
+        cur = next;
+    }
     kfree(ls);
 }
 
@@ -715,12 +740,16 @@ void ktfs_listing_close(struct uio * uio) {
  */
 long ktfs_listing_read(struct uio * uio, void * buf, unsigned long bufsz) {
     struct ktfs_listing_uio * const ls = (struct ktfs_listing_uio*)uio;
+    struct ktfs_listing_elem * file = ls->file;
     size_t len;
 
-    if (ls->file != NULL) {
-        len = strlen(ls->file->dentry.name);
-        strncpy(buf, ls->file->dentry.name, bufsz);
-        ls->file = ls->file->next;
+    if (file != NULL) {
+        len = strlen(file->name);
+        strncpy(buf, file->name, bufsz);
+        ls->file = file->next;
+
+        kfree(file); // no longer needed
+
         return (len < bufsz) ? len : bufsz;
     } else
         return 0;
