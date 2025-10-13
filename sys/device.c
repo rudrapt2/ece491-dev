@@ -142,6 +142,11 @@ static const struct uio_intf video_uio_intf __attribute__((unused)) = {
 // EXPORTED FUNCTION DEFINITIONS
 //
 
+/**
+ * @brief Device Manager initialization
+ * @param void None
+ * @return None
+ */
 void devmgr_init(void) {
     trace("%s()", __func__);
     devmgr_initialized = 1;
