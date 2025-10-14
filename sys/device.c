@@ -474,6 +474,11 @@ int video_cntl(struct video * vid, int op, void * arg) {
         return -ENOTSUP;
 }
 
+/**
+ * @brief Mounts the device filesystem at the specified mount point name
+ * @param name mount point name
+ * @return 0 if successful, negative error code if error
+ */
 int mount_devfs(const char * name) {
     return attach_filesystem(name, (struct filesystem*)&devfs);
 }
