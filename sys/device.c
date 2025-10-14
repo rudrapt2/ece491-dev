@@ -577,6 +577,18 @@ long serial_uio_write(struct uio * uio, const void * buf, unsigned long buflen) 
 }
 
 /**
+ * @brief Performs control operation on a serial device
+ * @param uio pointer to serial uio object
+ * @param op control operation of serial device
+ * @param arg arguments of control operation
+ * @return output of control operation on success, negative error code if error
+ */
+long serial_uio_cntl(struct uio * uio, int op, void * arg) {
+    struct serial_uio * suio = (struct serial_uio*)uio;
+    return serial_cntl(suio->ser, op, arg);
+}
+
+/**
  * @brief Opens a storage device and wraps it in a uio object
  * @param sto pointer to storage device struct
  * @param uioptr pointer to uio struct pointer to be filled in
