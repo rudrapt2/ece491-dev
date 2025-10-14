@@ -78,7 +78,7 @@ static int serial_open_uio(struct serial * ser, struct uio ** uioptr);
 static void serial_uio_close(struct uio * uio);
 static long serial_uio_read(struct uio * uio, void * buf, unsigned long bufsz);
 static long serial_uio_write(struct uio * uio, const void * buf, unsigned long buflen);
-static long serial_uio_cntl(struct uio * uio, int op, void * arg);
+static int serial_uio_cntl(struct uio * uio, int op, void * arg);
 
 static int storage_open_uio(struct storage * sto, struct uio ** uioptr);
 static void storage_uio_close(struct uio * uio);
@@ -638,7 +638,7 @@ long serial_uio_write(struct uio * uio, const void * buf, unsigned long buflen) 
  * @param arg arguments of control operation
  * @return output of control operation on success, negative error code if error
  */
-long serial_uio_cntl(struct uio * uio, int op, void * arg) {
+int serial_uio_cntl(struct uio * uio, int op, void * arg) {
     struct serial_uio * suio = (struct serial_uio*)uio;
     return serial_cntl(suio->ser, op, arg);
 }
