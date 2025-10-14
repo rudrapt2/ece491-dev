@@ -1,12 +1,13 @@
-#ifdef UMODE
-    #include "string.h"
-    #include "syscall.h"
-    #include "shell.h"
+#ifndef UMODE // cp1
+    #include "uio.h"
+    void main(struct uio * uio) {
+        uio_printf(uio, "Hello, world!\n");
+    }
 #endif
 
-void main(void) {
-    #ifdef UMODE
-        _print("Hello, world!\n");
-        _exit();
-    #endif
-}
+#ifdef UMODE // cp2&3
+    #include "string.h"
+    void main(void) {
+        printf("Hello, world!\n");
+    }
+#endif

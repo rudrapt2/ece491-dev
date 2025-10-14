@@ -180,7 +180,7 @@ int create_cache(struct storage * disk, struct cache ** cptr) {
  */
 int cache_get_block(struct cache * cache, unsigned long long pos, void ** pptr) {
     struct cache_entry * ent; // cache entry for block
-    long rcnt; // return value from ioread
+    long rcnt; // return value from fetch
     int i; // block index
 
     trace("%s(0x%llx)", __func__, pos);

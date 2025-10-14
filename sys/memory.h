@@ -15,6 +15,9 @@
 
 // EXPORTED CONSTANTS
 //
+#ifndef HEAP_ALLOC_MAX
+#define HEAP_ALLOC_MAX (PAGE_SIZE - 64)
+#endif
 
 #define PAGE_ORDER 12
 #define PAGE_SIZE (1UL << PAGE_ORDER)

@@ -13,7 +13,7 @@
 // Maximum allocation request size
 
 #ifndef HEAP_ALLOC_MAX
-#define HEAP_ALLOC_MAX (PAGE_SIZE - 64)
+#define HEAP_ALLOC_MAX 4000
 #endif
 
 extern char heap_initialized; // 1 if heap_init called, 0 otherwise
