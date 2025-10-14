@@ -78,6 +78,7 @@ static int serial_open_uio(struct serial * ser, struct uio ** uioptr);
 static void serial_uio_close(struct uio * uio);
 static long serial_uio_read(struct uio * uio, void * buf, unsigned long bufsz);
 static long serial_uio_write(struct uio * uio, const void * buf, unsigned long buflen);
+static long serial_uio_cntl(struct uio * uio, int op, void * arg);
 
 static int storage_open_uio(struct storage * sto, struct uio ** uioptr);
 static void storage_uio_close(struct uio * uio);
@@ -118,7 +119,8 @@ static const struct uio_intf devfs_listing_uio_intf = {
 static const struct uio_intf serial_uio_intf = {
     .close = &serial_uio_close,
     .read = &serial_uio_read,
-    .write = &serial_uio_write
+    .write = &serial_uio_write,
+    .cntl = &serial_uio_cntl
 };
 
 /**
