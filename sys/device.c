@@ -152,6 +152,13 @@ void devmgr_init(void) {
     devmgr_initialized = 1;
 }
 
+/**
+ * @brief Function to register a device in the device list
+ * @param name name of the device
+ * @param type type of device
+ * @param device_struct input device struct to be stored in the device list
+ * @return instance number of device
+ */
 int register_device(const char * name, enum device_type type, void * device_struct) {
     struct device_record ** dptr = &devlist;
     struct device_record * dev;
