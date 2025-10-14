@@ -207,6 +207,13 @@ int register_device(const char * name, enum device_type type, void * device_stru
     return instno;
 }
 
+/**
+ * @brief Function to find a device in the device list
+ * @param name name of the device to be found
+ * @param type type of device to be found
+ * @param instno instance number of device to be found
+ * @return device struct of device if found, NULL otherwise
+ */
 void * find_device(const char * name, enum device_type type, int instno) {
     struct device_record * dev;
 
@@ -226,6 +233,11 @@ void * find_device(const char * name, enum device_type type, int instno) {
     return NULL;
 }
 
+/**
+ * @brief Function to return the short name of a device type
+ * @param type type of device to find the short name for
+ * @return short name of required device
+ */
 const char * device_type_short_name(enum device_type type) {
     switch (type) {
     case DEV_SERIAL: return "ser";
@@ -235,6 +247,11 @@ const char * device_type_short_name(enum device_type type) {
     }
 }
 
+/**
+ * @brief Function to open the inputted serial device
+ * @param ser pointer to serial device struct
+ * @return 0 if device is opened, error code otherwise
+ */
 int serial_open(struct serial * ser) {
     if (ser->intf->open != NULL)
         return ser->intf->open(ser);
@@ -242,11 +259,23 @@ int serial_open(struct serial * ser) {
         return -ENOTSUP;
 }
 
+/**
+ * @brief Function to close the inputted serial device
+ * @param ser pointer to serial device struct
+ * @return None
+ */
 void serial_close(struct serial * ser) {
     if (ser->intf->close != NULL)
         return ser->intf->close(ser);
 }
 
+/**
+ * @brief Function to call the receive function of the inputted serial device
+ * @param ser pointer to serial device struct
+ * @param buf buffer to read data into
+ * @param bufsz size of buffer in bytes
+ * @return number of bytes read, error code if unable to read
+ */
 int serial_recv(struct serial * ser, void * buf, unsigned int bufsz) {
     unsigned int const blksz = ser->intf->blksz;
 
@@ -261,6 +290,13 @@ int serial_recv(struct serial * ser, void * buf, unsigned int bufsz) {
         return -ENOTSUP;
 }
 
+/**
+ * @brief Function to call the send function of the inputted serial device
+ * @param ser pointer to serial device struct
+ * @param buf buffer to write data from
+ * @param buflen size of buffer in bytes
+ * @return number of bytes written, error code if unable to write
+ */
 int serial_send(struct serial * ser, const void * buf, unsigned int buflen) {
     unsigned int const blksz = ser->intf->blksz;
 
@@ -275,6 +311,13 @@ int serial_send(struct serial * ser, const void * buf, unsigned int buflen) {
         return -ENOTSUP;
 }
 
+/**
+ * @brief Function to call the control function of the inputted serial device
+ * @param ser pointer to serial device struct
+ * @param op operation of the serial device
+ * @param arg arguments passed into the control oepration of the device
+ * @return return value of control operation for device on success, error code on failure 
+ */
 int serial_cntl(struct serial * ser, int op, void * arg) {
     if (ser->intf->cntl != NULL)
         return ser->intf->cntl(ser, op, arg);
