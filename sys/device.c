@@ -327,6 +327,11 @@ int serial_cntl(struct serial * ser, int op, void * arg) {
         return -ENOTSUP;
 }
 
+/**
+ * @brief Function to get the minimum block size in bytes of a serial device
+ * @param ser pointer to serial device struct
+ * @return block size in bytes
+ */
 unsigned int serial_blksz(const struct serial * ser) {
     return ser->intf->blksz;
 }
@@ -334,6 +339,11 @@ unsigned int serial_blksz(const struct serial * ser) {
 // STORAGE DEVICE
 // 
 
+/**
+ * @brief Function to open the inputted storage device
+ * @param sto pointer to storage device struct
+ * @return 0 if device is opened, error code otherwise
+ */
 int storage_open(struct storage * sto) {
     if (sto->intf->open != NULL)
         return sto->intf->open(sto);
@@ -341,11 +351,24 @@ int storage_open(struct storage * sto) {
         return -ENOTSUP;
 }
 
+/**
+ * @brief Function to close the inputted storage device
+ * @param sto pointer to storage device struct
+ * @return None
+ */
 void storage_close(struct storage * sto) {
     if (sto->intf->close != NULL)
         return sto->intf->close(sto);
 }
 
+/**
+ * @brief Function to call the fetch function of the inputted storage device
+ * @param sto pointer to storage device struct
+ * @param pos position on storage device
+ * @param buf buffer to read data into
+ * @param bufsz size of buffer in bytes
+ * @return number of bytes read, error code if error
+ */
 long storage_fetch (
     struct storage * sto,
     unsigned long long pos,
@@ -365,6 +388,14 @@ long storage_fetch (
         return -ENOTSUP;
 }
 
+/**
+ * @brief Function to call the store function of the inputted storage device
+ * @param sto pointer to storage device struct
+ * @param pos position on storage device
+ * @param buf buffer to write data from
+ * @param buflen size of buffer in bytes
+ * @return number of bytes written, error code if error
+ */
 long storage_store (
     struct storage * sto,
     unsigned long long pos,
@@ -384,6 +415,13 @@ long storage_store (
         return -ENOTSUP;
 }
 
+/**
+ * @brief Function to call the control function of the inputted storage device
+ * @param sto pointer to storage device struct
+ * @param op operation of the storage device
+ * @param arg arguments passed into the control oepration of the device
+ * @return return value of control operation for device on success, error code on failure 
+ */
 int storage_cntl(struct storage * sto, int op, void * arg) {
     if (sto->intf->cntl != NULL)
         return sto->intf->cntl(sto, op, arg);
@@ -391,10 +429,20 @@ int storage_cntl(struct storage * sto, int op, void * arg) {
         return -ENOTSUP;
 }
 
+/**
+ * @brief Function to get the block size in bytes of a storage device
+ * @param sto pointer to storage device struct
+ * @return block size in bytes
+ */
 unsigned int storage_blksz(const struct storage * sto) {
     return sto->intf->blksz;
 }
 
+/**
+ * @brief Function to get the storage capacity in bytes of a storage device
+ * @param sto pointer to storage device struct
+ * @return capacity
+ */
 unsigned long long storage_capacity(const struct storage * sto) {
     return sto->capacity;
 }
