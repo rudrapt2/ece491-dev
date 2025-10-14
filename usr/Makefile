@@ -12,6 +12,7 @@ OBJDUMP=$(TOOLPREFIX)objdump
 UMODE := 1
 
 ULIB_OBJS = \
+	uio.o \
 	string.o \
 	syscall.o \
 	heap.o
@@ -52,6 +53,4 @@ bin:
 	mkdir $@
 
 clean:
-# 	mv bin/trek .
-	rm -rf *.o *.elf *.asm
-# 	mv trek bin/trek
+	rm -rf *.o *.elf *.asm bin/
