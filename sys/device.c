@@ -78,6 +78,7 @@ static int serial_open_uio(struct serial * ser, struct uio ** uioptr);
 static void serial_uio_close(struct uio * uio);
 static long serial_uio_read(struct uio * uio, void * buf, unsigned long bufsz);
 static long serial_uio_write(struct uio * uio, const void * buf, unsigned long buflen);
+static long serial_uio_cntl(struct uio * uio, int op, void * arg);
 
 static int storage_open_uio(struct storage * sto, struct uio ** uioptr);
 static void storage_uio_close(struct uio * uio);
@@ -118,7 +119,8 @@ static const struct uio_intf devfs_listing_uio_intf = {
 static const struct uio_intf serial_uio_intf = {
     .close = &serial_uio_close,
     .read = &serial_uio_read,
-    .write = &serial_uio_write
+    .write = &serial_uio_write,
+    .cntl = &serial_uio_cntl
 };
 
 /**
@@ -152,6 +154,13 @@ void devmgr_init(void) {
     devmgr_initialized = 1;
 }
 
+/**
+ * @brief Function to register a device in the device list
+ * @param name name of the device
+ * @param type type of device
+ * @param device_struct input device struct to be stored in the device list
+ * @return instance number of device
+ */
 int register_device(const char * name, enum device_type type, void * device_struct) {
     struct device_record ** dptr = &devlist;
     struct device_record * dev;
@@ -200,6 +209,13 @@ int register_device(const char * name, enum device_type type, void * device_stru
     return instno;
 }
 
+/**
+ * @brief Function to find a device in the device list
+ * @param name name of the device to be found
+ * @param type type of device to be found
+ * @param instno instance number of device to be found
+ * @return device struct of device if found, NULL otherwise
+ */
 void * find_device(const char * name, enum device_type type, int instno) {
     struct device_record * dev;
 
@@ -219,6 +235,11 @@ void * find_device(const char * name, enum device_type type, int instno) {
     return NULL;
 }
 
+/**
+ * @brief Function to return the short name of a device type
+ * @param type type of device to find the short name for
+ * @return short name of required device
+ */
 const char * device_type_short_name(enum device_type type) {
     switch (type) {
     case DEV_SERIAL: return "ser";
@@ -228,6 +249,11 @@ const char * device_type_short_name(enum device_type type) {
     }
 }
 
+/**
+ * @brief Function to open the inputted serial device
+ * @param ser pointer to serial device struct
+ * @return 0 if device is opened, error code otherwise
+ */
 int serial_open(struct serial * ser) {
     if (ser->intf->open != NULL)
         return ser->intf->open(ser);
@@ -235,11 +261,23 @@ int serial_open(struct serial * ser) {
         return -ENOTSUP;
 }
 
+/**
+ * @brief Function to close the inputted serial device
+ * @param ser pointer to serial device struct
+ * @return None
+ */
 void serial_close(struct serial * ser) {
     if (ser->intf->close != NULL)
         return ser->intf->close(ser);
 }
 
+/**
+ * @brief Function to call the receive function of the inputted serial device
+ * @param ser pointer to serial device struct
+ * @param buf buffer to read data into
+ * @param bufsz size of buffer in bytes
+ * @return number of bytes read, error code if unable to read
+ */
 int serial_recv(struct serial * ser, void * buf, unsigned int bufsz) {
     unsigned int const blksz = ser->intf->blksz;
 
@@ -254,6 +292,13 @@ int serial_recv(struct serial * ser, void * buf, unsigned int bufsz) {
         return -ENOTSUP;
 }
 
+/**
+ * @brief Function to call the send function of the inputted serial device
+ * @param ser pointer to serial device struct
+ * @param buf buffer to write data from
+ * @param buflen size of buffer in bytes
+ * @return number of bytes written, error code if unable to write
+ */
 int serial_send(struct serial * ser, const void * buf, unsigned int buflen) {
     unsigned int const blksz = ser->intf->blksz;
 
@@ -268,6 +313,13 @@ int serial_send(struct serial * ser, const void * buf, unsigned int buflen) {
         return -ENOTSUP;
 }
 
+/**
+ * @brief Function to call the control function of the inputted serial device
+ * @param ser pointer to serial device struct
+ * @param op operation of the serial device
+ * @param arg arguments passed into the control oepration of the device
+ * @return return value of control operation for device on success, error code on failure 
+ */
 int serial_cntl(struct serial * ser, int op, void * arg) {
     if (ser->intf->cntl != NULL)
         return ser->intf->cntl(ser, op, arg);
@@ -275,6 +327,11 @@ int serial_cntl(struct serial * ser, int op, void * arg) {
         return -ENOTSUP;
 }
 
+/**
+ * @brief Function to get the minimum block size in bytes of a serial device
+ * @param ser pointer to serial device struct
+ * @return block size in bytes
+ */
 unsigned int serial_blksz(const struct serial * ser) {
     return ser->intf->blksz;
 }
@@ -282,6 +339,11 @@ unsigned int serial_blksz(const struct serial * ser) {
 // STORAGE DEVICE
 // 
 
+/**
+ * @brief Function to open the inputted storage device
+ * @param sto pointer to storage device struct
+ * @return 0 if device is opened, error code otherwise
+ */
 int storage_open(struct storage * sto) {
     if (sto->intf->open != NULL)
         return sto->intf->open(sto);
@@ -289,11 +351,24 @@ int storage_open(struct storage * sto) {
         return -ENOTSUP;
 }
 
+/**
+ * @brief Function to close the inputted storage device
+ * @param sto pointer to storage device struct
+ * @return None
+ */
 void storage_close(struct storage * sto) {
     if (sto->intf->close != NULL)
         return sto->intf->close(sto);
 }
 
+/**
+ * @brief Function to call the fetch function of the inputted storage device
+ * @param sto pointer to storage device struct
+ * @param pos position on storage device
+ * @param buf buffer to read data into
+ * @param bufsz size of buffer in bytes
+ * @return number of bytes read, error code if error
+ */
 long storage_fetch (
     struct storage * sto,
     unsigned long long pos,
@@ -313,6 +388,14 @@ long storage_fetch (
         return -ENOTSUP;
 }
 
+/**
+ * @brief Function to call the store function of the inputted storage device
+ * @param sto pointer to storage device struct
+ * @param pos position on storage device
+ * @param buf buffer to write data from
+ * @param buflen size of buffer in bytes
+ * @return number of bytes written, error code if error
+ */
 long storage_store (
     struct storage * sto,
     unsigned long long pos,
@@ -332,6 +415,13 @@ long storage_store (
         return -ENOTSUP;
 }
 
+/**
+ * @brief Function to call the control function of the inputted storage device
+ * @param sto pointer to storage device struct
+ * @param op operation of the storage device
+ * @param arg arguments passed into the control oepration of the device
+ * @return return value of control operation for device on success, error code on failure 
+ */
 int storage_cntl(struct storage * sto, int op, void * arg) {
     if (sto->intf->cntl != NULL)
         return sto->intf->cntl(sto, op, arg);
@@ -339,10 +429,20 @@ int storage_cntl(struct storage * sto, int op, void * arg) {
         return -ENOTSUP;
 }
 
+/**
+ * @brief Function to get the block size in bytes of a storage device
+ * @param sto pointer to storage device struct
+ * @return block size in bytes
+ */
 unsigned int storage_blksz(const struct storage * sto) {
     return sto->intf->blksz;
 }
 
+/**
+ * @brief Function to get the storage capacity in bytes of a storage device
+ * @param sto pointer to storage device struct
+ * @return capacity
+ */
 unsigned long long storage_capacity(const struct storage * sto) {
     return sto->capacity;
 }
@@ -374,6 +474,11 @@ int video_cntl(struct video * vid, int op, void * arg) {
         return -ENOTSUP;
 }
 
+/**
+ * @brief Mounts the device filesystem at the specified mount point name
+ * @param name mount point name
+ * @return 0 if successful, negative error code if error
+ */
 int mount_devfs(const char * name) {
     return attach_filesystem(name, (struct filesystem*)&devfs);
 }
@@ -524,6 +629,18 @@ long serial_uio_read(struct uio * uio, void * buf, unsigned long bufsz) {
 long serial_uio_write(struct uio * uio, const void * buf, unsigned long buflen) {
     struct serial_uio * suio = (struct serial_uio*)uio;
     return serial_send(suio->ser, buf, buflen);
+}
+
+/**
+ * @brief Performs control operation on a serial device
+ * @param uio pointer to serial uio object
+ * @param op control operation of serial device
+ * @param arg arguments of control operation
+ * @return output of control operation on success, negative error code if error
+ */
+long serial_uio_cntl(struct uio * uio, int op, void * arg) {
+    struct serial_uio * suio = (struct serial_uio*)uio;
+    return serial_cntl(suio->ser, op, arg);
 }
 
 /**
