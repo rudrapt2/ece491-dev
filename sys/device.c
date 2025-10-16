@@ -486,7 +486,13 @@ int mount_devfs(const char * name) {
 // INTERNAL FUNCTION DEFINITIONS
 //
 
-
+/**
+ * @brief Opens the device file system for the listing or the device
+ * @param fs filesystem
+ * @param name name of file to be opened in case of file, or NULL for listing
+ * @param uioptr double pointer for uio struct
+ * @return 0 if successful, negative error code if error
+ */
 int devfs_open (
     struct filesystem * fs, const char * name, struct uio ** uioptr)
 {
@@ -496,6 +502,11 @@ int devfs_open (
         return devfs_open_file(name, uioptr);
 }
 
+/**
+ * @brief Opens the device file system for listing
+ * @param uioptr double pointer for uio struct
+ * @return 0 on success
+ */
 int devfs_open_listing(struct uio ** uioptr) {
     struct devfs_listing_uio * ls;
 
