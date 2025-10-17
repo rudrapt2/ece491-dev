@@ -12,6 +12,7 @@
 #include "conf.h"
 #include "string.h"
 #include "misc.h"
+#include "uio.h" // TODO: Remove this further after discussed with Prof, now needed for int storage_uio_cntl(struct uio * uio, int op, void * arg)
 #include "heap.h"
 #include "misc.h"
 
@@ -726,7 +727,22 @@ long storage_uio_write(struct uio * uio, const void * buf, unsigned long buflen)
  */
 int storage_uio_cntl(struct uio * uio, int op, void * arg) {
     struct storage_uio * suio = (struct storage_uio*)uio;
-
+    if (op == FCNTL_SETPOS)
+    {
+      size_t *pos = (size_t *)arg;
+      if (pos == NULL || *pos > suio->sto->capacity)
+        return -EINVAL;
+      suio->pos = *pos;
+      return 0;
+    }
+    if (op == FCNTL_GETPOS)
+    {
+      size_t *pos = (size_t *)arg;
+      if (pos == NULL)
+        return -EINVAL;
+      *pos = suio->pos;
+      return 0;
+    }
     return storage_cntl(suio->sto, op, arg);
 }
 
