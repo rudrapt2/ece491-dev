@@ -45,6 +45,7 @@ struct devfs_listing_uio {
 struct serial_uio {
     struct uio base;
     struct serial * ser;
+    char* buffer;
 };
 
 struct video_uio {
@@ -57,7 +58,7 @@ struct storage_uio {
     struct uio base;
     struct storage * sto;
     unsigned long pos;
-
+    char* buffer;
 };
 
 // INTERNAL FUNCTION DECLARATIONS
@@ -86,6 +87,9 @@ static void storage_uio_close(struct uio * uio);
 static long storage_uio_read(struct uio * uio, void * buf, unsigned long bufsz);
 static long storage_uio_write(struct uio * uio, const void * buf, unsigned long buflen);
 static int storage_uio_cntl(struct uio * uio, int op, void * arg);
+
+long unaligned_fetch(struct storage_uio * suio, void * buf, unsigned long bufsz);
+long unaligned_store(struct storage_uio * suio, const void * buf, unsigned long buflen);
 
 static int video_open_uio(struct video * vid, struct uio ** uioptr);
 static void video_uio_close(struct uio * uio);
@@ -602,6 +606,10 @@ int serial_open_uio(struct serial * ser, struct uio ** uioptr) {
     
     suio = kcalloc(1, sizeof(*suio));
 
+    // we also need to create an internal buffer 
+    // to deal with unaligned reads
+    suio->buffer = kcalloc(1, ser->intf->blksz);
+
     suio->ser = ser;
     *uioptr = uio_init1(&suio->base, &serial_uio_intf);
     return 0;
@@ -616,6 +624,7 @@ void serial_uio_close(struct uio * uio) {
     struct serial_uio * suio = (struct serial_uio*)uio;
 
     serial_close(suio->ser);
+    kfree(suio->buffer);
     kfree(suio);
 }
 
@@ -628,7 +637,24 @@ void serial_uio_close(struct uio * uio) {
  */
 long serial_uio_read(struct uio * uio, void * buf, unsigned long bufsz) {
     struct serial_uio * suio = (struct serial_uio*)uio;
-    return serial_recv(suio->ser, buf, bufsz);
+    unsigned int blksz = suio->ser->intf->blksz;
+    unsigned long aligned_bufsz = ROUND_DOWN(bufsz, blksz);
+    int result = serial_recv(suio->ser, buf, aligned_bufsz);
+
+    if (result < 0)
+        return result;
+
+    if (bufsz % blksz != 0 && aligned_bufsz == result) {
+        // the device has filled the buffer as much as it can,
+        // so we must use our internal buffer to fill the rest.
+        result = serial_recv(suio->ser, suio->buffer, blksz);
+        if (result <= 0)
+            return aligned_bufsz;
+        memcpy(buf + aligned_bufsz, suio->buffer, bufsz % blksz);
+        return bufsz;
+    }
+
+    return result;
 }
 
 /**
@@ -674,6 +700,10 @@ int storage_open_uio(struct storage * sto, struct uio ** uioptr) {
     
     suio = kcalloc(1, sizeof(*suio));
 
+    // we also need to create an internal buffer 
+    // to deal with unaligned reads and writes
+    suio->buffer = kcalloc(1, sto->intf->blksz);
+        
     suio->sto = sto;
     suio->pos = 0;
     *uioptr = uio_init1(&suio->base, &storage_uio_intf);
@@ -689,11 +719,12 @@ void storage_uio_close(struct uio * uio) {
     struct storage_uio * suio = (struct storage_uio*)uio;
     storage_close(suio->sto);
 
+    kfree(suio->buffer);
     kfree(suio);
 }
 
 /**
- * @brief Reads data from a storage device into a buffer
+ * @brief Reads data from a storage device into a buffer and updates internal pos
  * @param uio pointer to storage uio object
  * @param buf pointer to buffer to read data into
  * @param bufsz size of buffer in bytes
@@ -701,8 +732,63 @@ void storage_uio_close(struct uio * uio) {
  */
 long storage_uio_read(struct uio * uio, void * buf, unsigned long bufsz) {
     struct storage_uio * suio = (struct storage_uio*)uio;
+    long bytes_read = 0;
+    long result;
+    unsigned int blksz = suio->sto->intf->blksz;
 
-    return storage_fetch(suio->sto, suio->pos, buf, bufsz);
+    if (suio->pos % blksz != 0) { // unaligned starting pos
+        bytes_read = unaligned_fetch(suio, buf, bufsz);
+        if (bytes_read <= 0)
+            return bytes_read;
+        suio->pos += bytes_read;
+        bufsz -= bytes_read;
+    }
+
+    if (bufsz==0)
+        return bytes_read;
+
+    result = storage_fetch(suio->sto, suio->pos, buf + bytes_read, ROUND_DOWN(bufsz, blksz));
+
+    if (result < 0)
+        return (bytes_read > 0) ? bytes_read : result;
+
+    suio->pos += result;
+
+    if (result < ROUND_DOWN(bufsz, blksz))
+        return bytes_read + result;
+
+    bytes_read += result;
+    bufsz -= result;
+
+    if (bufsz % blksz != 0) { // unaligned bufsz
+        result = unaligned_fetch(suio, buf+bytes_read, bufsz);
+        if (result < 0)
+            return bytes_read;
+        bytes_read += result;
+        suio->pos += result;
+    }
+
+    return bytes_read;
+}
+
+/**
+ * @brief Helper function for `storage_uio_read`. 
+ * Aligns reads for when pos or bufsz is unaligned.
+ * @param suio pointer to storage_uio object
+ * @param buf pointer to buffer to read data into
+ * @param bufsz size of buffer in bytes
+ * @return number of bytes read, negative error code if error
+ */
+long unaligned_fetch(struct storage_uio * suio, void * buf, unsigned long bufsz) {
+    unsigned int blksz = suio->sto->intf->blksz;
+    long bytes_read = storage_fetch(suio->sto, ROUND_DOWN(suio->pos, blksz), suio->buffer, blksz);
+
+    if (bytes_read < 0)
+        return bytes_read;
+
+    bytes_read = MIN(blksz - suio->pos % blksz, bufsz);
+    memcpy(buf, suio->buffer + suio->pos % blksz, bytes_read);
+    return bytes_read;
 }
 
 /**
@@ -714,8 +800,72 @@ long storage_uio_read(struct uio * uio, void * buf, unsigned long bufsz) {
  */
 long storage_uio_write(struct uio * uio, const void * buf, unsigned long buflen) {
     struct storage_uio * suio = (struct storage_uio*)uio;
+    long bytes_written = 0;
+    long result;
+    unsigned int blksz = suio->sto->intf->blksz;
 
-    return storage_store(suio->sto, suio->pos, buf, buflen);
+    if (suio->pos % blksz != 0) { // unaligned starting pos
+        result = unaligned_store(suio, buf, buflen);
+        if (result < 0)
+            return result;
+        bytes_written = result;
+        suio->pos += bytes_written;
+        buflen -= bytes_written;
+    }
+
+    if (buflen==0)
+        return bytes_written;
+
+    result = storage_store(suio->sto, suio->pos, buf + bytes_written, ROUND_DOWN(buflen, blksz));
+
+    if (result < 0)
+        return (bytes_written > 0) ? bytes_written : result;
+        
+    suio->pos += result;
+
+    if (result < ROUND_DOWN(buflen, blksz))
+        return bytes_written + result;
+
+    bytes_written += result;
+    buflen -= result;
+
+    if (buflen % blksz != 0) { // unaligned buflen
+        result = unaligned_store(suio, buf+bytes_written, buflen);
+        if (result < 0)
+            return bytes_written;
+        bytes_written += result;
+        suio->pos += result;
+    }
+
+    return bytes_written;
+}
+
+/**
+ * @brief Helper function for `storage_uio_write`. 
+ * Aligns writes for when pos or bufsz is unaligned.
+ * @param suio pointer to storage_uio object
+ * @param buf pointer to buffer to read data into
+ * @param buflen size of buffer in bytes
+ * @return number of bytes read, negative error code if error
+ */
+long unaligned_store(struct storage_uio * suio, const void * buf, unsigned long buflen) {
+    unsigned int blksz = suio->sto->intf->blksz;
+    long bytes_written = 0;
+    // fetch the original block of data
+    long result = storage_fetch(suio->sto, ROUND_DOWN(suio->pos, blksz), suio->buffer, blksz);
+
+    if (result < 0)
+        return result;
+
+    bytes_written = MIN(blksz - suio->pos % blksz, buflen);
+    // overwrite with new data and store in its place
+    memcpy(suio->buffer + suio->pos % blksz, buf, bytes_written);
+    result = storage_store(suio->sto, ROUND_DOWN(suio->pos, blksz), suio->buffer, blksz);
+    
+    if (result < 0)
+        return result;
+        
+    return bytes_written;
 }
 
 /**

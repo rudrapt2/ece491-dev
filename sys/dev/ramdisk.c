@@ -1,4 +1,4 @@
-/*! @file memstorage.c
+/*! @file ramdisk.c
     @brief Memory-backed I/O implementation
     @copyright Copyright (c) 2024-2025 University of Illinois
 
@@ -17,9 +17,14 @@
 #include "string.h"
 #include "heap.h"
 #include "misc.h"
+#include "console.h"
 #include "uio.h"
 
 #include <stddef.h>
+
+#ifndef RAMDISK_NAME
+#define RAMDISK_NAME "ramdisk"
+#endif
 
 // INTERNAL TYPE DEFINITIONS
 //
@@ -27,7 +32,7 @@
 /**
  * @brief Storage device backed by a block of memory. Allows modification of the backing memory block.
  */
-struct memstorage
+struct ramdisk
 {
   struct storage storage; ///< Storage struct of memory storage
   void *buf;              ///< Block of memory
@@ -37,83 +42,55 @@ struct memstorage
 // INTERNAL FUNCTION DECLARATIONS
 //
 
-static int memstorage_open(struct storage *sto);
-static void memstorage_close(struct storage *sto);
-static long memstorage_fetch(struct storage *sto, unsigned long long pos, void *buf, unsigned long bytecnt);
-static int memstorage_cntl(struct storage *sto, int cmd, void *arg);
+static int ramdisk_open(struct storage *sto);
+static void ramdisk_close(struct storage *sto);
+static long ramdisk_fetch(struct storage *sto, unsigned long long pos, void *buf, unsigned long bytecnt);
+static int ramdisk_cntl(struct storage *sto, int cmd, void *arg);
 
 // INTERNAL GLOBAL CONSTANTS
 //
 
-static const struct storage_intf memstorage_intf = {
+static const struct storage_intf ramdisk_intf = {
     .blksz = 1,
-    .open = &memstorage_open,
-    .close = &memstorage_close,
-    .fetch = &memstorage_fetch,
+    .open = &ramdisk_open,
+    .close = &ramdisk_close,
+    .fetch = &ramdisk_fetch,
     .store = NULL, // Read-only storage (blob data in .rodata)
-    .cntl = &memstorage_cntl};
+    .cntl = &ramdisk_cntl};
 
 // EXPORTED FUNCTION DEFINITIONS
 //
 
-int attach_memory_storage(const char *name, void *buf, size_t size)
-{
-  struct memstorage *msto;
-  int result;
-
-  msto = kmalloc(sizeof(struct memstorage));
-  if (!msto)
-  {
-    return -ENOMEM;
-  }
-
-  msto->buf = buf;
-  msto->size = size;
-
-  storage_init(&msto->storage, &memstorage_intf, size);
-
-  result = register_device(name, DEV_STORAGE, msto);
-  if (result != 0)
-  {
-    kfree(msto);
-    return result;
-  }
-
-  return 0;
-}
-
-int attach_blob_storage(const char *name)
+void ramdisk_attach()
 {
   // External symbols from linker script for embedded blob data
   extern char _kimg_blob_start[], _kimg_blob_end[];
 
+  struct ramdisk *rdisk;
+  int result;
+
   size_t blob_size = _kimg_blob_end - _kimg_blob_start;
 
-  if (blob_size == 0)
-  {
-    return -ENOENT;
+  if (blob_size == 0) {
+    kprintf("Not enough available RAM for ramdisk\n");
+    return;
   }
+  
+  rdisk = kmalloc(sizeof(struct ramdisk));
 
   // Use the embedded blob data as the storage buffer
   // Note: This creates a read-only storage device since blob data is in .rodata
-  return attach_memory_storage(name, _kimg_blob_start, blob_size);
-}
+  rdisk->buf = _kimg_blob_start;
+  rdisk->size = blob_size;
 
-struct storage *create_memory_storage(void *buf, size_t size)
-{
-  struct memstorage *msto;
+  storage_init(&rdisk->storage, &ramdisk_intf, blob_size);
 
-  msto = kmalloc(sizeof(struct memstorage));
-  if (!msto)
-  {
-    return NULL;
-  }
+  result = register_device(RAMDISK_NAME, DEV_STORAGE, rdisk);
 
-  msto->buf = buf;
-  msto->size = size;
+  if (result != 0)
+    kfree(rdisk);
 
-  storage_init(&msto->storage, &memstorage_intf, size);
-  return &msto->storage;
+  return;
 }
 
 // INTERNAL FUNCTION DEFINITIONS
@@ -124,7 +101,7 @@ struct storage *create_memory_storage(void *buf, size_t size)
  * @param sto Storage struct pointer for memory storage
  * @return 0 on success
  */
-static int memstorage_open(struct storage *sto)
+static int ramdisk_open(struct storage *sto)
 {
   return 0; // Always successful for memory storage
 }
@@ -133,9 +110,9 @@ static int memstorage_open(struct storage *sto)
  * @brief _close_ implementation for memory storage.
  * @param sto Storage struct pointer for memory storage
  */
-static void memstorage_close(struct storage *sto)
+static void ramdisk_close(struct storage *sto)
 {
-  kfree((void *)sto - offsetof(struct memstorage, storage));
+  kfree((void *)sto - offsetof(struct ramdisk, storage));
 }
 
 /**
@@ -147,21 +124,21 @@ static void memstorage_close(struct storage *sto)
  * @param bytecnt Number of bytes to read from memory
  * @return Number of bytes successfully read
  */
-static long memstorage_fetch(struct storage *sto, unsigned long long pos, void *buf, unsigned long bytecnt)
+static long ramdisk_fetch(struct storage *sto, unsigned long long pos, void *buf, unsigned long bytecnt)
 {
-  struct memstorage *const msto = (void *)sto - offsetof(struct memstorage, storage);
+  struct ramdisk *const rdisk = (void *)sto - offsetof(struct ramdisk, storage);
   unsigned long len;
 
   // Check bounds
-  if (pos >= msto->size)
+  if (pos >= rdisk->size)
     return 0;
 
-  if (pos + bytecnt > msto->size)
-    len = msto->size - pos;
+  if (pos + bytecnt > rdisk->size)
+    len = rdisk->size - pos;
   else
     len = bytecnt;
 
-  memcpy(buf, (char *)msto->buf + pos, len);
+  memcpy(buf, (char *)rdisk->buf + pos, len);
   return len;
 }
 
@@ -173,10 +150,10 @@ static long memstorage_fetch(struct storage *sto, unsigned long long pos, void *
  * @param arg Argument for commands
  * @return 0 on success, error on failure or unsupported command
  */
-static int memstorage_cntl(struct storage *sto, int cmd, void *arg)
+static int ramdisk_cntl(struct storage *sto, int cmd, void *arg)
 {
-  struct memstorage *const msto = (void *)sto - offsetof(struct memstorage, storage);
-  (void)msto; // Mark as used to avoid warnings
+  struct ramdisk *const rdisk = (void *)sto - offsetof(struct ramdisk, storage);
+  (void)rdisk; // Mark as used to avoid warnings
   (void)arg;  // Mark as used to avoid warnings
 
   switch (cmd)
@@ -184,7 +161,7 @@ static int memstorage_cntl(struct storage *sto, int cmd, void *arg)
   case FCNTL_GETEND:
     if (arg == NULL)
       return -EINVAL;
-    *((unsigned long long *)arg) = msto->size;
+    *((unsigned long long *)arg) = rdisk->size;
     return 0;
   default:
     return -ENOTSUP;

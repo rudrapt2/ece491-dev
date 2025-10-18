@@ -13,6 +13,11 @@
 #define ROUND_UP(n,k) (((n)+(k)-1)/(k)*(k))
 #define ROUND_DOWN(n,k) ((n)/(k)*(k))
 
+// The MIN and MAX macros find the minumum and maximum between /a/ and /b/
+// respectively.
+#define MIN(a,b) (((a)<(b))?(a):(b))
+#define MAX(a,b) (((a)>(b))?(a):(b))
+
 // The ISPOW2 macro evaluates to 1 if its argument is either zero or a power of
 // two. The argument must be an integer type. Cast pointers to `uintptr_t` to
 // test pointer alignment. The argument is evaluated multiple times.

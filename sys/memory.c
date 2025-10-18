@@ -107,11 +107,6 @@ struct pte {
 #define VPN1(vma) ((VPN(vma) >> (1*9)) % PTE_CNT)
 #define VPN0(vma) ((VPN(vma) >> (0*9)) % PTE_CNT)
 
-#define MIN(a,b) (((a)<(b))?(a):(b))
-
-#define ROUND_UP(n,k) (((n)+(k)-1)/(k)*(k)) 
-#define ROUND_DOWN(n,k) ((n)/(k)*(k))
-
 // The following macros test is a PTE is valid, global, or a leaf. The argument
 // is a struct pte (*not* a pointer to a struct pte).
 

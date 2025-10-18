@@ -14,6 +14,7 @@
 #include "dev/rtc.h"
 #include "dev/uart.h"
 #include "dev/virtio.h"
+#include "dev/ramdisk.h"
 #include "timer.h"
 #include "string.h"
 #include "filesys.h"
@@ -61,6 +62,7 @@ void attach_devices(void) {
     int result;
 
     rtc_attach((void*)RTC_MMIO_BASE);
+    ramdisk_attach();
 
     for (i = 0; i < NUART; i++)
         attach_uart((void*)UART_MMIO_BASE(i), UART0_INTR_SRCNO+i);
@@ -84,10 +86,17 @@ void mount_cdrive(void) {
     int result;
 
     hd = find_storage(CDEVNAME, CDEVINST);
-    storage_open(hd);
 
     if (hd == NULL) {
         kprintf("Storage device %s%d not found\n", CDEVNAME, CDEVINST);
+        halt_failure();
+    }
+
+    result = storage_open(hd);
+
+    if (result != 0) {
+        kprintf("storage_open failed on %s%d: %s\n",
+            CDEVNAME, CDEVINST, error_name(result));
         halt_failure();
     }
 
