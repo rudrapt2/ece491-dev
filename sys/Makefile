@@ -95,7 +95,7 @@ kernel.elf: $(OBJS) main.o blob.o
 	$(LD) $(LDFLAGS) -T kernel.ld -o $@ $^
 
 run: kernel.elf
-	$(QEMU) $(QEMUOPTS) -m 8M -kernel $< 2>&1 | tee qemu_output.log
+	$(QEMU) $(QEMUOPTS) -m 8M -kernel $<
 
 debug: kernel.elf
 	$(QEMU) $(QEMUOPTS) -m 8M -kernel $< -S -s
