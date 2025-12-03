@@ -4,11 +4,7 @@
 // SPDX-License-identifier: NCSA
 //
 
-/*! @file thread.c
-    @brief Thread manager and operations
-    @copyright Copyright (c) 2024-2025 University of Illinois
-    @license SPDX-License-identifier: NCSA
-*/
+// FIXME Need to handle re-parenting child
 
 #ifdef THREAD_TRACE
 #define TRACE
@@ -57,7 +53,7 @@ char thrmgr_initialized = 0;
 enum thread_state {
     THREAD_UNINITIALIZED = 0,
     THREAD_WAITING,
-    THREAD_SELF,
+    THREAD_RUNNING,
     THREAD_READY,
     THREAD_EXITED
 };
@@ -212,7 +208,7 @@ extern char _main_stack_anchor[]; // from start.s
 static struct thread main_thread = {
     .id = MAIN_TID,
     .name = "main",
-    .state = THREAD_SELF,
+    .state = THREAD_RUNNING,
     .stack_anchor = (void*)_main_stack_anchor,
     .stack_lowest = _main_stack_lowest,
     .child_exit.name = "main.child_exit"
@@ -498,7 +494,7 @@ void condition_wait(struct condition * cond) {
     trace("%s(cond=<%s>) in <%s:%d>", __func__,
         cond->name, TP->name, TP->id);
 
-    assert(TP->state == THREAD_SELF);
+    assert(TP->state == THREAD_RUNNING);
 
     // Insert current thread into condition wait list
     
@@ -656,7 +652,7 @@ const char * thread_state_name(enum thread_state state) {
     static const char * const names[] = {
         [THREAD_UNINITIALIZED] = "UNINITIALIZED",
         [THREAD_WAITING] = "WAITING",
-        [THREAD_SELF] = "SELF",
+        [THREAD_RUNNING] = "SELF",
         [THREAD_READY] = "READY",
         [THREAD_EXITED] = "EXITED"
     };
@@ -765,12 +761,12 @@ void running_thread_suspend(void) {
 
     next_thread = tlremove(&ready_list);
     assert(next_thread->state == THREAD_READY);
-    set_thread_state(next_thread, THREAD_SELF);
+    set_thread_state(next_thread, THREAD_RUNNING);
     
     // If the suspending thread is still running, mark it ready-to-run and put
     // it in the back of the ready-to-run list.
 
-    if (susp_thread->state == THREAD_SELF) {
+    if (susp_thread->state == THREAD_RUNNING) {
         set_thread_state(susp_thread, THREAD_READY);
         tlinsert(&ready_list, susp_thread);
     }
