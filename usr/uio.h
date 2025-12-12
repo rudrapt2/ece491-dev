@@ -1,9 +1,3 @@
-// uio.h - Abstract uio interface
-//
-// Copyright (c) 2024-2025 University of Illinois
-// SPDX-License-identifier: NCSA
-//
-
 /*! @file uio.h
     @brief Unified Uniform I/O object
     @copyright Copyright (c) 2024-2025 University of Illinois

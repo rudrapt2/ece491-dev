@@ -1,8 +1,8 @@
-// console.h - Console i/o
-//
-// Copyright (c) 2024-2025 University of Illinois
-// SPDX-License-identifier: NCSA
-//
+/*! @file console.h
+    @brief Console i/o
+    @copyright Copyright (c) 2024-2025 University of Illinois
+
+*/
 
 #ifndef _CONSOLE_H_
 #define _CONSOLE_H_

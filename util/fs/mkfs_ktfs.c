@@ -10,9 +10,9 @@
 
 // Change this to turn off randomizing data block indices. This is provided for debugging purposes only.
 // Your filesystem driver must be able to handle non-sequential data blocks.
-#define RANDOMIZE_ON 1
+char RANDOMIZE_ON = 0;
 
-#define MAX_DATA_BLOCKS_PER_FILE KTFS_NUM_DIRECT_DATA_BLOCKS + (KTFS_BLKSZ / sizeof(uint32_t)) + KTFS_NUM_DINDIRECT_BLOCKS * (KTFS_BLKSZ / sizeof(uint32_t)) * (KTFS_BLKSZ / sizeof(uint32_t))
+#define MAX_DATA_BLOCKS_PER_FILE (KTFS_NUM_DIRECT_DATA_BLOCKS + (KTFS_BLKSZ / sizeof(uint32_t)) + KTFS_NUM_DINDIRECT_BLOCKS * (KTFS_BLKSZ / sizeof(uint32_t)) * (KTFS_BLKSZ / sizeof(uint32_t)))
 #define MAX_DISK_SIZE (1 << 30)
 
 
@@ -23,14 +23,48 @@ uint32_t num_bitmap_blocks;
 uint32_t num_inode_blocks;
 uint32_t num_starter_blocks;
 
+// Forward declarations
+void shuffle(uint32_t* arr, size_t n);
+
 uint32_t current_inode;
 uint32_t current_dentry;
 uint32_t current_data_block;
 uint32_t remaining_disk_size;
 
+// Random allocation state
+static uint32_t* inode_order = NULL;
+static uint32_t inode_order_size = 0;
+static uint32_t inode_order_pos = 0;
+
+static uint32_t* data_block_order = NULL;
+static uint32_t data_block_order_size = 0;
+static uint32_t data_block_order_pos = 0;
+
+static void init_allocators(uint32_t inode_count, uint32_t data_block_count) {
+    // Inodes available to allocate: [1, inode_count-1]
+    if (inode_count > 1) {
+        inode_order_size = inode_count - 1;
+        inode_order = (uint32_t*)malloc(sizeof(uint32_t) * inode_order_size);
+        for (uint32_t i = 0; i < inode_order_size; i++) inode_order[i] = i + 1;
+        if (RANDOMIZE_ON) shuffle(inode_order, inode_order_size);
+    }
+    // Data blocks available to allocate: [0, data_block_count-1]
+    data_block_order_size = data_block_count;
+    data_block_order = (uint32_t*)malloc(sizeof(uint32_t) * data_block_order_size);
+    for (uint32_t i = 0; i < data_block_order_size; i++) data_block_order[i] = i;
+    if (RANDOMIZE_ON) shuffle(data_block_order, data_block_order_size);
+}
+
+static uint32_t alloc_inode_index(void) {
+    if (inode_order_pos >= inode_order_size) {
+        fprintf(stderr, "Ran out of free inodes to allocate\n");
+        exit(1);
+    }
+    return inode_order[inode_order_pos++];
+}
+
 void shuffle(uint32_t* arr, size_t n)
 {
-  srand(time(NULL));
   for (int i = n - 1; i > 0; i--) {
     int j = rand() % (i + 1);
     int t = arr[i];
@@ -105,7 +139,11 @@ void update_bitmap(FILE* fp, uint32_t offset_start, uint32_t block_index, uint8_
 }
 
 static uint32_t alloc_block(FILE* fp) {
-    uint32_t idx = current_data_block++;
+    if (data_block_order_pos >= data_block_order_size) {
+        fprintf(stderr, "Ran out of data blocks to allocate\n");
+        exit(1);
+    }
+    uint32_t idx = data_block_order[data_block_order_pos++];
     update_bitmap(fp, 1 + num_inode_bitmap_blocks, num_starter_blocks + idx, KTFS_FILE_IN_USE);
     return idx;
 }
@@ -216,9 +254,9 @@ int write_dentry(FILE* fp, struct ktfs_dir_entry* dentry) {
 }
 
 // Write an inode to the filesystem image
-int write_inode(FILE* fp, struct ktfs_inode* inode) {
-    uint32_t inode_index = current_inode / (KTFS_BLKSZ / KTFS_INOSZ);
-    uint32_t inode_offset = current_inode % (KTFS_BLKSZ / KTFS_INOSZ);
+int write_inode(FILE* fp, uint32_t inode_num, struct ktfs_inode* inode) {
+    uint32_t inode_index = inode_num / (KTFS_BLKSZ / KTFS_INOSZ);
+    uint32_t inode_offset = inode_num % (KTFS_BLKSZ / KTFS_INOSZ);
 
     if (inode_index >= num_inode_blocks) {
         fprintf(stderr, "Ran out of inodes\n");
@@ -228,7 +266,6 @@ int write_inode(FILE* fp, struct ktfs_inode* inode) {
     fseek(fp, (1 + num_inode_bitmap_blocks + num_bitmap_blocks + inode_index) * KTFS_BLKSZ + inode_offset * KTFS_INOSZ, SEEK_SET);
     fwrite(inode, KTFS_INOSZ, 1, fp);
     fflush(fp);
-    current_inode++;
     return 0;
 }
 
@@ -262,8 +299,11 @@ void load_binary(FILE* fp, const char* binary_path) {
         return;
     }
 
+    // Allocate an inode number for this file first
+    uint32_t inode_num = alloc_inode_index();
+
     struct ktfs_dir_entry dentry = {0};
-    dentry.inode = current_inode;
+    dentry.inode = inode_num;
 
     memset(dentry.name, 0, KTFS_MAX_FILENAME_LEN);
     strncpy(dentry.name, get_filename(binary_path), KTFS_MAX_FILENAME_LEN);
@@ -285,13 +325,13 @@ void load_binary(FILE* fp, const char* binary_path) {
     }
 
     // Mark the inode as in use and persist it
-    update_bitmap(fp, 1, current_inode, KTFS_FILE_IN_USE);
-    write_inode(fp, &inode);
+    update_bitmap(fp, 1, inode_num, KTFS_FILE_IN_USE);
+    write_inode(fp, inode_num, &inode);
 
     fflush(fp);
     fclose(binary_fp);
 
-    fprintf(stdout, "Added file %s to inode %d\n", binary_path, current_inode - 1);
+    fprintf(stdout, "Added file %s to inode %d\n", binary_path, inode_num);
     fprintf(stdout, "File size: %d bytes\n", file_size);
     fprintf(stdout, "File start data block index: %d\n", inode.block[0]);
     fprintf(stdout, "File start address: %d\n", (num_starter_blocks + inode.block[0]) * KTFS_BLKSZ);
@@ -299,8 +339,16 @@ void load_binary(FILE* fp, const char* binary_path) {
 
 int main(int argc, char *argv[]) {
     if (argc < 5) {
-        fprintf(stderr, "Usage: %s [filesystem_image] [disk_size in K, M, or G] [inode_count] [file1] [file2] ...\n", argv[0]);
+        fprintf(stderr, "Usage: %s [-R] [filesystem_image] [disk_size in K, M, or G] [inode_count] [file1] [file2] ...\n", argv[0]);
         return 1;
+    }
+
+    if (strcmp(argv[1], "-R") == 0) {
+        // Enable RANDOMIZE_ON
+        RANDOMIZE_ON = 1;
+        // Shift arguments
+        argv++;
+        argc--;
     }
 
     const char *output_file = argv[1];
@@ -309,8 +357,8 @@ int main(int argc, char *argv[]) {
     uint32_t block_count = disk_size / KTFS_BLKSZ;
 
     num_bitmap_blocks = ceil((double)block_count / (KTFS_BLKSZ * 8));
+    num_inode_bitmap_blocks = ceil((double)inode_count / (KTFS_BLKSZ * 8));
     num_inode_blocks = ceil((double)inode_count * KTFS_INOSZ / KTFS_BLKSZ);
-    num_inode_bitmap_blocks = ceil((double)inode_count / KTFS_BLKSZ);
 
     num_starter_blocks = 1 + num_inode_bitmap_blocks + num_bitmap_blocks + num_inode_blocks;
 
@@ -359,6 +407,10 @@ int main(int argc, char *argv[]) {
     current_dentry = 0;
     current_data_block = 0;
     remaining_disk_size = disk_size - (num_starter_blocks * KTFS_BLKSZ);
+
+    // Initialize random seed and allocators
+    srand(time(NULL));
+    init_allocators(inode_count, (block_count - num_starter_blocks));
 
     // Load each file given
     for (int i = 4; i < argc; i++) {

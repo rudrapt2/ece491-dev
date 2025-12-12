@@ -1,8 +1,8 @@
-// viorng.c - VirtIO rng device
-// 
-// Copyright (c) 2024-2025 University of Illinois
-// SPDX-License-identifier: NCSA
-//
+/*! @file viorng.c 
+    @brief VirtIO rng device
+    @copyright Copyright (c) 2024-2025 University of Illinois
+
+*/
 
 #include "virtio.h"
 #include "intr.h"

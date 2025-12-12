@@ -1,5 +1,5 @@
 /*! @file memory.h
-    @brief Physical and virtual memory manager    
+    @brief Physical and virtual memory manager
     @copyright Copyright (c) 2024-2025 University of Illinois
     @license SPDX-License-identifier: NCSA
 
@@ -8,10 +8,10 @@
 #ifndef _MEMORY_H_
 #define _MEMORY_H_
 
-#include "trap.h" // for struct trap_frame
-
 #include <stddef.h>
 #include <stdint.h>
+
+#include "trap.h"  // for struct trap_frame
 
 // EXPORTED CONSTANTS
 //
@@ -24,14 +24,14 @@
 
 // Flags for alloc_and_map_range() and set_range_flags()
 
-#define PTE_V (1 << 0) // internal use only
+#define PTE_V (1 << 0)  // internal use only
 #define PTE_R (1 << 1)
 #define PTE_W (1 << 2)
 #define PTE_X (1 << 3)
 #define PTE_U (1 << 4)
 #define PTE_G (1 << 5)
-#define PTE_A (1 << 6) // internal use only
-#define PTE_D (1 << 7) // internal use only
+#define PTE_A (1 << 6)  // internal use only
+#define PTE_D (1 << 7)  // internal use only
 
 // EXPORTED TYPE DEFINITIONS
 //
@@ -46,7 +46,7 @@ typedef unsigned long mtag_t;
 extern char memory_initialized;
 
 /**
- * @brief Initializes kernel memory pages (with proper permissions), sets up 
+ * @brief Initializes kernel memory pages (with proper permissions), sets up
  * the heap memory manager, and adds remaining memory to the free chunk list
  * @return None
  */
@@ -92,38 +92,38 @@ extern mtag_t discard_active_mspace(void);
  * @param rwxug_flags Flags to set on page
  * @return Newly mapped virtual memory address
  */
-extern void * map_page(uintptr_t vma, void * pp, int rwxug_flags);
+extern void* map_page(uintptr_t vma, void* pp, int rwxug_flags);
 
 /**
- * @brief Adds a range of contiguous pages with provided virtual memory address, size, and flags to page table
+ * @brief Adds a range of contiguous pages with provided virtual memory address, size, and flags to
+ * page table
  * @param vma Virtual memory address for page (must be a PAGE_SIZE increment)
  * @param size Number of bytes to be mapped as pages
  * @param pp Pointer to the first page to be added to page table
  * @param rwxug_flags Flags to set on page
  * @return Newly mapped virtual memory address
  */
-extern void * map_range (
-    uintptr_t vma, size_t size, void * pp, int rwxug_flags);
+extern void* map_range(uintptr_t vma, size_t size, void* pp, int rwxug_flags);
 
 /**
- * @brief Allocates memory for and maps a range of pages starting at provided virtual memory address.
- * Rounds up size to be a multiple of PAGE_SIZE
+ * @brief Allocates memory for and maps a range of pages starting at provided virtual memory
+ * address. Rounds up size to be a multiple of PAGE_SIZE
  * @param vma Virtual memory address to begin mapping at (must be a multiple of PAGE_SIZE)
  * @param size Size (in bytes) of range
  * @param rwxug_flags Flags to be set on pages in range
  * @return Newly mapped virtual memory address
  */
-extern void * alloc_and_map_range (
-    uintptr_t vma, size_t size, int rwxug_flags);
+extern void* alloc_and_map_range(uintptr_t vma, size_t size, int rwxug_flags);
 
 /**
- * @brief Sets passed flags for pages in range. Rounds up size to be a multiple of PAGE_SIZE.
+ * @brief Sets passed flags for pages in range, overwriting previous flags. Rounds up size to 
+ * be a multiple of PAGE_SIZE.
  * @param vp Virtual memory address to begin setting flags at (must be a multiple of PAGE_SIZE)
  * @param size Size (in bytes) of range
  * @param rwxug_flags Flags to set
  * @return None
  */
-extern void set_range_flags(const void * vp, size_t size, int rwxug_flags);
+extern void set_range_flags(const void* vp, size_t size, int rwxug_flags);
 
 /**
  * @brief Unmaps a range of pages starting at provided virtual memory address and frees the pages.
@@ -132,41 +132,41 @@ extern void set_range_flags(const void * vp, size_t size, int rwxug_flags);
  * @param size Size (in bytes) of range
  * @return None
  */
-extern void unmap_and_free_range(void * vp, size_t size);
+extern void unmap_and_free_range(void* vp, size_t size);
 
 /**
  * @brief Checks that pointer is wellformed and pointer + len does not wrap around zero,
- * then iterates over pages in range, confirming the pages are mapped and have the passed
- * flags set.
- * @param vp Virtual memory address to start validation (must be a multiple of PAGE_SIZE)
+ * then iterates over pages in range, confirming the pages are mapped and have AT LEAST
+ * the passed flags set (it may have additional flags as well).
+ * @param vp Virtual memory address to start validation
  * @param len Size (in bytes) of range
  * @param rwxu_flags Flags to check pages in range for
  * @return 0 on success; error on malformed pointer, unmapped page, or mismatching flags
  */
-extern int validate_vptr(const void * vp, size_t len, int rwxu_flags);
+extern int validate_vptr(const void* vp, size_t len, int rwxu_flags);
 
 /**
  * @brief Checks that pointer is wellformed and the given string is valid. Since the length
  * of the string is unknown, we iterate through all characters of the string until \0 terminator,
  * confirming that the pages are mapped and have the passed flags set.
  * @param vs Virtual memory address that contains the string
- * @param ug_flags Flags to check pages
+ * @param rug_flags Flags to check pages
  * @return 0 on success; error on malformed pointer, unmapped page, or mismatching flags
  */
-extern int validate_vstr(const char * vs, int ug_flags);
+extern int validate_vstr(const char* vs, int rug_flags);
 
 /**
  * @brief Allocates a single new page using alloc_phys_pages().
  * @return Address of the allocated page
  */
-extern void * alloc_phys_page(void);
+extern void* alloc_phys_page(void);
 
 /**
  * @brief Free a page using free_phys_pages().
  * @param pp Physical address of page to free
  * @return None
  */
-extern void free_phys_page(void * pp);
+extern void free_phys_page(void* pp);
 
 /**
  * @brief Allocates the passed number of physical pages from the free chunk list
@@ -177,7 +177,7 @@ extern void free_phys_page(void * pp);
  * @param cnt Number of pages to allocate
  * @return Pointer to allocated pages
  */
-extern void * alloc_phys_pages(unsigned int cnt);
+extern void* alloc_phys_pages(unsigned int cnt);
 
 /**
  * @brief Adds chunk consisting of passed count of pages at passed pointer back to
@@ -186,7 +186,7 @@ extern void * alloc_phys_pages(unsigned int cnt);
  * @param cnt Number of pages being freed
  * @return None
  */
-extern void free_phys_pages(void * pp, unsigned int cnt);
+extern void free_phys_pages(void* pp, unsigned int cnt);
 
 /**
  * @brief Counts the number of pages remaining in the free chunk list.
@@ -203,7 +203,6 @@ extern unsigned long free_phys_page_count(void);
  * @param vma Virtual memory address that caused page fault
  * @return 1 if mapping was successful, 0 otherwise
  */
-extern int handle_umode_page_fault (
-    struct trap_frame * tfr, uintptr_t vma);
+extern int handle_umode_page_fault(struct trap_frame* tfr, uintptr_t vma);
 
 #endif

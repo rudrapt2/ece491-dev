@@ -1,8 +1,8 @@
-// device.h - Interface to device system
-//
-// Copyright (c) 2024-2025 University of Illinois
-// SPDX-License-identifier: NCSA
-//
+/*! @file device.h
+    @brief Interface to device system
+    @copyright Copyright (c) 2024-2025 University of Illinois
+
+*/
 
 #ifndef _DEVICE_H_
 #define _DEVICE_H_

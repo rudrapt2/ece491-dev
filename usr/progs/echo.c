@@ -1,13 +1,18 @@
-#include "syscall.h"
-#include "string.h"
-#include "shell.h"
+#include "../syscall.h"
+#include "../string.h"
+#include "../shell.h"
 
-int main (int argc, char** argv)
+void main (int argc, char** argv)
 {
     int i;
+
+    if (argc < 2) {
+        printf("Usage: echo [string1] [string2] ...\n");
+        return;
+    }
     
     for (i=1; i<argc; i++) {
         dprintf(STDOUT, "%s ", argv[i]);
     }
-    printf("\n");
+    dprintf(STDOUT, "\n");
 }

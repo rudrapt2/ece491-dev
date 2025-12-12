@@ -115,6 +115,14 @@ struct virtio_mmio_regs {
             uint32_t max_secure_erase_seg;
             uint32_t secure_erase_sector_alignment;
         } blk;
+
+        // GPU device config
+        struct {
+            uint32_t events_read; 
+            uint32_t events_clear; 
+            uint32_t num_scanouts; 
+            uint32_t num_capsets; 
+        } gpu;
         uint8_t raw[0];
     } config;
 };

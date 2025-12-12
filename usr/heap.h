@@ -1,9 +1,3 @@
-// heap.h - User heap memory allocator
-//
-// Copyright (c) 2024-2025 University of Illinois
-// SPDX-License-identifier: NCSA
-//
-
 /*! @file heap.h
     @brief User heap memory allocator
     @copyright Copyright (c) 2024-2025 University of Illinois

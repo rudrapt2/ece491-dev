@@ -1,5 +1,8 @@
-// devimpl.h - Header for device implementations
-//
+/*! @file devimpl.h
+    @brief Header for device implementations
+    @copyright Copyright (c) 2024-2025 University of Illinois
+
+*/
 
 #ifndef _DEVIMPL_H_
 #define _DEVIMPL_H_

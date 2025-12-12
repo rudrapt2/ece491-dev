@@ -1,8 +1,8 @@
-// filesys.h - File system interface
-//
-// Copyright (c) 2024-2025 University of Illinois
-// SPDX-License-identifier: NCSA
-//
+/*! @file filesys.h
+    @brief File system interface
+    @copyright Copyright (c) 2024-2025 University of Illinois
+
+*/
 
 #ifndef _FILESYS_H_
 #define _FILESYS_H_

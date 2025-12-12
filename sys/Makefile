@@ -10,44 +10,49 @@ LD=$(PREFIX)ld
 OBJCOPY=$(PREFIX)objcopy
 OBJDUMP=$(PREFIX)objdump
 
+RAMSIZEMB=8
+
 OBJS = \
-	misc.o \
-	console.o \
-	dev/uart.o \
-	dev/rtc.o \
-	dev/virtio.o \
-	dev/viorng.o \
-	dev/ramdisk.o \
-	device.o \
-	filesys.o \
 	elf.o \
-	error.o \
-	excp.o \
-	heap0.o \
-	intr.o \
-	uio.o \
-	memory.o \
-	plic.o \
-	process.o \
 	see.o \
+	uio.o \
+	misc.o \
+	ktfs.o \
+	intr.o \
+	excp.o \
+	plic.o \
+	trap.o \
 	start.o \
+	heap0.o \
+	error.o \
+	timer.o \
+	cache.o \
 	string.o \
 	thrasm.o \
 	thread.o \
-	timer.o \
-	trap.o \
+	device.o \
 	syscall.o \
+	memory.o \
+	process.o \
+	filesys.o \
+	console.o \
+	dev/rtc.o \
+	dev/uart.o \
+	dev/viohi.o \
+	dev/virtio.o \
+	dev/viorng.o \
 	dev/viorng.o \
 	dev/vioblk.o \
-	cache.o \
-	ktfs.o
-#   tarfs.o 
+	dev/viogpu.o \
+	dev/ramdisk.o \
+
 
 CFLAGS = -Wall -Werror=implicit-function-declaration
 CFLAGS += -fno-omit-frame-pointer -ggdb3 -gdwarf-2
 CFLAGS += -mcmodel=medany -fno-pie -no-pie -march=rv64imazicsr -mabi=lp64
 CFLAGS += -fno-common -nostdlib -mno-relax -ffreestanding 
 CFLAGS += -fno-asynchronous-unwind-tables -mno-riscv-attribute
+CFLAGS += -DRAM_SIZE_MB=$(RAMSIZEMB)
 CFLAGS += -I.
 
 # CFLAGS += -DDEBUG -DTRACE # Everything!
@@ -65,40 +70,34 @@ CFLAGS += -I.
 # CFLAGS += -DCACHE_DEBUG -DCACHE_TRACE
 # CFLAGS += -DKTFS_DEBUG -DKTFS_TRACE
 # CFLAGS += -DELF_DEBUG -DELF_TRACE
-# CFLAGS += -DTARFS_DEBUG -DTARFS_TRACE
-
 
 ASFLAGS = -march=rv64imazicsr
-
 LDFLAGS = -melf64lriscv
 
 QEMUOPTS = -global virtio-mmio.force-legacy=false
 QEMUOPTS += -machine virt -bios none -nographic
 
-# the first rng-random is for reading "true" randomness from /dev/urandom
-# the second one is for testing if they are correctly reading from a source
-# of randomness with the entropy device
-QEMUOPTS += -object rng-random,filename=/dev/urandom,id=rng0
-# QEMUOPTS += -object rng-random,filename=test/rand,id=rng0
-QEMUOPTS += -device virtio-rng-device,rng=rng0
 QEMUOPTS += -serial mon:stdio
 QEMUOPTS += -serial pty
-# QEMUOPTS += -serial pty
-# QEMUOPTS += -serial pty
+QEMUOPTS += -monitor pty
+# Add more UARTs
+
+QEMUOPTS += -object rng-random,filename=/dev/urandom,id=rng0
+QEMUOPTS += -device virtio-rng-device,rng=rng0
+# Add more RNG devices
+
 QEMUOPTS += -drive file=ktfs.raw,id=blk0,if=none,format=raw,readonly=false
 QEMUOPTS += -device virtio-blk-device,drive=blk0
-#QEMUOPTS += -device virtio-gpu-device -display gtk
+
+QEMUOPTS += -device virtio-gpu-device
+# QEMUOPTS += -display cocoa # For macOS
+QEMUOPTS += -display gtk # For Linux
+
+QEMUOPTS += -device virtio-keyboard-device -device virtio-tablet-device
+
+###########################################################################
 
 all: kernel.elf
-
-kernel.elf: $(OBJS) main.o blob.o
-	$(LD) $(LDFLAGS) -T kernel.ld -o $@ $^
-
-run: kernel.elf
-	$(QEMU) $(QEMUOPTS) -m 8M -kernel $<
-
-debug: kernel.elf
-	$(QEMU) $(QEMUOPTS) -m 8M -kernel $< -S -s
 
 BLOB_OBJCOPY_FLAGS = \
 	--add-section .rodata.blob=blob.raw \
@@ -109,4 +108,32 @@ blob.o:
 	[ ! -f blob.raw ] || $(OBJCOPY) $(BLOB_OBJCOPY_FLAGS) $@
 
 clean:
-	rm -rf *.o dev/*.o test/*.o demo/*.o *.elf
+	rm -rf *.o dev/*.o tests/*.o demo/*.o *.elf
+
+###################################MAIN.C###################################
+
+kernel.elf: $(OBJS) main.o blob.o
+	$(LD) $(LDFLAGS) -T kernel.ld -o $@ $^
+
+run: kernel.elf
+	$(QEMU) $(QEMUOPTS) -m $(RAMSIZEMB)M -kernel $<
+
+debug: kernel.elf
+	$(QEMU) $(QEMUOPTS) -m $(RAMSIZEMB)M -kernel $< -S -s
+
+################################TEST_MAIN.C#################################
+
+# Add more test objects or test suites
+TEST_SUITE_OBJS = tests/testsuite_1.o
+TEST_OBJS = $(TEST_SUITE_OBJS) $(OBJS)
+
+test-kernel.elf: $(TEST_OBJS) tests/test_main.o blob.o
+	$(LD) $(LDFLAGS) -T kernel.ld -o $@ $^
+
+run-test: test-kernel.elf
+	$(QEMU) $(QEMUOPTS) -m 64M -kernel $<
+
+debug-test: test-kernel.elf
+	$(QEMU) $(QEMUOPTS) -m 64M -kernel $< -S -s
+
+###########################################################################

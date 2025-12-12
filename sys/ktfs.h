@@ -1,3 +1,9 @@
+/*! @file ktfs.h
+    @brief KTFS Header File. 
+    @copyright Copyright (c) 2024-2025 University of Illinois
+
+*/
+
 #include <stdint.h>
 #include "uioimpl.h"
 

@@ -1,8 +1,8 @@
-// cache.c - Block cache for a storage device
-//
-// Copyright (c) 2025 University of Illinois
-// SPDX-License-identifier: NCSA
-//
+/*! @file cache.c
+    @brief Block cache for a storage device. 
+    @copyright Copyright (c) 2024-2025 University of Illinois
+
+*/
 
 #ifdef CACHE_TRACE
 #define TRACE
@@ -127,8 +127,7 @@ int cache_get_backing_device(struct cache * cache, struct storage ** disk){
     *(disk) = cache->disk;
     return 0;
 }
-/// @brief Creates/initializes a cache with the passed backing storage device (disk) and makes it available through cptr. 
-/// @return Return 0 if successful.
+
 int create_cache(struct storage * disk, struct cache ** cptr) {
     struct cache * cache;
     int bkgblksz;
@@ -169,15 +168,6 @@ int create_cache(struct storage * disk, struct cache ** cptr) {
     return 0;
 }
 
-
-/** \brief
- *
- *  
- *  Reads a CACHE_BLKSZ sized block from the backing interface into the cache. 
- *  pos is the position in the backing device. pos must be aligned to a multiple of the block size of the backing interface. Makes a pointer to this block available through pptr. Assume that CACHE_BLKSZ will always be equal to the block size of the storage disk. Any replacement policy is permitted, as long as your design meets the above specifications. Return 0 if successful.
- * 
- *
- */
 int cache_get_block(struct cache * cache, unsigned long long pos, void ** pptr) {
     struct cache_entry * ent; // cache entry for block
     long rcnt; // return value from fetch
@@ -314,13 +304,6 @@ int cache_get_block(struct cache * cache, unsigned long long pos, void ** pptr) 
     return 0;
 }
 
-/** \brief
- *
- *  
- *  pblk is a pointer to a block that was made available in cache_get_block() (which means that pblk == *pptr for some pptr). If dirty==1, the block has been written to. If dirty==0, the block has not been written to.
- *  
- *
- */
 void cache_release_block(struct cache * cache, void * pblk, int dirty) {
     struct cache_entry * ent;
     int i;
@@ -380,13 +363,6 @@ void cache_release_block(struct cache * cache, void * pblk, int dirty) {
     }
 }
 
-
-/** \brief
- *
- *  
- *  This function flushes the cache. Any dirty blocks that have not yet been written to the backing interface must be written to the backing interface. Returns 0 if successful.
- *
- */
 int cache_flush(struct cache * cache) {
     while (cache->dirty_cnt > 0)
         condition_wait(&cache->nodirty);

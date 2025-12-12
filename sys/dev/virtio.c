@@ -5,6 +5,7 @@
 #include "virtio.h"
 #include "error.h"
 #include "misc.h"
+#include "console.h"
 
 #include <stddef.h>
 
@@ -50,23 +51,23 @@ void attach_virtio(void * mmio_base, int irqno) {
 
     switch (regs->device_id) {
     case VIRTIO_ID_CONSOLE:
-        debug("%p: Found virtio console device", regs);
+        debug("%p: Found virtio console device\n", regs);
         viocons_attach(regs, irqno);
         break;
     case VIRTIO_ID_BLOCK:
-        debug("%p: Found virtio block device", regs);
+        debug("%p: Found virtio block device\n", regs);
         vioblk_attach(regs, irqno);
         break;
     case VIRTIO_ID_RNG:
-        debug("%p: Found virtio rng device", regs);
+        debug("%p: Found virtio rng device\n", regs);
         viorng_attach(regs, irqno);
         break;
     case VIRTIO_ID_GPU:
-        debug("%p: Found virtio gpu device", regs);
+        debug("%p: Found virtio gpu device\n", regs);
         viogpu_attach(regs, irqno);
         break;
     case VIRTIO_ID_INPUT:
-        debug("%p: Found virtio input device", regs);
+        debug("%p: Found virtio input device\n", regs);
         viohi_attach(regs, irqno);
         break;
     default:

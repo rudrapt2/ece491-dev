@@ -25,14 +25,18 @@ ifeq ($(UMODE), 1)
 endif
 
 ALL_TARGETS = \
+	wc \
+	rm \
+	ls \
+	cat \
+	echo \
+	date \
 	hello \
 	shell \
-	cat \
-	wc \
 	touch \
-	rm \
-	echo \
-	ls
+	xargs \
+	printf \
+	append 
 
 CFLAGS = -Wall -fno-omit-frame-pointer -ggdb -gdwarf-2
 CFLAGS += -mcmodel=medany -fno-pie -no-pie -march=rv64g -mabi=lp64d

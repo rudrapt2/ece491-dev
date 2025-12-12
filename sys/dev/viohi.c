@@ -12,20 +12,19 @@
 #define DEBUG
 #endif
 
-#include "viohi.h"
-#include "virtio.h"
+#include "uio.h"
 #include "intr.h"
-#include "assert.h"
 #include "heap.h"
-#include "io.h"
+#include "conf.h"
+#include "misc.h"
+#include "viohi.h"
+#include "error.h"
+#include "virtio.h"
 #include "device.h"
 #include "thread.h"
-#include "error.h"
 #include "string.h"
-#include "assert.h"
-#include "ioimpl.h"
-#include "io.h"
-#include "conf.h"
+#include "console.h"
+#include "devimpl.h"
 
 #include <limits.h>
 
@@ -77,8 +76,8 @@ struct viohi_virtq {
 // Main device structure
 
 struct viohi_device {
+    struct serial base;
     volatile struct virtio_mmio_regs * regs;
-    struct io io;
 
     int irqno;
     int instno;
@@ -86,21 +85,20 @@ struct viohi_device {
     struct virtio_input_event evts[VIOHI_QLEN];
 };
 
-static int viohi_open(struct io ** ioptr, void * aux);
-
-static void viohi_close(struct io * io);
-static int viohi_cntl(struct io * io, int cmd, void * arg);
-static long viohi_read(struct io * io, void * buf, long bufsz);
+static int viohi_open(struct serial * ser);
+static void viohi_close(struct serial * ser);
+static int viohi_read(struct serial * ser, void * buf, unsigned int buflen);
 
 static void viohi_isr(int srcno, void * aux);
 
 // INTERNAL GLOBAL VARIABLES
 //
 
-static const struct iointf viohi_intf = {
+static const struct serial_intf viohi_intf = {
+    .open = viohi_open,
     .close = viohi_close,
-    .cntl = viohi_cntl,
-    .read = viohi_read
+    .recv = viohi_read,
+    .blksz = 1
 };
 
 // EXPORTED FUNCTION DEFINITIONS
@@ -144,7 +142,7 @@ void viohi_attach(volatile struct virtio_mmio_regs * regs, int irqno) {
     vhi->regs = regs;
 
     // fill io struct with ref count of zero
-    ioinit0(&vhi->io, &viohi_intf);
+    serial_init(&vhi->base, &viohi_intf);
 
     // vbd->instno filled later
     vhi->irqno = irqno;
@@ -166,16 +164,18 @@ void viohi_attach(volatile struct virtio_mmio_regs * regs, int irqno) {
         (uintptr_t)&vhi->vq.used,
         (uintptr_t)&vhi->vq.avail);
     
-    vhi->instno = register_device(VIOHI_NAME, viohi_open, vhi);
-
+    vhi->instno = register_device(VIOHI_NAME, DEV_SERIAL, vhi);
     // Signal initialization complete
 
     regs->status |= VIRTIO_STAT_DRIVER_OK;    
     __sync_synchronize(); // fence o,oi
+    trace("%p: Virtio Input device initialized (instance %d)\n", regs, vhi->instno);
 }
 
-int viohi_open(struct io ** ioptr, void * aux) {
-    struct viohi_device * const vhi = aux;
+int viohi_open(struct serial * ser) {
+    struct viohi_device * const vhi =
+        (void*)ser - offsetof(struct viohi_device, base);
+
     int i;
 
     trace("%s()", __func__);
@@ -190,51 +190,40 @@ int viohi_open(struct io ** ioptr, void * aux) {
     virtio_enable_virtq(vhi->regs, VIRTIO_INPUT_EVENTQ);
     enable_intr_source(vhi->irqno, VIOHI_INTR_PRIO, viohi_isr, vhi);
 
-    *ioptr = ioaddref(&vhi->io);
-
     return 0;
 }
 
-void viohi_close(struct io * io) {
+void viohi_close(struct serial * ser) {
     struct viohi_device * const vhi =
-        (void*)io - offsetof(struct viohi_device, io);
+        (void*)ser - offsetof(struct viohi_device, base);
 
-    assert (io != NULL);
-    assert (iorefcnt(io) == 0);
+    // assert (ser != NULL);
+    // assert (iorefcnt(ser) == 0);
 
     virtio_reset_virtq(vhi->regs, VIRTIO_INPUT_EVENTQ);
     disable_intr_source(vhi->irqno);
 }
 
-int viohi_cntl(struct io * io, int cmd, void * arg) {
-    switch (cmd) {
-    case IOCTL_GETBLKSZ:
-        return VIOHI_EVTSZ;
-    default:
-        return -ENOTSUP;
-    }
-}
-
-long viohi_read(struct io * io, void * buf, long bufsz) {
+int viohi_read(struct serial * ser, void * buf, unsigned int buflen) {
     struct viohi_device * const vhi =
-        (void*)io - offsetof(struct viohi_device, io);
+        (void*)ser - offsetof(struct viohi_device, base);
     long cnt = 0;
     int pie;
     int k;
 
-    trace("%s(buf=%p, bufsz=%ld)", __func__, buf, bufsz);
+    trace("%s(buf=%p, bufsz=%ld)", __func__, buf, buflen);
 
-    assert (buf != NULL);
-    assert (0 <= bufsz);
+    // assert (buf != NULL);
+    assert (0 <= buflen);
 
-    if (bufsz == 0)
+    if (buflen == 0)
         return 0;
     
-    if (bufsz < VIOHI_EVTSZ)
+    if (buflen < VIOHI_EVTSZ)
         return -EINVAL;
     
     // Round down to multiple of VIOHI_EVTSZ
-    bufsz &= ~(VIOHI_EVTSZ - 1);
+    buflen &= ~(VIOHI_EVTSZ - 1);
 
     k = vhi->vq.avail.idx - VIOHI_QLEN;
 
@@ -248,7 +237,7 @@ long viohi_read(struct io * io, void * buf, long bufsz) {
         restore_interrupts(pie);
     }
     
-    while (cnt < bufsz && vhi->vq.used.idx != k) {
+    while (cnt < buflen && vhi->vq.used.idx != k) {
         memcpy(buf+cnt, &vhi->evts[k++ % VIOHI_QLEN], VIOHI_EVTSZ);
         cnt += VIOHI_EVTSZ;
     }

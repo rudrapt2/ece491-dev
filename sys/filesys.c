@@ -1,18 +1,19 @@
-// fs.c - Default empty file system
-//
-// Copyright (c) 2025 University of Illinois
-// SPDX-License-identifier: NCSA
-//
+/*! @file filesys.c
+    @brief File system interface
+    @copyright Copyright (c) 2024-2025 University of Illinois
+
+*/
 
 #include "filesys.h"
-#include "fsimpl.h"
-#include "error.h"
-#include "string.h"
-#include "misc.h"
-#include "heap.h"
-#include "uioimpl.h"
 
 #include <stddef.h>
+
+#include "error.h"
+#include "fsimpl.h"
+#include "heap.h"
+#include "misc.h"
+#include "string.h"
+#include "uioimpl.h"
 
 // INTERNAL TYPE DEFINITIONS
 //
@@ -21,26 +22,26 @@
  * @brief Defines the mountpoints within the root file system.
  */
 struct mountpoint {
-    struct mountpoint * next; ///< Next mountpoint in linked list
-    struct filesystem * fs; ///< Filesystem function interface
-    char name[]; ///< Path alias for mountpoint
+    struct mountpoint* next;  ///< Next mountpoint in linked list
+    struct filesystem* fs;    ///< Filesystem function interface
+    char name[];              ///< Path alias for mountpoint
 };
 
 // INTERNAL FUNCTION PROTOTYPES
 //
 
-static struct filesystem * getfs(const char * mpname);
-static int fsopen(struct filesystem * fs, const char * flname, struct uio ** uioptr);
-static int fscreate(struct filesystem * fs, const char * flname);
-static int fsdelete(struct filesystem * fs, const char * flname);
-static void fsflush(struct filesystem * fs);
+static struct filesystem* getfs(const char* mpname);
+static int fsopen(struct filesystem* fs, const char* flname, struct uio** uioptr);
+static int fscreate(struct filesystem* fs, const char* flname);
+static int fsdelete(struct filesystem* fs, const char* flname);
+static void fsflush(struct filesystem* fs);
 
-static int fs_open_listing(struct uio ** uioptr);
-static void fs_listing_close(struct uio * uio);
-static long fs_listing_read (struct uio * uio, void * buf, unsigned long bufsz);
+static int fs_open_listing(struct uio** uioptr);
+static void fs_listing_close(struct uio* uio);
+static long fs_listing_read(struct uio* uio, void* buf, unsigned long bufsz);
 
-static int nullfs_open(struct filesystem * fs, const char * flname, struct uio ** uioptr);
-static void nullfs_flush(struct filesystem * fs);
+static int nullfs_open(struct filesystem* fs, const char* flname, struct uio** uioptr);
+static void nullfs_flush(struct filesystem* fs);
 
 // INTERNAL GLOBAL VARIABLES
 //
@@ -49,24 +50,18 @@ static void nullfs_flush(struct filesystem * fs);
  * @brief listing interface for uio.
  */
 struct fs_listing_uio {
-    struct uio base; ///< uio base
-    const struct mountpoint * fs; ///< listing object position
+    struct uio base;              ///< uio base
+    const struct mountpoint* fs;  ///< listing object position
 };
 
-static const struct uio_intf fs_listing_uio_intf = {
-    .close = &fs_listing_close,
-    .read = &fs_listing_read
-};
+static const struct uio_intf fs_listing_uio_intf = {.close = &fs_listing_close,
+                                                    .read = &fs_listing_read};
 
-static const struct filesystem nullfs = {
-    .open = &nullfs_open,
-    .flush = &nullfs_flush
-};
+static const struct filesystem nullfs = {.open = &nullfs_open, .flush = &nullfs_flush};
 
 // Linked list of mounted filesystems
 
-static struct mountpoint * mplist;
-
+static struct mountpoint* mplist;
 
 // EXPORTED GLOBAL VARIABLES
 //
@@ -85,10 +80,9 @@ int fsmgr_init(void) {
  * @brief Flushes all mounted filesystems
  */
 void fsmgr_flushall(void) {
-    struct mountpoint * mp;
+    struct mountpoint* mp;
 
-    for (mp = mplist; mp != NULL; mp = mp->next)
-        fsflush(mp->fs);
+    for (mp = mplist; mp != NULL; mp = mp->next) fsflush(mp->fs);
 }
 
 /**
@@ -98,15 +92,14 @@ void fsmgr_flushall(void) {
  * @param uioptr pointer to uio struct pointer to be filled in
  * @return 0 if successful, negative error code if error
  */
-int open_file(const char * mpname, const char * flname, struct uio ** uioptr) {
-    struct filesystem * fs;
+int open_file(const char* mpname, const char* flname, struct uio** uioptr) {
+    struct filesystem* fs;
 
     trace("%s(%s/%s)", __func__, mpname, flname);
 
-    assert (mpname != NULL || flname == NULL);
+    assert(mpname != NULL || flname == NULL);
 
-    if (mpname == NULL || *mpname == '\0')
-        return fs_open_listing(uioptr);
+    if (mpname == NULL || *mpname == '\0') return fs_open_listing(uioptr);
 
     fs = getfs(mpname);
 
@@ -114,34 +107,32 @@ int open_file(const char * mpname, const char * flname, struct uio ** uioptr) {
 }
 
 /**
- * @brief Create a file in the filesystem specified by the path.
+ * @brief Create a file in the filesystem specified by the path
  * @param mpname mount point name
  * @param flname file name within the mount point
- * @return 0 on success, negative value on error.
+ * @return 0 on success, negative error code if error
  */
-int create_file(const char * mpname, const char * flname) {
-    struct filesystem * fs;
+int create_file(const char* mpname, const char* flname) {
+    struct filesystem* fs;
 
-    if(mpname == NULL || flname == NULL)
-        return -EINVAL;
-    
+    if (mpname == NULL || flname == NULL) return -EINVAL;
+
     fs = getfs(mpname);
 
     return (fs != NULL) ? fscreate(fs, flname) : -ENOENT;
 }
 
 /**
- * @brief Deletes a file in the filesystem specified by the path.
+ * @brief Deletes a file in the filesystem specified by the path
  * @param mpname mount point name
  * @param flname file name within the mount point
- * @return 0 on success, negative value on error.
+ * @return 0 on success, negative error code if error
  */
-int delete_file(const char * mpname, const char * flname) {
-    struct filesystem * fs;
+int delete_file(const char* mpname, const char* flname) {
+    struct filesystem* fs;
 
-    if(mpname == NULL || flname == NULL)
-        return -EINVAL;
-    
+    if (mpname == NULL || flname == NULL) return -EINVAL;
+
     fs = getfs(mpname);
 
     return (fs != NULL) ? fsdelete(fs, flname) : -ENOENT;
@@ -152,8 +143,8 @@ int delete_file(const char * mpname, const char * flname) {
  * @param uioptr pointer to uio struct pointer to be filled in
  * @return 0 if successful, negative error code if error
  */
-int fs_open_listing(struct uio ** uioptr) {
-    struct fs_listing_uio * ls;
+int fs_open_listing(struct uio** uioptr) {
+    struct fs_listing_uio* ls;
 
     ls = kcalloc(1, sizeof(*ls));
     ls->fs = mplist;
@@ -168,8 +159,8 @@ int fs_open_listing(struct uio ** uioptr) {
  * @brief Closes a filesystem listing uio object
  * @param uio pointer to uio object to be closed
  */
-void fs_listing_close(struct uio * uio) {
-    struct fs_listing_uio * const ls = (struct fs_listing_uio*)uio;
+void fs_listing_close(struct uio* uio) {
+    struct fs_listing_uio* const ls = (struct fs_listing_uio*)uio;
     kfree(ls);
 }
 
@@ -178,12 +169,10 @@ void fs_listing_close(struct uio * uio) {
  * @param uio pointer to filesystem listing uio object
  * @param buf buffer to read the filesystem name into
  * @param bufsz size of the buffer
- * @return number of bytes read, 0 if no more filesystems,
+ * @return number of bytes read, 0 if no more filesystems
  */
-long fs_listing_read (
-    struct uio * uio, void * buf, unsigned long bufsz)
-{
-    struct fs_listing_uio * const ls = (struct fs_listing_uio*)uio;
+long fs_listing_read(struct uio* uio, void* buf, unsigned long bufsz) {
+    struct fs_listing_uio* const ls = (struct fs_listing_uio*)uio;
     size_t len;
 
     if (ls->fs != NULL) {
@@ -200,9 +189,7 @@ long fs_listing_read (
  * @param name mount point name
  * @return 0 if successful, negative error code if error
  */
-int mount_nullfs(const char * name) {
-    return attach_filesystem(name, (struct filesystem*)&nullfs);
-}
+int mount_nullfs(const char* name) { return attach_filesystem(name, (struct filesystem*)&nullfs); }
 
 /**
  * @brief Attaches a filesystem to a mount point name
@@ -210,23 +197,22 @@ int mount_nullfs(const char * name) {
  * @param fs pointer to filesystem
  * @return 0 if successful, -EEXIST if mount point already exists
  */
-int attach_filesystem(const char * mpname, struct filesystem * fs) {
-    struct mountpoint ** mpptr;
-    struct mountpoint * mp;
+int attach_filesystem(const char* mpname, struct filesystem* fs) {
+    struct mountpoint** mpptr;
+    struct mountpoint* mp;
     size_t namelen;
 
     mpptr = &mplist;
     while ((mp = *mpptr) != NULL) {
-        if (strcmp(mp->name, mpname) == 0)
-            return -EEXIST;
+        if (strcmp(mp->name, mpname) == 0) return -EEXIST;
         mpptr = &mp->next;
     }
 
     namelen = strlen(mpname);
-    mp = kmalloc(sizeof(*mp) + namelen+1);
+    mp = kmalloc(sizeof(*mp) + namelen + 1);
     memset(mp, 0, sizeof(*mp));
 
-    strncpy(mp->name,mpname, namelen+1);
+    strncpy(mp->name, mpname, namelen + 1);
     mp->fs = fs;
     *mpptr = mp;
 
@@ -241,12 +227,11 @@ int attach_filesystem(const char * mpname, struct filesystem * fs) {
  * @param mpname mount point name
  * @return pointer to filesystem if found, NULL if not found
  */
-struct filesystem * getfs(const char * mpname) {
-    struct mountpoint * mp;
+struct filesystem* getfs(const char* mpname) {
+    struct mountpoint* mp;
 
     for (mp = mplist; mp != NULL; mp = mp->next) {
-        if (strcmp(mp->name, mpname) == 0)
-            return mp->fs;
+        if (strcmp(mp->name, mpname) == 0) return mp->fs;
     }
 
     return NULL;
@@ -259,7 +244,7 @@ struct filesystem * getfs(const char * mpname) {
  * @param uioptr pointer to uio struct pointer to be filled in
  * @return 0 if successful, -ENOTSUP if not supported
  */
-int fsopen(struct filesystem * fs, const char * flname, struct uio ** uioptr) {
+int fsopen(struct filesystem* fs, const char* flname, struct uio** uioptr) {
     if (fs->open != NULL)
         return fs->open(fs, flname, uioptr);
     else
@@ -272,7 +257,7 @@ int fsopen(struct filesystem * fs, const char * flname, struct uio ** uioptr) {
  * @param flname file name within the filesystem
  * @return 0 if successful, -ENOTSUP if not supported
  */
-int fscreate(struct filesystem * fs, const char * flname) {
+int fscreate(struct filesystem* fs, const char* flname) {
     if (fs->create != NULL)
         return fs->create(fs, flname);
     else
@@ -285,7 +270,7 @@ int fscreate(struct filesystem * fs, const char * flname) {
  * @param flname file name within the filesystem
  * @return 0 if successful, -ENOTSUP if not supported
  */
-int fsdelete(struct filesystem * fs, const char * flname) {
+int fsdelete(struct filesystem* fs, const char* flname) {
     if (fs->delete != NULL)
         return fs->delete(fs, flname);
     else
@@ -296,31 +281,25 @@ int fsdelete(struct filesystem * fs, const char * flname) {
  * @brief Flushes the specified filesystem
  * @param fs pointer to filesystem
  */
-void fsflush(struct filesystem * fs) {
-    if (fs->flush != NULL)
-        fs->flush(fs);
+void fsflush(struct filesystem* fs) {
+    if (fs->flush != NULL) fs->flush(fs);
 }
-
 
 /**
  * @brief Opens a file in the null filesystem (always fails)
  * @return -ENOENT (always fails)
  */
-int nullfs_open (
-    struct filesystem * fs __attribute__ ((unused)),
-    const char * flname,
-    struct uio ** uioptr)
-{
+int nullfs_open(struct filesystem* fs __attribute__((unused)), const char* flname,
+                struct uio** uioptr) {
     return -ENOENT;
 }
 
 /**
  * @brief Flushes the null filesystem (does nothing)
  */
-void nullfs_flush(struct filesystem * fs __attribute__ ((unused))) {
-    // nothing
+void nullfs_flush(struct filesystem* fs __attribute__((unused))) {
+    // Does nothing
 }
-
 
 /**
  * @brief Parses a path into mount point name and file name
@@ -337,11 +316,11 @@ int parse_path(char * path, char ** mpnameptr, char ** flnameptr){
     while (*path == '/') path++; // ignore all leading slashes
 
     char *slash = strchr(path, '/');
-    if (slash != NULL) { // no slashes indicates mp only
+    if (slash != NULL) {
         *flnameptr = slash + 1;
         *slash = '\0';
-    } else
-        *flnameptr = '\0';
+    } else // no slashes indicates mp only
+        *flnameptr = NULL;
 
     *mpnameptr = path;
 

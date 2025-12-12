@@ -64,6 +64,41 @@ void write_file(FILE *image, struct ktfs_inode *inode, const char *filename) {
     fclose(output);
 }
 
+// Get data block number for given position using direct, indirect, and doubly-indirect blocks
+int get_data_block_num(FILE *image, struct ktfs_inode * inode, uint32_t pos) {
+    uint32_t block_index = pos / KTFS_BLKSZ;
+    uint32_t blocks_per_indirect = KTFS_BLKSZ / sizeof(uint32_t);
+    uint32_t blocks_per_dindirect = blocks_per_indirect * blocks_per_indirect;
+
+    if (block_index < KTFS_NUM_DIRECT_DATA_BLOCKS) {
+        return inode->block[block_index];
+    }
+    block_index -= KTFS_NUM_DIRECT_DATA_BLOCKS;
+
+    if (block_index < blocks_per_indirect) {
+        uint32_t indirect_blocks[blocks_per_indirect];
+        read_block(image, indirect_blocks, num_starter_blocks + inode->indirect);
+        return indirect_blocks[block_index];
+    }
+    block_index -= blocks_per_indirect;
+
+    for (int i = 0; i < KTFS_NUM_DINDIRECT_BLOCKS; i++) {
+        if (block_index < blocks_per_dindirect) {
+            uint32_t dindirect_blocks[blocks_per_indirect];
+            read_block(image, dindirect_blocks, num_starter_blocks + inode->dindirect[i]);
+            uint32_t indirect_index = block_index / blocks_per_indirect;
+            uint32_t indirect_offset = block_index % blocks_per_indirect;
+
+            uint32_t indirect_blocks[blocks_per_indirect];
+            read_block(image, indirect_blocks, num_starter_blocks + dindirect_blocks[indirect_index]);
+            return indirect_blocks[indirect_offset];
+        }
+        block_index -= blocks_per_dindirect;
+    }
+
+    return -1; // Invalid position
+}
+
 void extract_directory(FILE *image, struct ktfs_superblock *sb, uint16_t dir_inode, const char *path) {
     uint8_t buf[KTFS_BLKSZ];
     // read the inode block
@@ -76,7 +111,12 @@ void extract_directory(FILE *image, struct ktfs_superblock *sb, uint16_t dir_ino
     uint8_t dir_buf[KTFS_BLKSZ];
     for (uint32_t i = 0; i < root_inode.size / KTFS_DENSZ; i++) {
         // read the dictionary entry
-        read_block(image, &dir_buf, num_starter_blocks + root_inode.block[i / (KTFS_BLKSZ / KTFS_DENSZ)]);
+        int dentry_data_block = get_data_block_num(image, &root_inode, i*KTFS_DENSZ);
+        if (dentry_data_block == -1) {
+            fprintf(stderr, "Invalid data block for directory entry\n");
+            continue;
+        }
+        read_block(image, &dir_buf, num_starter_blocks + dentry_data_block);
         struct ktfs_dir_entry *entry = (struct ktfs_dir_entry *)(dir_buf + (i % (KTFS_BLKSZ / KTFS_DENSZ)) * KTFS_DENSZ);
 
         char entry_path[strlen(path) + strlen(entry->name) + 2];
@@ -88,11 +128,7 @@ void extract_directory(FILE *image, struct ktfs_superblock *sb, uint16_t dir_ino
         struct ktfs_inode entry_inode;
         memcpy(&entry_inode, &inode_buf[entry->inode % (KTFS_BLKSZ / KTFS_INOSZ)], KTFS_INOSZ);
 
-        if (entry_inode.size == 0) {
-            mkdir(entry_path, 0755);
-        } else {
-            write_file(image, &entry_inode, entry_path);
-        }
+        write_file(image, &entry_inode, entry_path);
     }
 }
 

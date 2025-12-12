@@ -1,5 +1,5 @@
 /*! @file ramdisk.c
-    @brief Memory-backed I/O implementation
+    @brief Memory-backed Storage implementation
     @copyright Copyright (c) 2024-2025 University of Illinois
 
 */
@@ -30,7 +30,8 @@
 //
 
 /**
- * @brief Storage device backed by a block of memory. Allows modification of the backing memory block.
+ * @brief Storage device backed by a block of memory. Allows modification of the backing memory
+ * block.
  */
 struct ramdisk
 {
@@ -61,6 +62,10 @@ static const struct storage_intf ramdisk_intf = {
 // EXPORTED FUNCTION DEFINITIONS
 //
 
+/**
+ * @brief Creates and registers a memory-backed storage device
+ * @return None
+ */
 void ramdisk_attach()
 {
   // External symbols from linker script for embedded blob data
@@ -72,7 +77,6 @@ void ramdisk_attach()
   size_t blob_size = _kimg_blob_end - _kimg_blob_start;
 
   if (blob_size == 0) {
-    kprintf("Not enough available RAM for ramdisk\n");
     return;
   }
   
@@ -97,9 +101,9 @@ void ramdisk_attach()
 //
 
 /**
- * @brief _open_ implementation for memory storage.
+ * @brief Opens the _ramdisk_ device.
  * @param sto Storage struct pointer for memory storage
- * @return 0 on success
+ * @return 0 on success, negative error code if error
  */
 static int ramdisk_open(struct storage *sto)
 {
@@ -107,8 +111,9 @@ static int ramdisk_open(struct storage *sto)
 }
 
 /**
- * @brief _close_ implementation for memory storage.
+ * @brief Closes the _ramdisk_ device.
  * @param sto Storage struct pointer for memory storage
+ * @return None
  */
 static void ramdisk_close(struct storage *sto)
 {
@@ -116,7 +121,7 @@ static void ramdisk_close(struct storage *sto)
 }
 
 /**
- * @brief _fetch_ implementation for memory storage.
+ * @brief Reads bytecnt number of bytes from the disk and writes them to buf.
  * @details Performs proper bounds checks, then copies data from memory block to passed buffer
  * @param sto Storage struct pointer for memory storage
  * @param pos Position in storage to read from
@@ -145,8 +150,11 @@ static long ramdisk_fetch(struct storage *sto, unsigned long long pos, void *buf
 /**
  * @brief _cntl_ functions for memory storage.
  * @details Memory storage supports basic control operations
+ * @details Any commands such as FCNTL_GETEND should pass back through the arg variable. Do not
+ * directly return the value.
+ * @details FCNTL_GETEND should return the capacity of the storage device in bytes.
  * @param sto Storage struct pointer for memory storage
- * @param cmd command to run
+ * @param cmd command to execute. ramdisk should support FCNTL_GETEND.
  * @param arg Argument for commands
  * @return 0 on success, error on failure or unsupported command
  */

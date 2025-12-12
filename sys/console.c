@@ -1,8 +1,8 @@
-// console.c - Console i/o
-//
-// Copyright (c) 2024-2025 University of Illinois
-// SPDX-License-identifier: NCSA
-//
+/*! @file console.c
+    @brief Console i/o
+    @copyright Copyright (c) 2024-2025 University of Illinois
+
+*/
 
 #include "console.h"
 #include "intr.h"

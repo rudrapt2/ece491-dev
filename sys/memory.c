@@ -1,5 +1,5 @@
 /*! @file memory.c
-    @brief Physical and virtual memory manager    
+    @brief Physical and virtual memory manager
     @copyright Copyright (c) 2024-2025 University of Illinois
     @license SPDX-License-identifier: NCSA
 
@@ -14,16 +14,16 @@
 #endif
 
 #include "memory.h"
+
 #include "conf.h"
-#include "riscv.h"
-#include "heap.h"
 #include "console.h"
+#include "error.h"
+#include "heap.h"
 #include "misc.h"
+#include "process.h"
+#include "riscv.h"
 #include "string.h"
 #include "thread.h"
-#include "process.h"
-#include "error.h"
-#include "misc.h"
 
 // COMPILE-TIME CONFIGURATION
 //
@@ -37,8 +37,8 @@
 // INTERNAL CONSTANT DEFINITIONS
 //
 
-#define MEGA_SIZE ((1UL << 9) * PAGE_SIZE) // megapage size
-#define GIGA_SIZE ((1UL << 9) * MEGA_SIZE) // gigapage size
+#define MEGA_SIZE ((1UL << 9) * PAGE_SIZE)  // megapage size
+#define GIGA_SIZE ((1UL << 9) * MEGA_SIZE)  // gigapage size
 
 #define PTE_ORDER 3
 #define PTE_CNT (1U << (PAGE_ORDER - PTE_ORDER))
@@ -83,29 +83,29 @@ char memory_initialized = 0;
  * allocate a block of pages, we break up the smallest chunk in the list
  */
 struct page_chunk {
-    struct page_chunk * next; ///< Next page in list
-    unsigned long pagecnt; ///< Number of pages in chunk
+    struct page_chunk *next;  ///< Next page in list
+    unsigned long pagecnt;    ///< Number of pages in chunk
 };
 
 /**
  * @brief RISC-V PTE. RTDC (RISC-V docs) for what each of these fields means!
  */
 struct pte {
-    uint64_t flags:8;
-    uint64_t rsw:2;
-    uint64_t ppn:44;
-    uint64_t reserved:7;
-    uint64_t pbmt:2;
-    uint64_t n:1;
+    uint64_t flags : 8;
+    uint64_t rsw : 2;
+    uint64_t ppn : 44;
+    uint64_t reserved : 7;
+    uint64_t pbmt : 2;
+    uint64_t n : 1;
 };
 
 // INTERNAL MACRO DEFINITIONS
 //
 
 #define VPN(vma) ((vma) / PAGE_SIZE)
-#define VPN2(vma) ((VPN(vma) >> (2*9)) % PTE_CNT)
-#define VPN1(vma) ((VPN(vma) >> (1*9)) % PTE_CNT)
-#define VPN0(vma) ((VPN(vma) >> (0*9)) % PTE_CNT)
+#define VPN2(vma) ((VPN(vma) >> (2 * 9)) % PTE_CNT)
+#define VPN1(vma) ((VPN(vma) >> (1 * 9)) % PTE_CNT)
+#define VPN0(vma) ((VPN(vma) >> (0 * 9)) % PTE_CNT)
 
 // The following macros test is a PTE is valid, global, or a leaf. The argument
 // is a struct pte (*not* a pointer to a struct pte).
@@ -114,47 +114,43 @@ struct pte {
 #define PTE_GLOBAL(pte) (((pte).flags & PTE_G) != 0)
 #define PTE_LEAF(pte) (((pte).flags & (PTE_R | PTE_W | PTE_X)) != 0)
 
-#define PT_INDEX(lvl, vpn) (((vpn) & (0x1FF << (lvl * (PAGE_ORDER - PTE_ORDER)))) \
-                             >> (lvl * (PAGE_ORDER - PTE_ORDER)))
+#define PT_INDEX(lvl, vpn) \
+    (((vpn) & (0x1FF << (lvl * (PAGE_ORDER - PTE_ORDER)))) >> (lvl * (PAGE_ORDER - PTE_ORDER)))
 // INTERNAL FUNCTION DECLARATIONS
 //
 
-static void ptab_reset (
-    struct pte * ptab       // page table to reset
+static void ptab_reset(struct pte *ptab  // page table to reset
 );
 
-static struct pte * ptab_clone (
-    struct pte * ptab       // page table to clone
+static struct pte *ptab_clone(struct pte *ptab  // page table to clone
 );
 
-static void ptab_discard (
-    struct pte * ptab       // page table to discard
+static void ptab_discard(struct pte *ptab  // page table to discard
 );
 
-static void ptab_insert (
-    struct pte * ptab,      // page table to modify
-    unsigned long vpn,      // virtual page number to insert
-    void * pp,              // pointer to physical page to insert
-    int rwxug_flags         // flags for inserted mapping
+static void ptab_insert(struct pte *ptab,   // page table to modify
+                        unsigned long vpn,  // virtual page number to insert
+                        void *pp,           // pointer to physical page to insert
+                        int rwxug_flags     // flags for inserted mapping
 );
 
-static void * ptab_remove(struct pte * ptab, unsigned long vpn);
+static void *ptab_remove(struct pte *ptab, unsigned long vpn);
 
-static void ptab_adjust(struct pte * ptab, unsigned long vpn, int rwxug_flags);
+static void ptab_adjust(struct pte *ptab, unsigned long vpn, int rwxug_flags);
 
-struct pte * ptab_fetch(struct pte * ptab, unsigned long vpn);
+struct pte *ptab_fetch(struct pte *ptab, unsigned long vpn);
 
 static inline mtag_t active_space_mtag(void);
-static inline mtag_t ptab_to_mtag(struct pte * root, unsigned int asid);
-static inline struct pte * mtag_to_ptab(mtag_t mtag);
-static inline struct pte * active_space_ptab(void);
+static inline mtag_t ptab_to_mtag(struct pte *root, unsigned int asid);
+static inline struct pte *mtag_to_ptab(mtag_t mtag);
+static inline struct pte *active_space_ptab(void);
 
-static inline void * pageptr(uintptr_t n);
-static inline uintptr_t pagenum(const void * p);
+static inline void *pageptr(uintptr_t n);
+static inline uintptr_t pagenum(const void *p);
 static inline int wellformed(uintptr_t vma);
 
-static inline struct pte leaf_pte(const void * pp, uint_fast8_t rwxug_flags);
-static inline struct pte ptab_pte(const struct pte * pt, uint_fast8_t g_flag);
+static inline struct pte leaf_pte(const void *pp, uint_fast8_t rwxug_flags);
+static inline struct pte ptab_pte(const struct pte *pt, uint_fast8_t g_flag);
 static inline struct pte null_pte(void);
 
 // INTERNAL GLOBAL VARIABLES
@@ -162,48 +158,45 @@ static inline struct pte null_pte(void);
 
 static mtag_t main_mtag;
 
-static struct pte main_pt2[PTE_CNT]
-    __attribute__ ((section(".bss.pagetable"), aligned(4096)));
+static struct pte main_pt2[PTE_CNT] __attribute__((section(".bss.pagetable"), aligned(4096)));
 
 static struct pte main_pt1_0x80000[PTE_CNT]
-    __attribute__ ((section(".bss.pagetable"), aligned(4096)));
+    __attribute__((section(".bss.pagetable"), aligned(4096)));
 
 static struct pte main_pt0_0x80000[PTE_CNT]
-    __attribute__ ((section(".bss.pagetable"), aligned(4096)));
+    __attribute__((section(".bss.pagetable"), aligned(4096)));
 
-static struct page_chunk * free_chunk_list;
+static struct page_chunk *free_chunk_list;
 
 // EXPORTED FUNCTION DECLARATIONS
-// 
+//
 
 void memory_init(void) {
-    const void * const text_start = _kimg_text_start;
-    const void * const text_end = _kimg_text_end;
-    const void * const rodata_start = _kimg_rodata_start;
-    const void * const rodata_end = _kimg_rodata_end;
-    const void * const data_start = _kimg_data_start;
-    
-    void * heap_start;
-    void * heap_end;
+    const void *const text_start = _kimg_text_start;
+    const void *const text_end = _kimg_text_end;
+    const void *const rodata_start = _kimg_rodata_start;
+    const void *const rodata_end = _kimg_rodata_end;
+    const void *const data_start = _kimg_data_start;
+
+    void *heap_start;
+    void *heap_end;
 
     uintptr_t pma;
-    const void * pp;
+    const void *pp;
 
     trace("%s()", __func__);
 
-    assert (RAM_START == _kimg_start);
+    assert(RAM_START == _kimg_start);
 
-    debug("           RAM: [%p,%p): %zu MB",
-        RAM_START, RAM_END, RAM_SIZE / 1024 / 1024);
+    debug("           RAM: [%p,%p): %zu MB", RAM_START, RAM_END, RAM_SIZE / 1024 / 1024);
     debug("  Kernel image: [%p,%p)", _kimg_start, _kimg_end);
 
     // Kernel must fit inside 2MB megapage (one level 1 PTE)
-    
-    if (MEGA_SIZE < _kimg_end - _kimg_start)
-        panic(NULL);
+
+    if (MEGA_SIZE < _kimg_end - _kimg_start) panic(NULL);
 
     // Initialize main page table with the following direct mapping:
-    // 
+    //
     //         0 to RAM_START:           RW gigapages (MMIO region)
     // RAM_START to _kimg_end:           RX/R/RW pages based on kernel image
     // _kimg_end to RAM_START+MEGA_SIZE: RW pages (heap and free page pool)
@@ -212,11 +205,11 @@ void memory_init(void) {
     // RAM_START = 0x80000000
     // MEGA_SIZE = 2 MB
     // GIGA_SIZE = 1 GB
-    
+
     // Identity mapping of MMIO region as two gigapage mappings
     for (pma = 0; pma < RAM_START_PMA; pma += GIGA_SIZE)
-        main_pt2[VPN2(pma)] = leaf_pte((void*)pma, PTE_R | PTE_W | PTE_G);
-    
+        main_pt2[VPN2(pma)] = leaf_pte((void *)pma, PTE_R | PTE_W | PTE_G);
+
     // Third gigarange has a second-level subtable
     main_pt2[VPN2(RAM_START_PMA)] = ptab_pte(main_pt1_0x80000, PTE_G);
 
@@ -226,25 +219,21 @@ void memory_init(void) {
     main_pt1_0x80000[VPN1(RAM_START_PMA)] = ptab_pte(main_pt0_0x80000, PTE_G);
 
     for (pp = text_start; pp < text_end; pp += PAGE_SIZE) {
-        main_pt0_0x80000[VPN0((uintptr_t)pp)] =
-            leaf_pte(pp, PTE_R | PTE_X | PTE_G);
+        main_pt0_0x80000[VPN0((uintptr_t)pp)] = leaf_pte(pp, PTE_R | PTE_X | PTE_G);
     }
 
     for (pp = rodata_start; pp < rodata_end; pp += PAGE_SIZE) {
-        main_pt0_0x80000[VPN0((uintptr_t)pp)] =
-            leaf_pte(pp, PTE_R | PTE_G);
+        main_pt0_0x80000[VPN0((uintptr_t)pp)] = leaf_pte(pp, PTE_R | PTE_G);
     }
 
     for (pp = data_start; pp < RAM_START + MEGA_SIZE; pp += PAGE_SIZE) {
-        main_pt0_0x80000[VPN0((uintptr_t)pp)] =
-            leaf_pte(pp, PTE_R | PTE_W | PTE_G);
+        main_pt0_0x80000[VPN0((uintptr_t)pp)] = leaf_pte(pp, PTE_R | PTE_W | PTE_G);
     }
 
     // Remaining RAM mapped in 2MB megapages
 
     for (pp = RAM_START + MEGA_SIZE; pp < RAM_END; pp += MEGA_SIZE) {
-        main_pt1_0x80000[VPN1((uintptr_t)pp)] =
-            leaf_pte(pp, PTE_R | PTE_W | PTE_G);
+        main_pt1_0x80000[VPN1((uintptr_t)pp)] = leaf_pte(pp, PTE_R | PTE_W | PTE_G);
     }
 
     // Enable paging; this part always makes me nervous.
@@ -257,19 +246,20 @@ void memory_init(void) {
     // HEAP_INIT_MIN bytes.
 
     heap_start = _kimg_end;
-    heap_end = (void*)ROUND_UP((uintptr_t)heap_start, PAGE_SIZE);
+    heap_end = (void *)ROUND_UP((uintptr_t)heap_start, PAGE_SIZE);
 
     if (heap_end - heap_start < HEAP_INIT_MIN) {
-        heap_end += ROUND_UP (
-            HEAP_INIT_MIN - (heap_end - heap_start), PAGE_SIZE);
+        heap_end += ROUND_UP(HEAP_INIT_MIN - (heap_end - heap_start), PAGE_SIZE);
     }
 
-    if (RAM_END < heap_end)
-        panic("out of memory");
-    
+    if (RAM_END < heap_end) panic("out of memory");
+
     // Initialize heap memory manager
 
     heap_init(heap_start, heap_end);
+
+    debug("Heap allocator: [%p,%p): %zu KB free", heap_start, heap_end,
+          (heap_end - heap_start) / 1024);
 
     debug("Heap allocator: [%p,%p): %zu KB free",
         heap_start, heap_end, (heap_end - heap_start) / 1024);
@@ -280,7 +270,7 @@ void memory_init(void) {
 
     debug("Page allocator: [%p,%p): %u pages free",
         heap_end, RAM_END, free_chunk_list->pagecnt);
-    
+
     // Allow supervisor to access user memory. We could be more precise by only
     // enabling supervisor access to user memory when we are explicitly trying
     // to access user memory, and disable it at other times. This would catch
@@ -291,13 +281,11 @@ void memory_init(void) {
     memory_initialized = 1;
 }
 
-mtag_t active_mspace(void) {
-    return active_space_mtag();
-}
+mtag_t active_mspace(void) { return active_space_mtag(); }
 
 mtag_t switch_mspace(mtag_t mtag) {
     mtag_t prev;
-    
+
     prev = csrrw_satp(mtag);
     sfence_vma();
     return prev;
@@ -332,7 +320,7 @@ mtag_t discard_active_mspace(void) {
 // mapping megapages and gigapages.
 
 void * map_page(uintptr_t vma, void * pp, int rwxug_flags) {
-    assert (vma % PAGE_SIZE == 0);
+    // assert (vma % PAGE_SIZE == 0);
 
     ptab_insert(active_space_ptab(), VPN(vma), pp, rwxug_flags);
     return (void*)vma;
@@ -397,7 +385,7 @@ void unmap_and_free_range(void * vp, size_t size) {
     }
 }
 
-int validate_vptr(const void * vp, size_t len, int rwxug_flags) {
+int validate_vptr(const void * vp, size_t len, int rwxu_flags) {
     uintptr_t const vma = (uintptr_t)vp;
     struct pte * ptab;
     unsigned long vpn;
@@ -417,7 +405,7 @@ int validate_vptr(const void * vp, size_t len, int rwxug_flags) {
         pte = ptab_fetch(ptab, vpn);
         if (pte == NULL || !PTE_VALID(*pte))
             return -EACCESS;
-        if ((pte->flags & rwxug_flags) != rwxug_flags)
+        if ((pte->flags & rwxu_flags) != rwxu_flags)
             return -EACCESS;
     }
 

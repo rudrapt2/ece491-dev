@@ -1,5 +1,5 @@
 /*! @file vioblk.c 
-    @brief VirtIO serial port (console)
+    @brief VirtIO block device
     @copyright Copyright (c) 2024-2025 University of Illinois
 
 */
@@ -131,26 +131,34 @@ struct vioblk_storage {
 //
 
 /**
- * @brief Sets the virtq avail and virtq used queues such that they are available for use. (Hint, read virtio.h) Enables the interupt line for the virtio device and sets necessary flags in vioblk device.
+ * @brief Sets the virtq avail and virtq used queues such that they are available for use. (Hint,
+ * read virtio.h) Enables the interupt line for the virtio device and sets necessary flags in vioblk
+ * device.
  * @param sto Storage IO struct for the storage device
- * @return Return success or error code
-*/
+ * @return Return 0 on success or negative error code if error. If the given sto is already opened,
+ * then return -EBUSY.
+ */
 static int vioblk_storage_open (struct storage * sto);
 
 /**
- * @brief Resets the virtq avail and virtq used queues and sets necessary flags in vioblk device.
+ * @brief Resets the virtq avail and virtq used queues and sets necessary flags in vioblk device. If
+ * the given sto is not opened, this function does nothing.
  * @param sto Storage IO struct for the storage device
  * @return None
  */
 static void vioblk_storage_close (struct storage * sto);
 
 /**
- * @brief Reads bytecnt number of bytes from the disk and writes them to buf. Achieves this by repeatedly setting the appropriate registers to request a block from the disk, waiting until the data has been populated in block buffer cache, and then writes that data out to buf. Thread sleeps while waiting for the disk to service the request. Returns the number of bytes successfully read from the disk.
+ * @brief Reads bytecnt number of bytes from the disk and writes them to buf, rounded down to 
+ * nearest blksz. Achieves this by repeatedly setting the appropriate registers to request a 
+ * block from the disk, waiting until the data has been populated in block buffer cache, and
+ * then writes that data out to buf. The request is truncated if attempted to read past the 
+ * end. Thread sleeps while waiting for the disk to service the request.
  * @param sto Storage IO struct for the storage device
  * @param pos The starting position for the read within the VirtIO device
  * @param buf A pointer to the buffer to fill with the read data
  * @param bytecnt The number of bytes to read from the VirtIO device into the buffer
- * @return The number of bytes read from the device
+ * @return The number of bytes read from the device, or negative error code if error
  */
 static long vioblk_storage_fetch (
     struct storage * sto,
@@ -159,12 +167,17 @@ static long vioblk_storage_fetch (
     unsigned long bytecnt);
     
 /**
- * @brief Writes n number of bytes from the parameter buf to the disk. The size of the virtio device should not change. You should only overwrite existing data. Write should also not create any new files. Achieves this by filling up the block buffer cache and then setting the appropriate registers to request the disk write the contents of the cache to the specified block location. Thread sleeps while waiting for the disk to service the request. Returns the number of bytes successfully written to the disk.
+ * @brief Writes bytecnt number of bytes from the parameter buf to the disk, rounded down to 
+ * the nearest blksz. The size of the virtio device should not change. You should only 
+ * overwrite existing data. Write should also not create any new files. Achieves this by 
+ * filling up the block buffer cache and then setting the appropriate registers to request 
+ * the disk write the contents of the cache to the specified block location, truncating to 
+ * avoid writing past end. Thread sleeps while waiting for the disk to service the request.
  * @param sto Storage IO struct for the storage device
  * @param pos The starting position for the write within the VirtIO device
  * @param buf A pointer to the buffer with the data to write
  * @param bytecnt The number of bytes to write to the VirtIO device from the buffer
- * @return The number of bytes written to the device
+ * @return The number of bytes written to the device, or negative error code if error
  */
 static long vioblk_storage_store (
     struct storage * sto,
@@ -173,20 +186,25 @@ static long vioblk_storage_store (
     unsigned long bytecnt);
 
 /**
- * @brief Perform operations to get information about the block device 
+ * @brief Given a file io object, a specific command, and possibly some arguments, execute the
+ * corresponding functions on the VirtIO block device.
+ * @details Any commands such as FCNTL_GETEND should pass back through the arg variable. Do not
+ * directly return the value.
+ * @details FCNTL_GETEND should return the capacity of the VirtIO block device in bytes.
  * @param sto Storage IO struct for the storage device
- * @param op Operation to perform
- * @param arg Argument specific to the oepration being performed
+ * @param op Operation to execute. vioblk should support FCNTL_GETEND.
+ * @param arg Argument specific to the operation being performed
  * @return Status code on the operation performed
  */
 static int vioblk_storage_cntl (struct storage * sto, int op, void * arg);
 
 /**
-* @brief The interrupt handler for the VirtIO device. When an interrupt occurs, the system will call this function.
-* @param irqno The interrupt request number for the VirtIO device
-* @param A generic pointer for auxiliary data.
-* @return None
-*/
+ * @brief The interrupt handler for the VirtIO device. When an interrupt occurs, the system will
+ * call this function.
+ * @param irqno The interrupt request number for the VirtIO device
+ * @param aux A generic pointer for auxiliary data.
+ * @return None
+ */
 static void vioblk_isr(int srcno, void * aux);
         
         
@@ -196,7 +214,8 @@ static void vioblk_isr(int srcno, void * aux);
 
 // Attaches a VirtIO block device. Declared and called directly from virtio.c.
 /**
- * @brief Initializes virtio block device with the necessary IO operation functions and sets the required feature bits.
+ * @brief Initializes virtio block device with the necessary IO operation functions and sets the
+ * required feature bits.
  * @param regs Memory mapped register of Virtio
  * @param irqno Interrupt request number of the device
  * @return None

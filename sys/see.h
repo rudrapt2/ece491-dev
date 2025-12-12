@@ -1,14 +1,7 @@
-// see.h - Supervisor Execution Environment
-//
-// Copyright (c) 2024-2025 University of Illinois
-// SPDX-License-identifier: NCSA
-//
-
 /*! @file see.h
-    @brief  
+    @brief Supervisor Execution Environment
     @copyright Copyright (c) 2024-2025 University of Illinois
     @license SPDX-License-identifier: NCSA
-
 */
 
 #ifndef _SEE_H_
@@ -20,14 +13,13 @@
  * @brief Halts the system indicating a successful execution
  * @return None
  */
-extern void halt_success(void) __attribute__ ((noreturn));
+extern void halt_success(void) __attribute__((noreturn));
 
 /*!
  * @brief Halts the system indicating a failure
  * @return None
  */
-extern void halt_failure(void) __attribute__ ((noreturn)) ;
-
+extern void halt_failure(void) __attribute__((noreturn));
 
 /*!
  * @brief Transfers control to machine mode and then sets the value of the mtimecmp register
@@ -36,4 +28,4 @@ extern void halt_failure(void) __attribute__ ((noreturn)) ;
  */
 extern void set_stcmp(uint64_t stcmp_value);
 
-#endif // _SEE_H_
+#endif  // _SEE_H_

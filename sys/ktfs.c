@@ -1,3 +1,9 @@
+/*! @file ktfs.c
+    @brief KTFS Implementation.
+    @copyright Copyright (c) 2024-2025 University of Illinois
+
+*/
+
 #ifdef KTFS_TRACE
 #define TRACE
 #endif
@@ -6,30 +12,26 @@
 #define DEBUG
 #endif
 
-#include "heap.h"
-#include "filesys.h"
-#include "uioimpl.h"
 #include "ktfs.h"
-#include "error.h"
-#include "thread.h"
-#include "string.h"
-#include "console.h"
+
 #include "cache.h"
-#include "uio.h"
+#include "console.h"
 #include "device.h"
 #include "devimpl.h"
+#include "error.h"
+#include "filesys.h"
 #include "fsimpl.h"
+#include "heap.h"
 #include "misc.h"
+#include "string.h"
+#include "thread.h"
+#include "uio.h"
+#include "uioimpl.h"
 
 // INTERNAL TYPE DEFINITIONS
 //
 
-// struct ktfs_free_inode_elem {
-//     uint16_t inode_index;
-//     struct ktfs_free_inode_elem * next; 
-// };
-
-/// @brief File struct for a file in 
+/// @brief File struct for a file in the Keegan Teal Filesystem
 struct ktfs_file {
     /// uio struct for accessing file
     struct uio uio;
@@ -151,9 +153,9 @@ static const struct uio_intf ktfs_listing_uio_intf = {
 };
 
 /**
- * @brief Mounts the file system with associated backing cache 
+ * @brief Mounts the file system with associated backing cache
  * @param cache Pointer to cache struct for the file system
- * @return 0 if mount successful, negative values if there's error.
+ * @return 0 if mount successful, negative error code if error
  */
 int mount_ktfs(const char * name, struct cache * cache) {
     struct ktfs_inode root_directory;
@@ -218,16 +220,20 @@ int mount_ktfs(const char * name, struct cache * cache) {
         new_file->prev = NULL;
         files_list = new_file;
         new_file->pos = 0;
+
+        debug("Mounted file: name=%s, inode=%d, size=%d", new_file->dentry.name, new_file->dentry.inode, new_file->file_size);
     }
     return 0;
 }
 
-
 /**
- * @brief Opens a file or ls with the given name and returns a pointer to the uio through double pointer
- * @param name The name of the file to open or "\" for ls
- * @param uioptr Will return a pointer to a file or ls uio pointer through this double pointer
- * @return 0 if open successful, negative values if there's error.
+ * @brief Opens a file or ls (listing) with the given name and returns a pointer to the uio through
+ * the double pointer. 
+ * @details A file may only be referenced by one uioptr at a time.
+ * @param name The name of the file to open or "" for listing (CP3)
+ * @param uioptr Will return a pointer to a file or ls (list) uio pointer through this double
+ * pointer
+ * @return 0 if open successful, negative error code if error
  */
 int ktfs_open(struct filesystem * fs, const char * name, struct uio ** uioptr) {
     if (name == NULL || *name == '\0')
@@ -268,7 +274,6 @@ int ktfs_open_file(const char * name, struct uio ** uioptr) {
     return -ENOENT;
 }
 
-
 /**
  * @brief Closes the file that is represented by the uio struct
  * @param uio The file io to be closed
@@ -283,11 +288,11 @@ void ktfs_close(struct uio* uio) {
 }
 
 /**
- * @brief Reads data from file attached to uio into provided buffer
+ * @brief Reads data from file attached to uio into provided argument buffer
  * @param uio uio of file to be read
  * @param buf Buffer to be filled
  * @param len Number of bytes to read
- * @return Number of bytes read
+ * @return Number of bytes read if successful, negative error code if error
  */
 long ktfs_fetch(struct uio *uio, void *buf, unsigned long len) {
     long total_num_bytes_to_read = len;
@@ -335,11 +340,12 @@ long ktfs_fetch(struct uio *uio, void *buf, unsigned long len) {
 }
 
 /**
- * @brief Write data from buffer into file attached to uio
- * @param uio The file to be written to 
+ * @brief Write data from the provided argument buffer into file attached to uio
+ * @param uio The file to be written to
  * @param buf The buffer to be read from
  * @param len Number of bytes to write from the buffer to the file
- * @return Number of bytes written from the buffer to the file system
+ * @return Number of bytes written from the buffer to the file system if sucessful, negative error
+ * code if error
  */
 long ktfs_store(struct uio* uio, const void* buf, unsigned long len){
     struct ktfs_file* f = (void*) uio - offsetof(struct ktfs_file, uio);
@@ -388,12 +394,14 @@ long ktfs_store(struct uio* uio, const void* buf, unsigned long len){
 
 /**
  * @brief Create a new file in the file system
+ * @details Should fail if the file already exists. Should also keep dentries contiguous.
  * @param fs The file system in which to create the file
  * @param name The name of the file
- * @return 0 if successful, error code if not
+ * @return 0 if successful, negative error code if error
  */
 int ktfs_create(struct filesystem * fs, const char* name) {
     struct ktfs_inode root_directory;
+    uint32_t data_block_idx;
     if (!name || strlen(name) > KTFS_MAX_FILENAME_LEN) {
         return -EINVAL;
     }
@@ -423,13 +431,15 @@ int ktfs_create(struct filesystem * fs, const char* name) {
     arbitrary_read(inode_number_to_absolute_position(superblock.root_directory_inode), &root_directory, sizeof(struct ktfs_inode));
 
     // Write the dentry into the root directory
-    uint32_t data_block_idx = root_directory.size / KTFS_BLKSZ;
+    uint32_t ith_data_block = root_directory.size / KTFS_BLKSZ;
     uint32_t data_block_offset = root_directory.size % KTFS_BLKSZ;
 
     // If the offset is 0, then we are at the beginning of a new data block
     if (data_block_offset == 0) {
         add_data_block_to_inode(superblock.root_directory_inode);
     }
+
+    get_ith_data_block(ith_data_block, &data_block_idx, superblock.root_directory_inode);
 
     uint32_t dentry_address = data_block_number_to_absolute_position(data_block_idx) + data_block_offset;
     arbitrary_write(dentry_address, &new_file->dentry, sizeof(struct ktfs_dir_entry));
@@ -453,9 +463,10 @@ int ktfs_create(struct filesystem * fs, const char* name) {
 
 /**
  * @brief Deletes a certain file from the file system with the given name
+ * @details Should fail if the file does not exist or is open. Should also keep dentries contiguous.
  * @param fs The file system to delete the file from
  * @param name The name of the file to be deleted
- * @return 0 if successful, error code if not
+ * @return 0 if successful, negative error code if error
  */
 int ktfs_delete(struct filesystem * fs, const char* name) {
     struct ktfs_file* f;
@@ -550,14 +561,23 @@ int ktfs_delete(struct filesystem * fs, const char* name) {
     return 0;
 }
 
-
 /**
- * @brief Given a file io object, a specific command, and possibly some arguments, execute the 
- * corresponding functions
+ * @brief   Given a file io object, a specific command, and possibly some arguments, execute the
+ *          corresponding functions
+ * @details Any commands such as (FCNTL_GETEND, FCNTL_GETPOS, ...) should pass back through the arg
+ *          variable. Do not directly return the value.
+ * @details FCNTL_GETEND should pass back the size of the file in bytes through the arg variable.
+ * @details FCNTL_SETEND should set the size of the file to the value passed in through arg. Does
+ *          not need to support file truncation
+ * @details FCNTL_GETPOS should pass back the current position of the file pointer in bytes through
+ *          the arg variable.
+ * @details FCNTL_SETPOS should set the current position of the file pointer to the value passed in
+ *          through arg.
  * @param uio the uio object of the file to perform the control function
- * @param cmd the io command to execute. Should support IOCTL_GETBUFSZ, IOCTL_GETEND, IOCTL_GETPOS, IOCTL_SETPOS
- * @param arg the argument to pass in, maybe different for different control functions
- * @return depends on specific control functions
+ * @param cmd the operation to execute. KTFS should support FCNTL_GETEND, FCNTL_SETEND (CP2),
+ *            FCNTL_GETPOS, FCNTL_SETPOS.
+ * @param arg the argument to pass in, may be different for different control functions
+ * @return 0 if successful, negative error code if error
  */
 int ktfs_cntl(struct uio *uio, int cmd, void *arg) {
     // struct ktfs_file * f = (struct ktfs_file *)uio;
@@ -586,7 +606,6 @@ int ktfs_cntl(struct uio *uio, int cmd, void *arg) {
  * @param fd pointer to any file in the filesystem
  * @return the block size of the filesystem
  */
-
 int ktfs_getblksz(struct ktfs_file *fd) {
     return 1;
 }
@@ -675,7 +694,7 @@ int ktfs_setpos(struct ktfs_file * fd, void * arg){
 
 /**
  * @brief Flushes the cache to the backing device
- * @return 0 if flush successful, negative values if there's an error.
+ * @return None
  */
 void ktfs_flush(struct filesystem * fs) {
     if (ktfs_block_cache == NULL) {
@@ -732,7 +751,8 @@ void ktfs_listing_close(struct uio * uio) {
 }
 
 /**
- * @brief Reads all of the files names in the file system using ls and copies them into the providied buffer
+ * @brief Reads one file name in the file system using ls and copies it into the
+ * providied buffer
  * @param uio The uio pointer of ls
  * @param buf The buffer to copy the file names to
  * @param bufsz The size of the buffer

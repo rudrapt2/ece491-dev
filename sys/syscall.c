@@ -13,26 +13,25 @@
 #endif
 
 #include "conf.h"
-#include "scnum.h"
-#include "process.h"
-#include "memory.h"
-#include "uio.h"
-#include "device.h"
-#include "filesys.h"
-#include "intr.h"
-#include "timer.h"
-#include "error.h"
-#include "thread.h"
-#include "process.h"
-#include "misc.h"
 #include "console.h"
-#include "string.h"
+#include "device.h"
+#include "error.h"
+#include "filesys.h"
 #include "heap.h"
+#include "intr.h"
+#include "memory.h"
+#include "misc.h"
+#include "process.h"
+#include "scnum.h"
+#include "string.h"
+#include "thread.h"
+#include "timer.h"
+#include "uio.h"
 
 // EXPORTED FUNCTION DECLARATIONS
 //
 
-extern void handle_syscall(struct trap_frame *tfr); // called from excp.c
+extern void handle_syscall(struct trap_frame *tfr);  // called from excp.c
 
 // INTERNAL FUNCTION DECLARATIONS
 //
@@ -62,7 +61,8 @@ static int sysuiodup(int oldfd, int newfd);
 
 /**
  * @brief Initiates syscall present in trap frame struct and stores the return address into the sepc
- * @details sepc will be used to return back to program execution after interrupt is handled and sret is called
+ * @details sepc will be used to return back to program execution after interrupt is handled and
+ * sret is called
  * @param tfr pointer to trap frame struct
  * @return void
  */
@@ -78,7 +78,8 @@ void handle_syscall(struct trap_frame *tfr)
 
 /**
  * @brief Calls specified syscall and passes arguments
- * @details Function uses register a7 to determine syscall number and arguments are passed in from a0-a5 depending on the function
+ * @details Function uses register a7 to determine syscall number and arguments are passed in from
+ * a0-a5 depending on the function
  * @param tfr pointer to trap frame struct
  * @return result of syscall
  */
@@ -134,7 +135,8 @@ int sysexit(void)
 
 /**
  * @brief Executes new process given a executable and arguments
- * @details Valid fd checks, get current process struct, close fd being executed, finally calls process_exec with arguments and executable io "file"
+ * @details Valid fd checks, get current process struct, close fd being executed, finally calls
+ * process_exec with arguments and executable io "file"
  * @param fd file descripter idx
  * @param argc number of arguments in argv
  * @param argv array of arguments for multiple args
@@ -197,7 +199,8 @@ int syswait(int tid)
 
 /**
  * @brief Prints to console via kprintf
- * @details Validates that msg string is valid via validate_vstr and pages are mapped, calls kprintf on current running process
+ * @details Validates that msg string is valid via validate_vstr and pages are mapped, calls kprintf
+ * on current running process
  * @param msg string msg in userspace
  * @return 0 on sucess else error from validate_vstr
  */
@@ -220,7 +223,9 @@ int sysprint(const char *msg)
 
 /**
  * @brief Sleeps process till specificed amount of time has passed
- * @details Creates alarm struct, inits struct with name usleep, which sets the current time via the rd_time() function, taking values from the csr, makes frequency calcuation to determine us has passed before waking process
+ * @details Creates alarm struct, inits struct with name usleep, which sets the current time via the
+ * rd_time() function, taking values from the csr, makes frequency calcuation to determine us has
+ * passed before waking process
  * @param us time in us for process to sleep
  * @return 0
  */
@@ -236,9 +241,10 @@ int sysusleep(unsigned long us)
 
 /**
  * @brief Creates a new file in the filesystem specified by the path.
- * @details Validates and parses the user provided path for mountpoint name, file name and calls create_file.
+ * @details Validates and parses the user provided path for mountpoint name, file name and calls
+ * create_file.
  * @param path User provided path string.
- * @return 0 on success, negative value on error.
+ * @return 0 on success, negative error code if error on error.
  */
 
 int sysfscreate(const char *path)
@@ -264,9 +270,10 @@ int sysfscreate(const char *path)
 
 /**
  * @brief Deletes a file in the filesystem specified by the path.
- * @details Validates and parses the user provided path for mountpoint name, file name and calls delete_file.
+ * @details Validates and parses the user provided path for mountpoint name, file name and calls
+ * delete_file.
  * @param path User provided path string.
- * @return 0 on success, negative value on error.
+ * @return 0 on success, negative error code if error on error.
  */
 
 int sysfsdelete(const char *path)
@@ -292,7 +299,8 @@ int sysfsdelete(const char *path)
 
 /**
  * @brief Opens a file or device of specified fd for given process
- * @details gets current process, allocates file descriptor (if fd = -1) or uses valid file descriptor given, validates and parses user provided path, calls open_file
+ * @details gets current process, allocates file descriptor (if fd = -1) or uses valid file
+ * descriptor given, validates and parses user provided path, calls open_file
  * @param fd file descriptor number
  * @param path User provided path string
  * @return fd number if sucessful else return error that occured -EMFILE or -EBADFD
@@ -376,7 +384,8 @@ int sysclose(int fd)
 
 /**
  * @brief Calls read function of file io on given buffer
- * @details get current process, valid file descriptor checks, find io struct via file descriptor, validate buffer, call ioread with given buffer
+ * @details get current process, valid file descriptor checks, find io struct via file descriptor,
+ * validate buffer, call ioread with given buffer
  * @param fd file descriptor number
  * @param buf pointer to buffer
  * @param bufsz number of bytes to be read
@@ -410,7 +419,8 @@ long sysread(int fd, void *buf, size_t bufsz)
 
 /**
  * @brief Calls write function of file io on given buffer
- * @details get current process, valid file descriptor checks, find io struct via file descriptor, validate buffer, call iowrite with given buffer
+ * @details get current process, valid file descriptor checks, find io struct via file descriptor,
+ * validate buffer, call iowrite with given buffer
  * @param fd file descriptor number
  * @param buf pointer to buffer
  * @param len number of bytes to be written
@@ -444,7 +454,8 @@ long syswrite(int fd, const void *buf, size_t len)
 
 /**
  * @brief Calls device input output commands for a given device instance
- * @details get current process, valid file descriptor checks, find io struct via file descriptor, ensure that fcntl type exists, validate argument pointer, issue fcntl
+ * @details get current process, valid file descriptor checks, find io struct via file descriptor,
+ * ensure that fcntl type exists, validate argument pointer, issue fcntl
  * @param fd file descriptor number
  * @param cmd selection of fcntl
  * @param arg pointer to arguments
@@ -502,10 +513,13 @@ int sysfcntl(int fd, int cmd, void *arg)
 
 /**
  * @brief Creates a pipe for the current process
- * @details The function retrieves the current process. If either the write or read descriptor pointer stores a negative value, an unused descriptor is assigned. If both file descriptors are unused and valid, the function connects them via create_pipe function.
+ * @details The function retrieves the current process. If either the write or read descriptor
+ * pointer stores a negative value, an unused descriptor is assigned. If both file descriptors are
+ * unused and valid, the function connects them via create_pipe function.
  * @param wfdptr pointer to write file descriptor
  * @param rfdptr pointer to read file descriptor
- * @return 0 on success. Else, negative error code on invalid file descriptor, or if a file descriptor is already in use, or if no descriptors are found available.
+ * @return 0 on success. Else, negative error code on invalid file descriptor, or if a file
+ * descriptor is already in use, or if no descriptors are found available.
  */
 int syspipe(int *wfdptr, int *rfdptr)
 {
@@ -557,10 +571,12 @@ syspipeopen_rfd_ok:
 
 /**
  * @brief Duplicates a file description
- * @details Allocates a new file descriptor that refers to the same open file description as the descriptor _oldfd_.
+ * @details Allocates a new file descriptor that refers to the same open _uio_ as the descriptor
+ * _oldfd_. Increments the _refcnt_ if successful.
  * @param oldfd old file descriptor number
  * @param newfd new file descriptor number
- * @return fd number if sucessful else return error on invalid file descriptor or empty file descriptor
+ * @return fd number if sucessful else return error on invalid file descriptor or empty file
+ * descriptor
  */
 
 int sysuiodup(int oldfd, int newfd)

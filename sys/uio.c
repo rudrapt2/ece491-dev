@@ -1,5 +1,8 @@
-// uio.c - Uniform I/O interface
-//
+/*! @file uio.c
+    @brief Uniform I/O interface 
+    @copyright Copyright (c) 2024-2025 University of Illinois
+
+*/
 
 #ifdef UIO_DEBUG
 #define DEBUG
@@ -169,20 +172,24 @@ void pipe_writer_close(struct uio * uio) {
 	struct pipe * const pipe = (void*)uio - offsetof(struct pipe, wio);
 	assert (uio_refcnt(&pipe->wio) == 0);
 	
-	if (uio_refcnt(&pipe->rio) == 0) {
+    if (uio_refcnt(&pipe->rio) == 0) {
 		free_phys_page(pipe->buf);
 		kfree(pipe);
 	}
+    else // alert readers that writers are closed
+        condition_broadcast(&pipe->updated);
 }
 
 void pipe_reader_close(struct uio * uio) {
     struct pipe * const pipe = (void*)uio - offsetof(struct pipe, rio);
 	assert (uio_refcnt(&pipe->rio) == 0);
 	
-	if (uio_refcnt(&pipe->wio) == 0) {
+    if (uio_refcnt(&pipe->wio) == 0) {
 		free_phys_page(pipe->buf);
 		kfree(pipe);
 	}
+    else // alert writers that readers are closed
+        condition_broadcast(&pipe->updated);
 }
 
 long pipe_read(struct uio * uio, void * buf, unsigned long bufsz) {
@@ -228,6 +235,7 @@ long pipe_write(struct uio * uio, const void * buf, unsigned long len) {
             return -EPIPE;
         memcpy(pipe->buf + pipe->tpos, buf, len);
         pipe->tpos += len;
+        condition_broadcast(&pipe->updated);
         return len;
     }
 

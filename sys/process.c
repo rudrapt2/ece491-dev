@@ -1,43 +1,45 @@
-// process.c - user process
-//
-// Copyright (c) 2024-2025 University of Illinois
-// SPDX-License-identifier: NCSA
-//
+/*! @file process.c
+    @brief user process
+    @copyright Copyright (c) 2024-2025 University of Illinois
+    @license SPDX-License-identifier: NCSA
+
+*/
 
 /*!
-* @brief Enables trace messages for process.c
-*/
+ * @brief Enables trace messages for process.c
+ */
 #ifdef PROCESS_TRACE
 #define TRACE
 #endif
 
 /*!
-* @brief Enables debug messages for process.c
-*/
+ * @brief Enables debug messages for process.c
+ */
 #ifdef PROCESS_DEBUG
 #define DEBUG
 #endif
 
-#include "conf.h"
 #include "process.h"
+
+#include "conf.h"
 #include "elf.h"
+#include "error.h"
 #include "filesys.h"
-#include "uio.h"
+#include "heap.h"
+#include "memory.h"
+#include "misc.h"
+#include "riscv.h"
 #include "string.h"
 #include "thread.h"
-#include "riscv.h"
 #include "trap.h"
-#include "memory.h"
-#include "heap.h"
-#include "error.h"
-#include "misc.h"
+#include "uio.h"
 
 // COMPILE-TIME PARAMETERS
 //
 
-/*! 
-* @brief Maximum number of processes
-*/
+/*!
+ * @brief Maximum number of processes
+ */
 #ifndef NPROC
 #define NPROC 16
 #endif
@@ -45,21 +47,19 @@
 // INTERNAL FUNCTION DECLARATIONS
 //
 
-static int build_stack(void * stack, int argc, char ** argv);
+static int build_stack(void* stack, int argc, char** argv);
 
-static void fork_func(struct condition * forked, struct trap_frame * tfr);
+static void fork_func(struct condition* forked, struct trap_frame* tfr);
 
 // INTERNAL GLOBAL VARIABLES
 //
 
 /*!
-* @brief The main user process struct
-*/
+ * @brief The main user process struct
+ */
 static struct process main_proc;
 
-static struct process * proctab[NPROC] = {
-    &main_proc
-};
+static struct process* proctab[NPROC] = {&main_proc};
 
 // EXPORTED GLOBAL VARIABLES
 //
@@ -70,8 +70,8 @@ char procmgr_initialized = 0;
 //
 
 void procmgr_init(void) {
-    assert (memory_initialized && heap_initialized);
-    assert (!procmgr_initialized);
+    assert(memory_initialized && heap_initialized);
+    assert(!procmgr_initialized);
 
     main_proc.tid = running_thread();
     main_proc.mtag = active_mspace();

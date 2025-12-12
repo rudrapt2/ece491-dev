@@ -1,9 +1,3 @@
-// riscv.h - RISC-V CSRs and MIE bit control
-//
-// Copyright (c) 2024-2025 University of Illinois
-// SPDX-License-identifier: NCSA
-//
-
 /*! @file riscv.h
     @brief This file contains all the RISCV CSR magic numbers and functions
     @copyright Copyright (c) 2024-2025 University of Illinois
@@ -42,7 +36,7 @@
  */
 static inline long csrr_scause(void) {
     long val;
-    asm ("csrr %0, scause" : "=r" (val));
+    asm("csrr %0, scause" : "=r"(val));
     return val;
 }
 
@@ -53,7 +47,7 @@ static inline long csrr_scause(void) {
  */
 static inline unsigned long csrr_stval(void) {
     unsigned long val;
-    asm ("csrr %0, stval" : "=r" (val));
+    asm("csrr %0, stval" : "=r"(val));
     return val;
 }
 
@@ -63,17 +57,15 @@ static inline unsigned long csrr_stval(void) {
  * @param val new sepc value
  * @return None
  */
-static inline void csrw_sepc(const void * val) {
-    asm ("csrw sepc, %0" :: "r" (val));
-}
+static inline void csrw_sepc(const void* val) { asm("csrw sepc, %0" ::"r"(val)); }
 
 /**
  * @brief This function retrieves sepc
  * @return sepc CSR value
  */
-static inline const void * csrr_sepc(void) {
-    const void * val;
-    asm ("csrr %0, sepc" : "=r" (val));
+static inline const void* csrr_sepc(void) {
+    const void* val;
+    asm("csrr %0, sepc" : "=r"(val));
     return val;
 }
 
@@ -83,9 +75,7 @@ static inline const void * csrr_sepc(void) {
  * @param val new sscratch value
  * @return None
  */
-static inline void csrw_sscratch(unsigned long val) {
-    asm ("csrw sscratch, %0" :: "r" (val));
-}
+static inline void csrw_sscratch(unsigned long val) { asm("csrw sscratch, %0" ::"r"(val)); }
 
 /**
  * @brief This function retrieves sscratch
@@ -94,7 +84,7 @@ static inline void csrw_sscratch(unsigned long val) {
 static inline unsigned long csrr_sscratch(void) {
     unsigned long val;
 
-    asm ("csrr %0, sscratch" : "=r" (val));
+    asm("csrr %0, sscratch" : "=r"(val));
     return val;
 }
 
@@ -115,9 +105,7 @@ static inline unsigned long csrr_sscratch(void) {
  * @param val new stvec value
  * @return None
  */
-static inline void csrw_stvec(unsigned long val) {
-    asm ("csrw stvec, %0" :: "r" (val));
-}
+static inline void csrw_stvec(unsigned long val) { asm("csrw stvec, %0" ::"r"(val)); }
 
 // sie
 
@@ -130,28 +118,21 @@ static inline void csrw_stvec(unsigned long val) {
  * @param mask bit mask
  * @return None
  */
-static inline void csrw_sie(unsigned long mask) {
-    asm ("csrw sie, %0" :: "r" (mask));
-}
+static inline void csrw_sie(unsigned long mask) { asm("csrw sie, %0" ::"r"(mask)); }
 
 /**
  * @brief This function sets bits in sie provided by mask
  * @param mask bit mask
  * @return None
  */
-static inline void csrs_sie(unsigned long mask) {
-    asm ("csrrs zero, sie, %0" :: "r" (mask));
-}
+static inline void csrs_sie(unsigned long mask) { asm("csrrs zero, sie, %0" ::"r"(mask)); }
 
 /**
  * @brief This function clears bits in sie provided by mask
  * @param mask bit mask
  * @return None
  */
-static inline void csrc_sie(unsigned long mask) {
-    asm ("csrrc zero, sie, %0" :: "r" (mask));
-}
-
+static inline void csrc_sie(unsigned long mask) { asm("csrrc zero, sie, %0" ::"r"(mask)); }
 
 // sip
 
@@ -164,32 +145,26 @@ static inline void csrc_sie(unsigned long mask) {
  * @param mask bit mask
  * @return None
  */
-static inline void csrw_sip(unsigned long mask) {
-    asm ("csrw sip, %0" :: "r" (mask));
-}
+static inline void csrw_sip(unsigned long mask) { asm("csrw sip, %0" ::"r"(mask)); }
 
 /**
  * @brief This function sets bits in sip provided by mask
  * @param mask bit mask
  * @return None
  */
-static inline void csrs_sip(unsigned long mask) {
-    asm ("csrrs zero, sip, %0" :: "r" (mask));
-}
+static inline void csrs_sip(unsigned long mask) { asm("csrrs zero, sip, %0" ::"r"(mask)); }
 
 /**
  * @brief This function clears bits in sip provided by mask
  * @param mask bit mask
  * @return None
  */
-static inline void csrc_sip(unsigned long mask) {
-    asm ("csrrc zero, sip, %0" :: "r" (mask));
-}
+static inline void csrc_sip(unsigned long mask) { asm("csrrc zero, sip, %0" ::"r"(mask)); }
 
 // sstatus
 
 #define RISCV_SSTATUS_SIE (1UL << 1)
-#define RISCV_SSTATUS_SPIE (1UL << 3)
+#define RISCV_SSTATUS_SPIE (1UL << 5)
 #define RISCV_SSTATUS_SPP (1UL << 8)
 #define RISCV_SSTATUS_SUM (1UL << 18)
 
@@ -200,7 +175,7 @@ static inline void csrc_sip(unsigned long mask) {
 static inline unsigned long csrr_sstatus(void) {
     unsigned long val;
 
-    asm ("csrr %0, sstatus" : "=r" (val));
+    asm("csrr %0, sstatus" : "=r"(val));
     return val;
 }
 
@@ -209,18 +184,14 @@ static inline unsigned long csrr_sstatus(void) {
  * @param mask bit mask
  * @return None
  */
-static inline void csrs_sstatus(unsigned long mask) {
-    asm ("csrs sstatus, %0" :: "r" (mask));
-}
+static inline void csrs_sstatus(unsigned long mask) { asm("csrs sstatus, %0" ::"r"(mask)); }
 
 /**
  * @brief This function clears bits in status provided by mask
  * @param mask bit mask
  * @return None
  */
-static inline void csrc_sstatus(unsigned long mask) {
-    asm ("csrc sstatus, %0" :: "r" (mask));
-}
+static inline void csrc_sstatus(unsigned long mask) { asm("csrc sstatus, %0" ::"r"(mask)); }
 
 // satp
 
@@ -251,7 +222,7 @@ static inline void csrc_sstatus(unsigned long mask) {
  */
 static inline unsigned long csrr_satp(void) {
     unsigned long val;
-    asm ("csrr %0, satp" : "=r" (val));
+    asm("csrr %0, satp" : "=r"(val));
     return val;
 }
 
@@ -260,9 +231,7 @@ static inline unsigned long csrr_satp(void) {
  * @param val new satp value
  * @return None
  */
-static inline void csrw_satp(unsigned long val) {
-    asm ("csrw satp, %0" :: "r" (val));
-}
+static inline void csrw_satp(unsigned long val) { asm("csrw satp, %0" ::"r"(val)); }
 
 /**
  * @brief This function reads and writes into satp atomically
@@ -272,10 +241,7 @@ static inline void csrw_satp(unsigned long val) {
 static inline unsigned long csrrw_satp(unsigned long new_val) {
     unsigned long prev_val;
 
-    asm volatile (
-    "csrrw %0, satp, %1"
-    : "=r"(prev_val)
-    : "r" (new_val));
+    asm volatile("csrrw %0, satp, %1" : "=r"(prev_val) : "r"(new_val));
     return prev_val;
 }
 
@@ -283,9 +249,7 @@ static inline unsigned long csrrw_satp(unsigned long new_val) {
  * @brief This function flushes the cached memory page table with updated value
  * @return None
  */
-static inline void sfence_vma(void) {
-    asm inline ("sfence.vma" ::: "memory");
-}
+static inline void sfence_vma(void) { asm inline("sfence.vma" ::: "memory"); }
 
 /**
  * @brief This function gets the value in the mtime register
@@ -294,7 +258,7 @@ static inline void sfence_vma(void) {
 static inline unsigned long long rdtime(void) {
 #if __riscv_xlen == 64
     unsigned long long time;
-    asm ("rdtime %0" : "=r"(time));
+    asm("rdtime %0" : "=r"(time));
     return time;
 #elif __riscv_xlen == 32
 #error "rdtime() nto defined for RV32"
@@ -310,12 +274,8 @@ static inline unsigned long long rdtime(void) {
 static inline long csrrsi_sstatus_SIE(void) {
     long sstatus;
 
-    asm volatile (
-        "csrrsi %0, sstatus, %1"
-        : "=r" (sstatus)
-        : "I" (RISCV_SSTATUS_SIE)
-    );
-    
+    asm volatile("csrrsi %0, sstatus, %1" : "=r"(sstatus) : "I"(RISCV_SSTATUS_SIE));
+
     return sstatus;
 }
 
@@ -326,10 +286,7 @@ static inline long csrrsi_sstatus_SIE(void) {
 static inline long csrrci_sstatus_SIE(void) {
     long sstatus;
 
-    asm volatile (
-    "csrrci %0, sstatus, %1"
-    :   "=r" (sstatus)
-    :   "I" (RISCV_SSTATUS_SIE));
+    asm volatile("csrrci %0, sstatus, %1" : "=r"(sstatus) : "I"(RISCV_SSTATUS_SIE));
 
     return sstatus;
 }
@@ -341,7 +298,8 @@ static inline long csrrci_sstatus_SIE(void) {
 // written to the sstatus CSR.
 
 /**
- * @brief This function updates the SIE bit in sstatus according to new value. SIE bit value is set to the value in that particular bit in the newval
+ * @brief This function updates the SIE bit in sstatus according to new value. SIE bit value is set
+ * to the value in that particular bit in the newval
  * @details csrwi_sstatus_SIE() updates the SIE bit in the sstatus CSR. If the
  * corresponding bit is set is _val_, then csrwi_sstatus_SIE() sets sstatus.SIE.
  * Otherwise, it clears SIE. Note that there is no csrwi instruction: the _i_ is
@@ -350,12 +308,12 @@ static inline long csrrci_sstatus_SIE(void) {
  * @param newval
  */
 static inline void csrwi_sstatus_SIE(long newval) {
-    asm volatile (
-    "csrci sstatus, %0" "\n\t"
-    "csrs sstatus, %1"
-    ::  "I" (RISCV_SSTATUS_SIE),
-        "r" (newval & RISCV_SSTATUS_SIE)
-    :   "memory");
+    asm volatile(
+        "csrci sstatus, %0"
+        "\n\t"
+        "csrs sstatus, %1" ::"I"(RISCV_SSTATUS_SIE),
+        "r"(newval & RISCV_SSTATUS_SIE)
+        : "memory");
 }
 
-#endif // _RISCV_H_
+#endif  // _RISCV_H_

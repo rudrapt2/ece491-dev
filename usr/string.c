@@ -1,10 +1,3 @@
-// string.c - String and memory functions
-//
-// Copyright (c) 2024-2025 University of Illinois
-// SPDX-License-identifier: NCSA
-//
-
-
 /*! @file string.c
     @brief User string and memory functions   
     @copyright Copyright (c) 2024-2025 University of Illinois

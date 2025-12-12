@@ -1,9 +1,3 @@
-// syscall.h - System call function headers
-//
-// Copyright (c) 2024-2025 University of Illinois
-// SPDX-License-identifier: NCSA
-//
-
 /*! @file syscall.h
     @brief System call function headers   
     @copyright Copyright (c) 2024-2025 University of Illinois
@@ -46,9 +40,9 @@ extern int _wait(int tid);
 /**
 * @brief Prints message to the console
 * @param msg Message to be printed
-* @return None
+* @return 0 if successful else error code
 */
-extern void _print(const char * msg);
+extern int _print(const char * msg);
 
 /**
 * @brief Sleep for us number of microseconds

@@ -1,32 +1,33 @@
-#include "syscall.h"
-#include "string.h"
-#include "error.h"
-#include "shell.h"
+#include "../syscall.h"
+#include "../string.h"
+#include "../error.h"
+#include "../shell.h"
 
 void main (int argc, char** argv)
 {
     int result;
     
-    if (argc != 2) {
-        printf("Usage: rm [file name]\n");
+    if (argc < 2) {
+        printf("Usage: rm [file name] [file name] ...\n");
         return;
     }
     
-    result = _fsdelete(argv[1]);
+    while (--argc) {
+        argv++;
+        result = _fsdelete(argv[0]);
 
-    if (result < 0) {
-        printf("Failed to delete file %s: ", argv[1]);
-        switch (result) {
-            case -ENOENT:
-                printf("No such file or directory\n");
-                break;
-            default:
-                printf("Failed to remove file");
-                break;
+        if (result < 0) {
+            printf("Failed to delete file %s: ", argv[0]);
+            switch (result) {
+                case -ENOENT:
+                    printf("No such file or directory\n");
+                    break;
+                default:
+                    printf("Failed to remove file\n");
+                    break;
+            }
+            continue;
         }
-        return;
+        dprintf(STDOUT, "Successfully removed %s\n", argv[0]);
     }
-    
-    dprintf(STDOUT, "Successfully removed %s\n", argv[1]);
-    return;
 }

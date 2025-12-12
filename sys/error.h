@@ -1,8 +1,8 @@
-// error.h - Error numbers
-//
-// Copyright (c) 2024-2025 University of Illinois
-// SPDX-License-identifier: NCSA
-//
+/*! @file error.h
+    @brief Error numbers
+    @copyright Copyright (c) 2024-2025 University of Illinois
+
+*/
 
 #ifndef _ERROR_H_
 #define _ERROR_H_

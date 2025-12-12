@@ -1,8 +1,8 @@
-// uart.h -  NS8250-compatible serial port
-//
-// Copyright (c) 2024-2025 University of Illinois
-// SPDX-License-identifier: NCSA
-//
+/*! @file uart.h
+    @brief NS8250-compatible serial port
+    @copyright Copyright (c) 2024-2025 University of Illinois
+
+*/
 
 #ifndef _UART_H_
 #define _UART_H_
