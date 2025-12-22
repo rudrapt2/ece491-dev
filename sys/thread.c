@@ -403,12 +403,22 @@ int thread_join(int tid) {
     return tid;
 }
 
-/**
- * @brief Returns a pointer to the process struct of a thread's process.
- * @details The process of a thread can be accessed from the thrtab. Returns NULL if the specified thread does not have an associated process (e.g. idle thread).
- * @param tid TID of a thread
- * @return pointer to the thread's process struct
- */
+// thread_process() returns a pointer to the process structure of the process
+// associated with the thread specified by /tid/, or NULL if there is no
+// associated process (kernel threads). A process may be associated with a
+// thread using \ref thread_attach_process.
+//
+// PRECONDITIONS (thread_process() assumes):
+// - /tid/ is a thread id of an existing thread.
+//
+// POSTCONDITIONS (thread_process() guarantees):
+// - If NULL: the thread does not have an associated process.
+// - If not NULL: The returned pointer points to a process structure most
+//   recently associated with the specified process.
+//
+// See also: running_thread_process(), thread_attach_process(),
+// thread_detach_process(), spawn_thread().
+
 struct process * thread_process(int tid) {
     assert (0 <= tid && tid < NTHR);
     assert (thrtab[tid] != NULL);
@@ -427,18 +437,19 @@ struct process * running_thread_process(void) {
 
 /**
  * @brief Sets a thread's associated process.
- * @details The proc argument can be NULL if a thread is a kernel thread (e.g. idle).
+ * @details The process (`struct process *`) associated with a thread can be retrieved using \ref thread_process. 
  * @param tid thread's ID for which a process needs to be asociated
  * @param proc process to be associated for the given thread
  * @return void 
  */
-void thread_set_process(int tid, struct process * proc) {
+void thread_attach_process(int tid, struct process * proc) {
     assert (0 <= tid && tid < NTHR);
     assert (thrtab[tid] != NULL);
+    assert (proc != NULL);
     thrtab[tid]->proc = proc;
 }
 
-void thread_detach(int tid) {
+void thread_detach_process(int tid) {
     assert (0 <= tid && tid < NTHR);
     assert (thrtab[tid] != NULL);
     thrtab[tid]->parent = NULL;
@@ -466,7 +477,7 @@ const char * running_thread_name(void) {
     return TP->name;
 }
 
-void * running_thread_stack_base(void){
+void * running_thread_stack_anchor(void){
     return TP->stack_anchor;
 }
 
@@ -548,63 +559,74 @@ void condition_broadcast(struct condition * cond) {
     restore_interrupts(pie);
 }
 
-/**
- * @brief Initializes a lock.
- * @details Initializes a lock condition variable on lock_release.
- * @param lock pointer to a lock struct
- * @return void
- */
-void lock_init(struct lock * lock) {
-    memset(lock, 0, sizeof(struct lock));
-    condition_init(&lock->release, "lock_release");
+//
+// READERS-WRITER LOCK FUNCTION DEFINITIONS
+//
+
+// A readers-writer lock (rw-lock) is implemented using the rwlock structure:
+//
+// struct rwlock {
+//     struct condition released;
+//     struct thread * owner;
+//     unsigned long cnt;
+// };
+//
+// The three states are:
+// - UNLOCKED when (owner == NULL && cnt == 0),
+// - LOCKED-SHARED when (owner == NULL && cnt > 0), and
+// - LOCKED-EXCLUISIVE when (owner != NULL && cnt > 0).
+//
+// The configuration (owner == NULL && cnt > 0) is not valid.
+//
+
+void rwlock_init(struct rwlock * rwlk) {
+    memset(rwlk, 0, sizeof(*rwlk));
+    condition_init(&rwlk->released, "rwlock.released");
 }
 
-/**
- * @brief Acquires a lock.
- * @details The function increments the count on locks if the lock owner is the currently running thread. Otherwise it will set the lock owner to the currently running thread. If the lock is owned by anything else that is not the currently running thread, the function will condition wait on the lock release condition until the owner is NULL before setting the new owner as the currently running thread.
- * @param lock pointer to a lock struct
- * @return void
- */
-void lock_acquire(struct lock * lock) {
-    if (lock->owner != TP) {
-        while (lock->owner != NULL)
-            condition_wait(&lock->release);
-        
-        lock->owner = TP;
-        lock->cnt = 1;
-        lock->next = TP->lock_list;
-        TP->lock_list = lock;
-    } else
-        lock->cnt += 1;
+void rwlock_acquire_shared(struct rwlock * rwlk) {
+    assert (rwlk->owner != TP);
+
+    while (rwlk->owner != NULL)
+        condition_wait(&rwlk->released);
+
+    rwlk->cnt += 1;
+
+    if (rwlk->cnt == 0)
+        panic("rwlock.cnt overflow");
 }
 
-/**
- * @brief Releases a lock.
- * @details The function decrements the count on the lock and if there are no more locks on the currently running thread, the function will release the lock completely.
- * @param lock pointer to a lock struct
- * @return void
- */
-void lock_release(struct lock * lock) {
-    assert (lock->owner == TP);
-    assert (lock->cnt != 0);
+void lock_release_shared(struct rwlock * rwlk) {
+    assert (rwlk->owner == NULL);
+    assert (rwlk->cnt > 0);
 
-    lock->cnt -= 1;
+    rwlk->cnt -= 1;
 
-    if (lock->cnt == 0)
-        lock_release_completely(lock);
+    if (rwlk->cnt == 0)
+        condition_broadcast(&rwlk->released);
 }
 
-/**
- * @brief Abandons a lock.
- * @details The function checks if the owner of the lock is the currently running thread, and releases the lock completely. The count of the lock doesn't matter for abandon.
- * @param lock pointer to a lock struct
- * @return void
- */
-void lock_abandon(struct lock * lock) {
-    if (lock->owner == TP) {
-        debug("Abandoning held lock %p", lock);
-        lock_release_completely(lock);
+void lock_acquire_exclusive(struct rwlock * rwlk) {
+    if (rwlk->owner != TP) {
+        while (rwlk->owner != NULL)
+            condition_wait(&rwlk->released);
+        rwlk->owner = TP;
     }
+    
+    rwlk->cnt += 1;
+
+    if (rwlk->cnt == 0)
+        panic("rwlock.cnt overflow");
+}
+
+void lock_release_shared(struct rwlock * rwlk) {
+    assert (rwlk->owner == TP);
+    assert (rwlk->cnt != 0);
+
+    rwlk->cnt -= 1;
+
+    if (rwlk->cnt == 0)
+        condition_broadcast(&rwlk->released);
 }
 
 // INTERNAL FUNCTION DEFINITIONS
@@ -892,49 +914,6 @@ void tlappend(struct thread_list * l0, struct thread_list * l1) {
 
     l1->head = NULL;
     l1->tail = NULL;
-}
-
-/**
- * @brief Releases a lock completely and removes it from the currently running thread's lock_list.
- * @details All the threads waiting on the lock are signalled before the lock is completely released. This function must only be called if the thread is still holding the lock that needs to be released.
- * @param lock pointer to a lock struct
- * @return void
- */
-void lock_release_completely(struct lock * lock) {
-    struct lock ** hptr;
-
-    condition_broadcast(&lock->release);
-    hptr = &TP->lock_list;
-    while (*hptr != lock && *hptr != NULL)
-        hptr = &(*hptr)->next;
-    assert (*hptr != NULL);
-    *hptr = (*hptr)->next;
-    lock->owner = NULL;
-    lock->next = NULL;
-}
-
-/**
- * @brief Releases all locks held by a thread.
- * @details This function is called when a thread exits. It iterates through the thread's lock_list and resets the owner, name, and count for each lock, and notifies the threads on the lock release condition variable.
- * @param thr pointer to a thread struct
- * @return void
- */
-void release_all_thread_locks(struct thread * thr) {
-    struct lock * head;
-    struct lock * next;
-
-    head = thr->lock_list;
-
-    while (head != NULL) {
-        next = head->next;
-        head->next = NULL;
-        head->owner = NULL;
-        head->cnt = 0;
-        condition_broadcast(&head->release);
-        head = next;
-    }
-
-    thr->lock_list = NULL;
 }
 
 /**

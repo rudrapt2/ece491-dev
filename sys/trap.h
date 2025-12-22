@@ -45,7 +45,7 @@ struct trap_frame {
  * @return None
  */
 
-extern void trap_frame_jump(struct trap_frame * tfr, void* sscratch) __attribute__ ((noreturn));
+extern void trap_frame_jump(struct trap_frame * tfr, void * sscratch) __attribute__ ((noreturn));
 
 // The following functions are called to handle interrupts and exceptions from
 // trap.s. The exception handlers are defined in excp.c, and the interrupt
