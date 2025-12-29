@@ -13,9 +13,10 @@ UMODE := 1
 
 ULIB_OBJS = \
 	uio.o \
+	heap.o \
+	error.o \
 	string.o \
 	syscall.o \
-	heap.o
 
 ULIB_LD = no_umode.ld
 
@@ -25,17 +26,16 @@ ifeq ($(UMODE), 1)
 endif
 
 ALL_TARGETS = \
-	wc \
-	rm \
 	ls \
+	rm \
+	wc \
 	cat \
-	echo \
 	date \
+	echo \
 	hello \
 	shell \
 	touch \
 	xargs \
-	printf \
 	append 
 
 CFLAGS = -Wall -fno-omit-frame-pointer -ggdb -gdwarf-2

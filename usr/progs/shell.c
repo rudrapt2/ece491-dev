@@ -1,154 +1,205 @@
 #include "../syscall.h"
 #include "../string.h"
 #include "../shell.h"
+#include "../error.h"
 
 #define BUFSIZE 1024
-#define MAXARGS 8
+#define MAXARGS 64
 
-void exec(int c, char** v) {
-	char path[256];
+#define SKIP_SPACES(buf) while(*buf == ' ') buf++
+
+void exec(int argc, char* argv[]) {
+	char path[BUFSIZE];
 	int fd, result;
 
-	// Null-terminate the argument array
-	v[c] = NULL;
-
 	// If path doesn't start with '/', prepend '/c/' for relative paths
-	if (strncmp(v[0], "/", 1) != 0 && strncmp(v[0], "c/", 2) != 0) {
-		snprintf(path, sizeof(path), "/c/%s", v[0]);
+	if (strncmp(argv[0], "/", 1) != 0 && strncmp(argv[0], "c/", 2) != 0) {
+		snprintf(path, sizeof(path), "/c/%s", argv[0]);
+        fd = _open(-1, path);
 	}
 	else {
-		strncpy(path, v[0], sizeof(path) - 1);
+	    fd = _open(-1, argv[0]);
 	}
-
-	// Open the executable file
-	fd = _open(-1, path);
 
 	if (fd < 0) {
-		printf("Unable to access %s (Error Code: %d)\n", path, fd);
-		_exit();
+		printf("Unable to access %s (%s)\n", path, error_name(fd));
+		return;
 	}
 
-	result = _exec(fd, c, v);
-	printf("Failed to exec file (Error Code: %d)", result);
-	_exit();
+	result = _exec(fd, argc, argv);
+	printf("Failed to exec file (%s)", error_name(result));
 }
 
-char* find_terminator(char* buf) {
-	char* p = buf;
-	while(*p) {
-		switch(*p) {
-			case ' ':
-			case '\0':
-			case FIN:
-			case FOUT:
-			case PIPE:
-				return p;
-			default:
-				p++;
-				break;
-		}
-	}
-	return p;
+static int handle_file_input(char* file) {
+    int res;
+    _close(STDIN);
+    res = _open(STDIN, file);
+    if (res < 0) printf("Failed to open file %s (%s)\n", file, error_name(res));
+    return res;
 }
 
-int parse_and_open(int fd, char** filename, int create) {
-	int result;
-	char temp;
-	char* start = *filename + 1;
-	char* end;
-
-	while(*start == ' ') start++;
-	end = find_terminator(start);
-	temp = *end;
-	*end = '\0';
-	if (create) _fscreate(start);
-	result = _open(fd, start);
-	if (result < 0) {
-		printf("Could not open file: %s\n", start);
-		return result;
-	}
-	*end = temp;
-	*filename = end;
-	return 0;
+static int handle_file_output(char* file) {
+    int res;
+    _close(STDOUT);
+    res = _open(STDOUT, file);
+    if (res < 0) {
+        res = _fscreate(file);
+        if (res < 0) {
+            printf("Failed to create file %s (%s)\n", file, error_name(res));
+            return res;
+        }
+        res = _open(STDOUT, file);
+    }
+    if (res < 0) printf("Failed to open file %s (%s)\n", file, error_name(res));
+    return res;
 }
 
-int parse(char* buf, char** v) {
-	int c = 0;
-	char temp;
-	int wpipe, rpipe;
+static int handle_pipe() {
+    int wpipe = -1;
+    int rpipe = -1;
+    int res = _pipe(&wpipe, &rpipe);
 
-	while(1) {
-		while(*buf == ' ') buf++;
-		v[c++] = buf;
-		buf = find_terminator(buf);
-		for(;;) {
-			temp = *buf;
-			*buf = '\0';
-			switch(temp) {
-				case '\0':
-					return (v[c-1][0] == '\0' ? c-1 : c); // remove terminating char
+    if (res < 0) {
+        printf("Failed to create pipe (%s)\n", error_name(res));
+        return res;
+    }
 
-				case FOUT:
-					_close(STDOUT);
-					if (parse_and_open(STDOUT, &buf, 1) < 0) return -1; 
-					continue;
-					
-				case FIN:
-					_close(STDIN);
-					if (parse_and_open(STDIN, &buf, 0) < 0) return -1;
-					continue;
+    res = _fork();
 
-				case PIPE:
-					wpipe = -1;
-					rpipe = -1;
-					if (_pipe(&wpipe, &rpipe) < 0) {
-						printf("failed to create pipe\n");
-						return -1;
-					}
-					if (_fork()) { // reader
-						_close(STDIN);
-						_close(wpipe);
-						_uiodup(rpipe, STDIN);
-						if (rpipe != STDIN)
-							_close(rpipe);
-						c = 0;
-						buf++;
-						break;
-					}
-					else { // writer
-						_close(STDOUT);
-						_close(rpipe);
-						_uiodup(wpipe, STDOUT);
-						if (wpipe != STDOUT)
-							_close(wpipe);
-						exec(c, v);
-					}
+    if (res < 0) {
+        printf("Failed to fork (%s)\n", error_name(res));
+        return res;
+    }
 
-				case ' ':
-					while(*(++buf) == ' ') ;
-					continue;
+    if (res) { // writer
+        _close(rpipe);
+        _close(STDOUT);
+        _uiodup(wpipe, STDOUT);
+        _close(wpipe);
+    }
+    else { // reader
+        _close(wpipe);
+        _close(STDIN);
+        _uiodup(rpipe, STDIN);
+        _close(rpipe);
+    }
 
-				default:
-					*buf = temp;
-					break;
-			}
-			break;
-		}
-	}
+    return res;
+}
+
+static int is_terminator(char c) {
+    switch (c) {
+        case ' ':
+        case '\0':
+        case FIN:
+        case FOUT:
+        case PIPE:
+            return 1;
+        default:
+            return 0;
+    }
+}
+
+static char find_terminator(char* head, char** end) {
+    *end = head;
+    while (!is_terminator(**end)) (*end)++;
+    return **end;
+}
+
+void parse_and_exec(char* head) {
+    int argc;
+    char* argv[MAXARGS + 1]; // +1 for NULL termination
+    char* end;
+    char term;
+    int res;
+
+    SKIP_SPACES(head);
+
+    // handle args
+    for (argc = 0; argc < MAXARGS;) {
+        term = find_terminator(head, &end);
+        *end = '\0';
+        
+        argv[argc++] = head;
+        
+        if (term == ' ') {
+            end++;
+            SKIP_SPACES(end);
+            head = end;
+            if(!is_terminator(*end)) continue;
+            term = *end;
+        }
+
+        break;
+    }
+
+    if (argc == 0) return; // nothing to do
+
+	// Null-terminate the argument array
+	argv[argc] = NULL;
+
+    // at this point, anything remaining should be redirection
+    while (term != '\0') {
+        head = end + 1;
+        SKIP_SPACES(head);
+        switch (term) {
+            case FIN:
+                term = find_terminator(head, &end);
+                *end = '\0';
+                res = handle_file_input(head);
+                if (res < 0) return;
+                break;
+            case FOUT:
+                term = find_terminator(head, &end);
+                *end = '\0';
+                res = handle_file_output(head);
+                if (res < 0) return;
+                break;
+            case PIPE:
+                res = handle_pipe();
+                if (res < 0) return;
+                if (res)
+                    exec(argc, argv); // writer
+                else 
+                    parse_and_exec(head); // reader
+                return;
+        }
+
+        if (term == ' ') {
+            end++;
+            SKIP_SPACES(end);
+            term = *end;
+        }
+    }
+
+    exec(argc, argv);
 }
 
 void main()
 {
     char buf[BUFSIZE];
-	int c;
-	char* v[MAXARGS + 1]; 
-	int child;
+    int child;
 
-	_open(CONSOLEOUT, "/dev/uart1");	// console device
-	_close(STDIN);              		// close any existing stdin
-	_uiodup(CONSOLEOUT, STDIN);       // stdin from console
-	_close(STDOUT);              		// close any existing stdout
-	_uiodup(CONSOLEOUT, STDOUT);      // stdout to console
+    /**************************************************/
+    // NOTE: REMOVE FROM STUDENT RELEASE
+    // this makes waiting for all children easier.
+    // if we dont do this we have to deal with children
+    // spawned by the main thread (ie cache thrfn)
+    // and would need to keep count of children spawned.
+    child = _fork();
+    if (child) {
+        _wait(child);
+        return;
+    }
+    /**************************************************/
+
+    buf[BUFSIZE-1] = '\0'; // terminate
+
+	_open(CONSOLEOUT, "/dev/uart1");    // console device
+	_close(STDIN);              	    // close any existing stdin
+	_uiodup(CONSOLEOUT, STDIN);         // stdin from console
+	_close(STDOUT);                     // close any existing stdout
+	_uiodup(CONSOLEOUT, STDOUT);        // stdout to console
 
 	printf("Starting 391 Shell\n");
 
@@ -161,15 +212,13 @@ void main()
 
 		child = _fork();
 		if (child) {
-			// Parent process: just wait for child
-			_wait(child);
+			// Parent process: wait for all children
+			while (_wait(0) > 0);
 		}
 		else {
 			// Child process: parse and execute
-			c = parse(buf, v);
-			if (c <= 0)
-				return;
-			exec(c, v);
+            parse_and_exec(buf);
+            _exit();
 		}
 	}
 }

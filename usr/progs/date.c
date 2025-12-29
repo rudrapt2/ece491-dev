@@ -1,6 +1,7 @@
 #include "../syscall.h"
 #include "../string.h"
 #include "../shell.h"
+#include "../error.h"
 
 #define NSEC_PER_SEC (1000000000UL)
 #define NSEC_PER_MIN (60UL * NSEC_PER_SEC)
@@ -34,7 +35,7 @@ void main (int argc, char** argv)
     dev_fd = _open(-1, "dev/rtc0");
 
     if (dev_fd < 0) {
-        printf("Could not open rtc: %d", dev_fd);
+        printf("Could not open rtc: %d", error_name(dev_fd));
         return;
     }
 

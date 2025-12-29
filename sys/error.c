@@ -13,7 +13,8 @@ extern const char* error_name(int code) {
         [0] = "(success)",   [EINVAL] = "EINVAL",   [EBUSY] = "EBUSY",   [ENOTSUP] = "ENOTSUP",
         [EIO] = "EIO",       [EBADFMT] = "EBADFMT", [ENOENT] = "ENOENT", [EACCESS] = "EACCESS",
         [EBADFD] = "EBADFD", [EMFILE] = "EMFILE",   [EMPROC] = "EMPROC", [EMTHR] = "EMTHR",
-        [ECHILD] = "ECHILD", [ENOMEM] = "ENOMEM",   [EEXIST] = "EEXIST"};
+        [ECHILD] = "ECHILD", [ENOMEM] = "ENOMEM",   [EPIPE] = "EPIPE",   [EEXIST] = "EEXIST",
+        [ENODATABLKS] = "ENODATABLKS",              [ENOINODEBLKS] = "ENOINODEBLKS"};
 
     const char* name;
 

@@ -1,6 +1,7 @@
 #include "../syscall.h"
 #include "../string.h"
 #include "../shell.h"
+#include "../error.h"
 
 #define BUFSZ 512
 
@@ -17,7 +18,7 @@ void main (int argc, char** argv)
         fd = _open(-1, "");
         
     if (fd < 0) {
-        printf("%s: Directory Not Found\n", argv[1]);
+        printf("Could not open directory %s: %s\n", argv[1], error_name(fd));
         return;
     }
 

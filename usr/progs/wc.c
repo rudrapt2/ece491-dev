@@ -1,6 +1,7 @@
 #include "../syscall.h"
 #include "../string.h"
 #include "../shell.h"
+#include "../error.h"
 
 void main (int argc, char** argv)
 {
@@ -16,7 +17,7 @@ void main (int argc, char** argv)
     if (argc != 1) {
         in_stream = _open(-1, argv[1]);
         if (in_stream < 0) {
-            printf("Failed to open file: %s\n", argv[1]);
+            printf("Could not open file %s: %s\n", argv[1], error_name(in_stream));
             return;
         }
     }
@@ -24,7 +25,7 @@ void main (int argc, char** argv)
     while (1) {
         result = _read(in_stream, &buffer, 1);
         if (result < 0) {
-            printf("Read failed!\n");
+            printf("Could not read buffer: %s\n", error_name(result));
             return;
         }
         if (buffer == 3 && in_stream == STDIN) {

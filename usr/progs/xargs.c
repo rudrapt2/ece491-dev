@@ -1,36 +1,31 @@
 #include "../syscall.h"
 #include "../string.h"
 #include "../shell.h"
+#include "../error.h"
 #include "../heap.h"
 
 #define BUFSZ 512
 
-void exec(int c, char** v) {
-	char path[256];
+void exec(int argc, char* argv[]) {
+	char path[BUFSZ];
 	int fd, result;
 
-	// Null-terminate the argument array
-	v[c] = NULL;
-
 	// If path doesn't start with '/', prepend '/c/' for relative paths
-	if (strncmp(v[0], "/", 1) != 0 && strncmp(v[0], "c/", 2) != 0) {
-		snprintf(path, sizeof(path), "/c/%s", v[0]);
+	if (strncmp(argv[0], "/", 1) != 0 && strncmp(argv[0], "c/", 2) != 0) {
+		snprintf(path, sizeof(path), "/c/%s", argv[0]);
+        fd = _open(-1, path);
 	}
 	else {
-		strncpy(path, v[0], sizeof(path) - 1);
+	    fd = _open(-1, argv[0]);
 	}
-
-	// Open the executable file
-	fd = _open(-1, path);
 
 	if (fd < 0) {
-		printf("Unable to access %s (Error Code: %d)\n", path, fd);
-		_exit();
+		printf("Unable to access %s (%s)\n", path, error_name(fd));
+		return;
 	}
 
-	result = _exec(fd, c, v);
-	printf("Failed to exec file (Error Code: %d)", result);
-	_exit();
+	result = _exec(fd, argc, argv);
+	printf("Failed to exec file (%s)", error_name(result));
 }
 
 void main (int argc, char** argv)

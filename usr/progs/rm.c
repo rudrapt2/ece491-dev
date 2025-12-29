@@ -17,15 +17,7 @@ void main (int argc, char** argv)
         result = _fsdelete(argv[0]);
 
         if (result < 0) {
-            printf("Failed to delete file %s: ", argv[0]);
-            switch (result) {
-                case -ENOENT:
-                    printf("No such file or directory\n");
-                    break;
-                default:
-                    printf("Failed to remove file\n");
-                    break;
-            }
+            printf("Could not delete file %s: %s\n", argv[0], error_name(result));
             continue;
         }
         dprintf(STDOUT, "Successfully removed %s\n", argv[0]);
