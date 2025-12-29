@@ -1,39 +1,22 @@
-// thread.h - A thread of execution
+// thread.h - Thread creation and synchronization
 //
 // Copyright (c) 2024-2025 University of Illinois
 // SPDX-License-identifier: NCSA
 //
 
-/*! @file thread.h
-    @brief A thread of execution
-    @copyright Copyright (c) 2024-2025 University of Illinois
-    @license SPDX-License-identifier: NCSA
-*/
-
 #ifndef _THREAD_H_
 #define _THREAD_H_
 
 struct thread; // opaque decl.
-struct process; // forward decl. (process.h)
-
-/**
- * @brief defines a thread_list, and will be used for maintaining ready-to-run and waiting threads.
- */
-struct thread_list {
-    struct thread * head;
-    struct thread * tail;
-};
-
-/**
- * @brief defines a condition variable
- */
-
+struct process; // forward opaque decl. (process.h)
 
 // EXPORTED FUNCTION DECLARATIONS
 //
 
 extern char thrmgr_initialized;
 extern void thrmgr_init(void);
+
+// TODO
 
 // struct thread * running_thread(void)
 // Returns the currently running thread (pointer to struct thread).
@@ -200,7 +183,30 @@ extern void * running_thread_stack_anchor(void);
 // CONDITION VARIABLES
 //
 
+// The main synchronization mechanism in between threads is the _condition
+// variable_ represented by a /condition/ structure. All other synchronization
+// mechanisms (e.g. readers-writer locks) are constructed using condition
+// variables.
+
+// The /thread_list/ structure is used internally by the thread manager and must
+// not be accessed outside thread.c. (Inside thread.c use only the provided
+// tl-prefixed functions.) It is included here because it is required for the
+// definition of the condition structure below.
+
+struct thread_list {
+    // NO DIRECT ACCESS!
+    struct thread * head;
+    struct thread * tail;
+};
+
+// A /condition/ structure represents a condition variable. The definition
+// should be treated as opaque; it is provided here so that condition variables
+// can be allocated statically. Do not access members of a /condition/ structure
+// directly; all operations on condition variables should be via the functions
+// declared below.
+
 struct condition {
+    // NO DIRECT ACCESS!
     const char * name; // optional
 	struct thread_list wait_list;
 };
@@ -230,6 +236,9 @@ extern void condition_init(struct condition * cond, const char * name);
 // On return condition_init() guarantees:
 // - /cond/ points to an initialized instance of a condition variable.
 // - No threads are considered to be waiting on the condition variable.
+//
+// Performance guarantees:
+// - The number of condition variables in the system is unlimited.
 //
 // See also condition_name(), condition_wait(), condition_broadcast().
 
@@ -264,18 +273,20 @@ extern void condition_wait(struct condition * cond);
 // - The associated condition was signalled using condition_broadcast() at least
 //   once between entry into condition_wait() and its return.
 //
+// This function may context-switch.
+//
+// Performance guarantees:
+// - The number of threads waiting on a condition variable is unlimited.
+//
 // While a call to condition_broadcast() is guaranteed to wake up all waiting
 // threads, there are _no_ guarantees about the order in which such threads will
 // be resumed.
 //
 // Despite the name _condition variable_, there no no guarantee that any
-// particular condition, in the broader sense of the word, holds when
+// particular condition, in the broad sense of the word, holds when
 // condition_wait() returns.
 //
 // See also: condition_init(), condition_broadcast().
-//
-// This function may context-switch.
-
 
 extern void condition_broadcast(struct condition * cond);
 
@@ -321,13 +332,12 @@ extern void condition_broadcast(struct condition * cond);
 //   holding the lock as a writer, and vice versa.
 // - None of the readers-writer lock functions may be called from an ISR.
 //
-// The readers-writer lock data structure is implemented as a `struct rwlock`
-// defined below. The definition is given here to allow locks to be allocated
-// statically (i.e. as a `struct rwlock` rather than a pointer to it), however,
-// the structure must only be manipulated using the functions declared below.
+// The /rwlock/ structure defined below implements a readers-writer lock. The
+// definition is given here to allow locks to be allocated statically. The
+// structure must only be manipulated using the functions declared below.
 
 struct rwlock {
-    // NOT DIRECT ACCESS!
+    // NO DIRECT ACCESS!
     struct condition released;
     struct thread * owner;
     unsigned long cnt;
@@ -348,6 +358,9 @@ extern void rwlock_init(struct rwlock * rwlk);
 // On return rwlock_init() guarantees:
 // - /rwlk/ points to an initialized instance of a reader-writers lock.
 // - No threads are considered to be holding the lock.
+//
+// Performance guarantees:
+// - The number of readers-writer locks in the system is unlimited.
 
 extern void rwlock_acquire_shared(struct rwlock * rwlk);
 
@@ -375,8 +388,14 @@ extern void rwlock_acquire_shared(struct rwlock * rwlk);
 // On return rwlock_acquire_shared() guarantees:
 // - The current thread is considered to be holding the lock as a reader.
 //
-// See also: rwlock_init(), rwlock_release_shared().
 // This function may context-switch.
+//
+// Performance guarantees:
+// - The number of threads waiting to acquire a shared lock is unlimited.
+// - If the lock is not currently held exclusively, rwlock_acquire_shared()
+//   returns immediately without a context switch.
+//
+// See also: rwlock_init(), rwlock_release_shared().
 
 extern void rwlock_release_shared(struct rwlock * rwlk);
 
@@ -405,7 +424,11 @@ extern void rwlock_release_shared(struct rwlock * rwlk);
 
 extern void rwlock_acquire_exclusive(struct rwlock * rwlk);
 
+// TODO
+
 extern void rwlock_release_exclusive(struct rwlock * rwlk);
+
+// TODO
 
 //
 // INLINE FUNCTION DEFINITIONS
