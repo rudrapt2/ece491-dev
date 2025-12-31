@@ -217,7 +217,7 @@ void process_exit(void) {
 
     if (running_thread() == 0) {
         fsmgr_flushall();
-        panic("Main process exited");
+        halt_success();
     }
 
     discard_active_mspace();

@@ -156,9 +156,6 @@ int viorng_serial_open(struct serial * ser) {
     if (vrng->opened)
 		return -EBUSY;
 
-    vrng->vq.avail.idx = 0;
-    vrng->vq.used.idx = 0;
-
     virtio_enable_virtq(vrng->regs, 0);
     enable_intr_source(vrng->irqno, VIORNG_INTR_PRIO, viorng_isr, vrng);
 

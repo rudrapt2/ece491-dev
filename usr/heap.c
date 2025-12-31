@@ -9,6 +9,12 @@
 #include "syscall.h"
 
 #include <stddef.h>
+#include <stdint.h>
+
+#define PAGE_ORDER 12
+#define PAGE_SIZE (1UL << PAGE_ORDER)
+#define ROUND_UP(n, k) (((n) + (k) - 1) / (k) * (k))
+#define ROUND_DOWN(n, k) ((n) / (k) * (k))
 
 // INTERNAL GLOBAL VARIABLES
 //
@@ -52,6 +58,12 @@ void * malloc(size_t size) {
         _print("Heap Overflow");
         _exit();
     }
+
+    // touch each page so it exists in memory
+    for (uintptr_t page = ROUND_UP((uintptr_t)heap_low, PAGE_SIZE); 
+         page < ROUND_UP((uintptr_t)heap_low + size, PAGE_SIZE); 
+         page += PAGE_SIZE)
+        *(char *)page = 0;
 
     ptr = heap_low;
     heap_low += size;

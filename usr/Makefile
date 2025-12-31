@@ -25,18 +25,7 @@ ifeq ($(UMODE), 1)
 	ULIB_LD = umode.ld
 endif
 
-ALL_TARGETS = \
-	ls \
-	rm \
-	wc \
-	cat \
-	date \
-	echo \
-	hello \
-	shell \
-	touch \
-	xargs \
-	append 
+ALL_TARGETS := $(basename $(notdir $(wildcard progs/*.c)))
 
 CFLAGS = -Wall -fno-omit-frame-pointer -ggdb -gdwarf-2
 CFLAGS += -mcmodel=medany -fno-pie -no-pie -march=rv64g -mabi=lp64d
