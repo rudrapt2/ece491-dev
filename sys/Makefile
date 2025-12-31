@@ -45,6 +45,7 @@ OBJS = \
 	dev/vioblk.o \
 	dev/viogpu.o \
 	dev/ramdisk.o \
+	cache.o
 
 
 CFLAGS = -Wall -Werror=implicit-function-declaration

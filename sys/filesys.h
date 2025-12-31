@@ -22,12 +22,14 @@ extern int delete_file(const char * mpname, const char * flname);
 
 extern int attach_filesystem(const char *name, struct filesystem *fs);
 
-// Splits a string path into two strings, the first being the mountpoint name and the seoncd
+// Splits a string path into two strings: a mount point name and a file name.
+// The existing string /path/ in modified and the /mpname/ and /flname/ are set
+// ot point inside /path/.
+
 extern int parse_path(char * path, char ** mpnameptr, char ** flnameptr);
 
 extern int mount_devfs(const char * name); // device.c
-extern int mount_ktfs(const char * name, struct cache * cache); // fs/ktfs.c
-extern int mount_tarfs(const char * name, struct cache * cache); // fs/tarfs.c
-extern int mount_nullfs(const char * name); // fs.c
+extern int mount_tarfs(const char * name, struct cache * cache); // tarfs.c
+extern int mount_nullfs(const char * name); // filesys.c
 
 #endif // _FILESYS_H_

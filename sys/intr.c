@@ -74,7 +74,9 @@ void intrmgr_init(void) {
     intrmgr_initialized = 1;
 }
 
-void enable_intr_source(int srcno, int prio, void (*isr)(int srcno, void* aux), void* isr_aux) {
+void enable_intr_source (
+    int srcno, int prio, void (*isr)(int srcno, void* aux), void* isr_aux)
+{
     assert(0 < srcno && srcno < NIRQ);
     assert(0 < prio);
 
@@ -89,9 +91,16 @@ void disable_intr_source(int srcno) {
     isrtab[srcno].isr_aux = NULL;
 }
 
-void handle_smode_interrupt(unsigned int cause) { handle_interrupt(cause); }
+void handle_smode_interrupt(unsigned int cause) {
+    // called from trap.s
+    handle_interrupt(cause);
+}
 
-void handle_umode_interrupt(unsigned int cause) { handle_interrupt(cause); }
+void handle_umode_interrupt(unsigned int cause) {
+    // called from trap.s
+    handle_interrupt(cause);
+    running_thread_yield();
+}
 
 // INTERNAL FUNCTION DEFINITIONS
 //
