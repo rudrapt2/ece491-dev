@@ -75,7 +75,7 @@ void procmgr_init(void) {
 
     main_proc.tid = running_thread();
     main_proc.mtag = active_mspace();
-    thread_attach(main_proc.tid, &main_proc);
+    thread_attach_process(main_proc.tid, &main_proc);
     procmgr_initialized = 1;
 }
 
@@ -190,7 +190,7 @@ int process_fork(const struct trap_frame * tfr) {
 
     condition_init(&done, "fork_child_done");
     ctid = spawn_thread("fork_child", (void*)&fork_func, &done, tfr);
-    thread_attach(ctid, child);
+    thread_attach_process(ctid, child);
 
     if (ctid < 0)
         return ctid;

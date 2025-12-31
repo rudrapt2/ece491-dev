@@ -1,6 +1,6 @@
 // object.h - Kernel objects
 //
-// Copyright (c) 2025 University of Illinois
+// Copyright (c) 2025-2026 University of Illinois
 // SPDX-License-identifier: NCSA
 //
 
@@ -13,7 +13,7 @@ enum object_type {
     OBJ_STORAGE
 };
 
-struct object;
+struct object; // 
 
 enum object_type object_type(const struct object * obj);
 void object_addref(struct object * obj);

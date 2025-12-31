@@ -10,57 +10,167 @@
 struct thread; // opaque decl.
 struct process; // forward opaque decl. (process.h)
 
-// EXPORTED FUNCTION DECLARATIONS
+// THREADS
 //
 
 extern char thrmgr_initialized;
 extern void thrmgr_init(void);
 
-// TODO
+// Initializes the thread manager. This function must be called before any other
+// functions declared in thread.h. The global variable /thrmgr_initialized/,
+// which is statically initialized to 0, is set to 1 by thrmgr_init(); it must
+// not be modified externally.
+//
+// On return from thrmgr_init(), the currently executing thread (current thread)
+// is the distinguished thread /main/ with TID 0. Additional threads may be
+// created using spawn_thread().
+//
+// * This function must be called once at system initialization time.
+// 
+// See spawn_thread().
 
-// struct thread * running_thread(void)
-// Returns the currently running thread (pointer to struct thread).
 
 extern int running_thread(void);
 
-// int spawn_thread(const char * name, void (*start)(void *), ...)
-// 
-// Creates and starts a new thread. Argument _name_ is the name of the thread
-// (optional, may be NULL), _start_ is the thread entry point, and _arg_ is an
-// argument passed to the thread. The thread is added to the runnable thread
-// list. If _start_ returns, this is equivalent to calling running_thread_exit from
-// _start_. The new thread is associated with the same process as the calling
-// thread. To change a thread's associated process, use thread_attach.
-// Returns the TID of the spawned thread or a negative value on error.
+// Returns the TID if the current (calling) thread.
+
 
 extern int spawn_thread (
     const char * name,
     void (*entry)(void),
     ...);
 
-// void running_thread_yield(void)
-// 
-// Yields the CPU to another thread and returns when the current thread is next
-// scheduled to run.
+// Creates a new thread. The /name/ argument is the name of the new thread; it
+// must be a pointer to a null-terminated string or NULL. If /name/ is NULL, the
+// thread is given an implementation-defined name. The new thread will start
+// execution in /entry/, which must be a pointer to executable code, when it is
+// scheduled to run. Up to 8 optional arguments may be passed to spawn_thread().
+// These arguments will be passed to /entry/ as function arguments when it is
+// started. That is, if spawn_thread() is invoked as,
+//
+//     spawn_thread("myname", (void(*)()) &myfunc, "one", 2);
+//
+// and /myfunc/ is a function declared as,
+//
+//    void myfunc(const char * s, int n);
+//
+// then the new thread will start executing as if myfunc() had been called as:
+//
+//    myfunc("one", 2);
+//
+// If /entry/ is a function and it returns, this is equivalent to calling
+// running_thread_exit() in the context of the new thread.
+//
+// Note: spawn_thread() does *not* suspend the calling thread. The thread
+// created by spawn_thread() will be scheduled to run after the calling thread
+// calls one of the functions that suspends the calling thread, such as
+// thread_yield() or condition_wait().
+
+// The calling thread is designated as the parent of the new thread. The
+// spawn_thread() function returns the TID of the new thread or one of the
+// following negative error codes:
+//
+//   [-EMTHR] A new thread could not be created because the maximum number of
+//            threads in system has been reached. The maximum number of threads
+//            is given by the compile-time paramter NTHR.
+//
+// In addition, spawn_thread() may call panic(), halting the system, if there is
+// insufficient memory to create a new thread.
+//
+// The calling thread may wait for the new thread to exit using thread_join().
+//
+// On entry spawn_thread() assumes:
+// - /name/ is a pointer to a null-terminated string or NULL.
+// - /entry/ is a pointer to executable code.
+//
+// On successful return spawn_thread() guarantees:
+// - A new thread is created in the system.
+// - The return value of spawn_thread() is the TID of the new thread.
+// - The name of the new thread is either /name/, if /name/ is not NULL, or an
+//   implementation-defined null-terminated string.
+// - The new thread will be scheduled to run at some point after the calling
+//   thread is suspended.
+// - The new thread will begin execution at the address given by /entry/.
+// - The first eight optional arguments to spawn_thread() will be passed to
+//   /entry/ as function arguments.
+// - If /entry/ is a pointer to a function and that function returns, the effect
+//   shall be the same as if the new thread called thread_exit().
+// - The calling thread is the parent of the new thread.
+//
+// Performance guarantees:
+// - spawn_thread() succeeds if the number of threads in the system is fewer
+//   than NTHR (compile-time parameter) and there is sufficient memory to
+//   allocate a thread stack and at least 256 bytes of additional memory.
+//
+// * This function may _not_ be called from an ISR.
+//
+// See also: running_thread_exit(), thread_join().
+
 
 extern void running_thread_yield(void);
 
-// int thread_join(int tid)
+// Yields control to the scheduler, possibly suspending the calling thread.
+// Note, however, that running_thread_yield() may return immediately, without
+// suspending the calling thread, if there are no other runnable threads.
 //
-// Waits for a child of the current thread to exit. if _tid_ is not zero, the
-// function waits for the identified child of the running thread to exit.
-// Otherwise, the function waits for any child of the running thread. The
-// function returns the thread id of the child thrad that exited or an error.
-// The thread_join function returns -EINVAL if _tid_ is not zero and the
-// identified thread does not exist or is not a child of the running thread. The
-// thread_join function returns -EINVAL if _tid_ is zero and the running thread
-// does not have any children.
+// * This function may switch to another thread context.
+// * This function may _not_ be called from an ISR.
 
-extern int thread_join(int tid);
+
+extern int thread_join(int u_tid);
+
+// Waits for a child of the calling thread to exit. If /u_tid/ is not zero,
+// thread_join() waits until the child identified by /u_tid/ exits. If that
+// child has already exited, thread_join() returns immediately. If /u_tid/ is
+// zero, thread_join() waits for _any_ of the calling thread's children to exit.
+// If there is a child thread that has already exited, but has not yet been
+// joined, thread_join() returns immediately. If successful, thread_join()
+// returns the TID of the joined child. After being joined, all resources
+// associated with the child thread are considered to be reclaimed by the system
+// and the joined thread no longer counts towards the number of threads in the
+// system.
+//
+// The /u_/ prefix in /u_tid/ indicates that this function checks it for
+// validity. The parameter may be passed unchecked from a system call.
+//
+// If a non-zero /u_tid/ is not the TID of a child of the calling thread,
+// thread_join() returns -ECHILD. If /u_tid/ is zero but the calling thread has
+// no children, thread_join() also returns -ECHILD.
+//
+// * This function may switch to another thread context.
+// * This function may _not_ be called from an ISR.
+//
+// On sucessful (non-error) return thread_join() guarantees:
+// - The returned TID is is a child of the calling thread and the child has
+//   exited but has not yet been joined.
+//
+// See also: thread_exit().
+
 
 extern void __attribute__ ((noreturn)) running_thread_exit(void);
 
-// Termimates the currently running thread.
+// Termimates the currently running thread. This function does not return. If
+// the calling thread is the main thread, the system halts. If the calling
+// thread is not the main thread, its parent will be able to join the calling
+// thread using thread_join(). If the calling thread has any children, the
+// /main/ thread becomes the new parent of the children.
+//
+// After exiting, a child is still considered to exist in the system until it is
+// joined by its parent.
+//
+// This function does not release any locks held by the thread. A thread *must*
+// release any locks it holds before exiting.
+//
+// Performance guarantees:
+// - The storage used for the calling thread's stack is returned to the system
+//   shortly after exiting without waiting for the thread to be joined. (Some
+//   resources associated with the thread, such as its TID, may be released only
+//   after the thread is joined.)
+//
+// * This function switches to another thread context.
+// * This function may _not_ be called from an ISR.
+//
+// See also: thread_join().
 
 extern struct process * thread_process(int tid);
 
@@ -74,7 +184,7 @@ extern struct process * thread_process(int tid);
 // not have an associated process, the active memory space is not switched.
 //
 // On entry thread_process() assumes:
-// - /tid/ is a thread id of an existing thread.
+// - /tid/ is a TID of an existing thread.
 //
 // On return thread_process() guarantees:
 // - If the return value is NULL, the thread has no associated process.
@@ -87,50 +197,39 @@ extern struct process * thread_process(int tid);
 
 extern struct process * running_thread_process(void);
 
-// Returns a pointer to the process structure (`struct process *`) of the
-// process associated with the running thread. This function is equivalent to:
-// 
+// Returns a pointer to the process structure of the process associated with the
+// running thread. This function is equivalent to:
+//
 //    thread_process(running_thread())
 //
 // See also: thread_process(), running_thread().
 
 
-extern void thread_attach(int tid, struct process * proc);
+extern void thread_attach_process(int tid, struct process * proc);
 
 // Sets the process associated with a thread. The /tid/ argument specifies a
 // thread and the /proc/ argument specifies the process to associate with that
-// thread. The /proc/ argument may be NULL, in which case, the call is
-// equivalent to calling thread_detach() with the thread id. If thread /tid/
-// already has an associated process, the association with /proc/ replaces it.
+// thread. If thread /tid/ already has an associated process, the association
+// with /proc/ replaces it. If /proc/ is NULL, any process association is
+// removed and the thread is no longer considered to be attached to a process. 
 //
-// On entry thread_attach() assumes:
+// On entry thread_attach_process() assumes:
 // - /tid/ is a thread id of an existing thread.
 // - /proc/ is a pointer to the process struct of an existing process or NULL.
 //
-// On return thread_attach() guarantees:
+// On return thread_attach_process() guarantees:
 // - If /proc/ is NULL, thread /tid/ is no longer has an associated process.
 // - If /proc/ is not NULL, it becomes the process associated thread /tid/.
 //
-// See also: thread_process(), thread_detach().
-
-
-extern void thread_detach(int tid);
-
-// Resets the process association of a thread so it is no longer associated with
-// a process. The /tid/ argument specifies a thread whose association is to be
-// reset.
-//
-// On entry thread_detach() assumes:
-// - /tid/ is a thread id of an existing thread.
-// 
-// On return thread_detach() guarantees:
-// - The thread /tid/ is no longer has an associated process.
+// See also: thread_process().
 
 
 extern const char * thread_name(int tid);
 
-// Returns the name of thread /tid/ or NULL. For spawned threads, this is the
-// pointer that was passed as the /name/ parameter to spawn_thread().
+// Returns the name of thread /tid/. For spawned threads, this is pointer that
+// was passed as the /name/ argument to spawn_thread() if /name/ was not NULL.
+// If spawn_thread() was called with a NULL /name/ argument, the returned name
+// is an implementation-defined null-terminated string.
 //
 // On entry thread_name() assumes:
 // - /tid/ is a thread id of an existing thread.
@@ -179,11 +278,10 @@ extern void * running_thread_stack_anchor(void);
 // process_fork().
 
 
-// 
 // CONDITION VARIABLES
 //
 
-// The main synchronization mechanism in between threads is the _condition
+// The main synchronization mechanism between threads is the _condition
 // variable_ represented by a /condition/ structure. All other synchronization
 // mechanisms (e.g. readers-writer locks) are constructed using condition
 // variables.
@@ -229,9 +327,9 @@ extern void condition_init(struct condition * cond, const char * name);
 // /name/ argument.
 //
 // On entry condition_init() assumes:
-// - /cond/ is a valid pointer to a region of memory large enough to hold an
+// - /cond/ is a pointer to a region of memory large enough to hold an
 //   instance of `struct condition`.
-// - /name/ is a valid pointer to a null-terminated string or NULL.
+// - /name/ is a pointer to a null-terminated string or NULL.
 //
 // On return condition_init() guarantees:
 // - /cond/ points to an initialized instance of a condition variable.
@@ -273,8 +371,6 @@ extern void condition_wait(struct condition * cond);
 // - The associated condition was signalled using condition_broadcast() at least
 //   once between entry into condition_wait() and its return.
 //
-// This function may context-switch.
-//
 // Performance guarantees:
 // - The number of threads waiting on a condition variable is unlimited.
 //
@@ -285,6 +381,9 @@ extern void condition_wait(struct condition * cond);
 // Despite the name _condition variable_, there no no guarantee that any
 // particular condition, in the broad sense of the word, holds when
 // condition_wait() returns.
+//
+// This function may switch to another thread context.
+// This function may _not_ be called from an ISR.
 //
 // See also: condition_init(), condition_broadcast().
 
@@ -388,12 +487,12 @@ extern void rwlock_acquire_shared(struct rwlock * rwlk);
 // On return rwlock_acquire_shared() guarantees:
 // - The current thread is considered to be holding the lock as a reader.
 //
-// This function may context-switch.
-//
 // Performance guarantees:
 // - The number of threads waiting to acquire a shared lock is unlimited.
 // - If the lock is not currently held exclusively, rwlock_acquire_shared()
 //   returns immediately without a context switch.
+//
+// This function may switch to another thread context.
 //
 // See also: rwlock_init(), rwlock_release_shared().
 

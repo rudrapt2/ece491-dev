@@ -301,6 +301,14 @@ static inline unsigned long long rdtime(void) {
 #endif
 }
 
+static inline void * get_thread_pointer(void) {
+    return __builtin_thread_pointer();
+}
+
+static inline void set_thread_pointer(void * tp) {
+    asm inline ("mv tp, %0" :: "r"(tp) : "tp");
+}
+
 // csrrsi_sstatus_SIE() and csrrci_sstatus_SIE() set and clear sstatus.SIE. They
 // return the previous value of the sstatus CSR.
 /**

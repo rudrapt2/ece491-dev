@@ -45,14 +45,6 @@ extern void enable_intr_source (
 extern void disable_intr_source(int srcno);
 
 /**
-* @brief called when an interrupt fires in S mode
-* @details called from trap.s
-* @param cause Supervisor trap cause
-* @return void
-*/
-extern void handle_smode_interrupt(unsigned int cause);
-
-/**
 * @brief enables interrupts globally
 * @return opaque value that can be passed to restore_interrupts() to restore the 
 * previous interrupt enable/disable state
@@ -99,4 +91,5 @@ extern void intr_install_isr (
     int srcno,
     void (*isr)(int srcno, void * aux),
     void * isr_aux);
+
 #endif // _INTR_H_

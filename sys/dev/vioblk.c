@@ -1,11 +1,11 @@
-/*! @file vioblk.c 
-    @brief VirtIO serial port (console)
-    @copyright Copyright (c) 2024-2025 University of Illinois
-
-*/
-
+// thread.c - Thread creation and synchronization
+//
+// Copyright (c) 2024-2026 University of Illinois
+// SPDX-License-identifier: NCSA
+//
 
 #include "devimpl.h"
+
 #ifdef VIOBLK_TRACE
 #define TRACE
 #endif
@@ -23,8 +23,9 @@
 #include "string.h"
 #include "conf.h"
 #include "misc.h"
-#include "console.h"
+#include "error.h"
 #include "uio.h" // FCNTL
+#include "console.h"
 
 #include <limits.h>
 
@@ -87,21 +88,18 @@ struct vioblk_request_header {
 
 struct vioblk_storage {
     struct storage base;
-    volatile struct virtio_mmio_regs * regs; ///< VirtIO device registers
+    volatile struct virtio_mmio_regs * regs;
     int irqno;
     char opened;
 
-    unsigned int blksz;         ///< The number of bytes in a block
+    unsigned int blksz;
 
-    unsigned long long size;    ///< The size of device in bytes
-    unsigned long long blkcnt;  ///< The size of device in blksz blocks
+    unsigned long long size;
+    unsigned long long blkcnt;
 
-    /**
-     * @brief Anonymous struct with the queues to interact with the device
-     */
     struct {
-        struct condition used_updated; ///< This condition is signalled when used.idx is updated
-        struct lock lock; ///< This lock provides exclusive access to virtq
+        struct condition used_updated;
+        struct rwlock lock;
 
         /**
          * @brief The avail virtqueue for interacting with the VirtIO device
@@ -298,7 +296,7 @@ void vioblk_attach(volatile struct virtio_mmio_regs * regs, int irqno) {
     vbd->vq.desc[3].next = -1;
 
     condition_init(&vbd->vq.used_updated, "vioblk.vq.used_updated");
-    lock_init(&vbd->vq.lock);
+    rwlock_init(&vbd->vq.lock);
 
     // Attach queues
 
@@ -384,15 +382,19 @@ long vioblk_storage_fetch (
 
     // Submit virtq request
 
-    lock_acquire(&vbd->vq.lock);
+    rwlock_acquire_exclusive(&vbd->vq.lock);
 
     vbd->vq.req_header.sector = pos / vbd->blksz;
     vbd->vq.req_header.type = VIRTIO_BLK_T_IN;
     vbd->vq.desc[2].flags = VIRTQ_DESC_F_NEXT | VIRTQ_DESC_F_WRITE;
     vbd->vq.desc[2].addr = (uintptr_t)buf;
     vbd->vq.desc[2].len = bytecnt;
+
     __sync_synchronize(); // fence w,w
+
     vbd->vq.avail.idx += 1;
+
+    __sync_synchronize(); // fence w,w
 
     virtio_notify_avail(vbd->regs, 0);
 
@@ -403,7 +405,7 @@ long vioblk_storage_fetch (
         condition_wait(&vbd->vq.used_updated);
     restore_interrupts(pie);
 
-    lock_release(&vbd->vq.lock);
+    rwlock_release_exclusive(&vbd->vq.lock);
 
     switch (vbd->vq.req_status) {
     case VIRTIO_BLK_S_OK:
@@ -448,7 +450,7 @@ static long vioblk_storage_store (
 
     // Submit virtq request
 
-    lock_acquire(&vbd->vq.lock);
+    rwlock_acquire_exclusive(&vbd->vq.lock);
 
     vbd->vq.req_header.sector = pos / vbd->blksz;
     vbd->vq.req_header.type = VIRTIO_BLK_T_OUT;
@@ -467,7 +469,7 @@ static long vioblk_storage_store (
         condition_wait(&vbd->vq.used_updated);
     restore_interrupts(pie);
 
-    lock_release(&vbd->vq.lock);
+    rwlock_release_exclusive(&vbd->vq.lock);
 
     switch (vbd->vq.req_status) {
     case VIRTIO_BLK_S_OK:
@@ -481,7 +483,7 @@ static long vioblk_storage_store (
     }
 }
 
-int vioblk_storage_cntl (struct storage * sto, int op, void * arg) {
+int vioblk_storage_cntl(struct storage * sto, int op, void * arg) {
     struct vioblk_storage * const vbd = 
         (void*)sto - offsetof(struct vioblk_storage, base);
     

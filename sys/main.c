@@ -35,24 +35,26 @@
 #endif
 
 static void attach_devices(void);
-static void mount_cdrive(void); // mount primary storage device ("C drive")
-static void run_init(void);
+
+// static void mount_cdrive(void); // mount primary storage device ("C drive")
+// static void run_init(void);
 
 void main(void) {
-    
     console_init();
     intrmgr_init();
     devmgr_init();
     thrmgr_init();
     memory_init();
     procmgr_init();
+    fsmgr_init();
 
     attach_devices();
 
     enable_interrupts();
 
-    mount_cdrive();
-    run_init();
+//    mount_cdrive();
+//    run_init();
+
 }
 
 void attach_devices(void) {

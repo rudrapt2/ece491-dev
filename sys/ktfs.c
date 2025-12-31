@@ -95,7 +95,7 @@ static inline int max(int a, int b) {
 
 // INTERNAL GLOBAL VARIABLES
 
-static struct lock fs_lock;
+static struct rwlock fs_lock;
 
 static struct cache * ktfs_block_cache;
 static struct storage * ktfs_backing_device;
@@ -142,7 +142,7 @@ int mount_ktfs(const char * name, struct cache * cache) {
     if(name == NULL)
         return -EINVAL;
 
-    lock_init(&fs_lock);
+    rwlock_init(&fs_lock);
 
     int result = attach_filesystem(name, &fs_intf);
     if(result != 0)

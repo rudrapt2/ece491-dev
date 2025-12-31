@@ -18,7 +18,7 @@
 #define EMFILE      9   ///< Too many open files
 #define EMPROC     10   ///< Too many processes
 #define EMTHR      11   ///< Too many threads
-#define ECHILD     12   ///< No child process
+#define ECHILD     12   ///< No child thread
 #define ENOMEM     13   ///< Out of memory
 #define EPIPE      14   ///< Broken pipe
 #define EEXIST     15   ///< Object exists
