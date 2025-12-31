@@ -77,35 +77,7 @@ void attach_devices(void) {
 }
 
 void mount_cdrive(void) {
-#if 1
-    struct storage * hd;
-    struct cache * cache;
-    int result;
-
-    hd = find_storage(CDEVNAME, CDEVINST);
-    storage_open(hd);
-
-    if (hd == NULL) {
-        kprintf("Storage device %s%d not found\n", CDEVNAME, CDEVINST);
-        halt_failure();
-    }
-
-    result = create_cache(hd, &cache);
-
-    if (result != 0) {
-        kprintf("create_cache(%s%d) failed: %s\n",
-            CDEVNAME, CDEVINST, error_name(result));
-        halt_failure();
-    }
-
-    result = mount_ktfs(CMNTNAME, cache);
-
-    if (result != 0) {
-        kprintf("mount_ktfs(%s, cache(%s%d)) failed: %s\n",
-            CMNTNAME, CDEVNAME, CDEVINST, error_name(result));
-        halt_failure();
-    }
-#endif
+    // nothing
 }
 
 void run_init(void) {

@@ -226,7 +226,7 @@ void process_exit(void) {
     // Free process struct. First, though, remove references to it from thread
     // struct and proctab.
 
-    thread_attach(running_thread(), NULL);
+    thread_attach_process(running_thread(), NULL);
     
     for (i = 0; i < NPROC; i++) {
         if (proctab[i] == self) {

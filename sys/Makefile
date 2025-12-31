@@ -39,8 +39,8 @@ OBJS = \
 	syscall.o \
 	dev/viorng.o \
 	dev/vioblk.o \
-	cache.o \
-	ktfs.o
+	cache.o
+#	ktfs.o
 #   tarfs.o 
 
 CFLAGS = -Wall -Werror=implicit-function-declaration
