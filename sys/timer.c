@@ -39,8 +39,8 @@ char timer_initialized = 0;
 //
 
 // Alarm used to periodically trigger preemption. This alarm is inserted into
-// the same pending-alarm list as user alarms, but it will never block in
-// alarm_sleep().
+// the same pending-alarm list as user alarms, but alarm_sleep() should
+// never be called on the preempt_alarm.
 
 static struct alarm preempt_alarm;
 
@@ -49,31 +49,32 @@ static struct alarm preempt_alarm;
 
 static struct alarm * sleep_list;
 
+// INTERNAL FUNCTION DECLARATIONS
+//
+
+static void sleep_list_insert(struct alarm * al);
+
 // EXPORTED FUNCTION DEFINITIONS
 //
 
-void timer_init(void)
-{
+void timer_init(void){
     set_stcmp(UINT64_MAX);
     timer_initialized = 1;
 
     alarm_init(&preempt_alarm, "preempt");
-    
-    //Doesn't block for special preempt alarm
+
+    // Doesn't block for special preempt alarm
     alarm_sleep_ms(&preempt_alarm, PREEMPT_FREQ);
 }
 
-void alarm_init(struct alarm * al, const char * name)
-{
+void alarm_init(struct alarm * al, const char * name){
     condition_init(&al->cond, name ? name : "alarm");
     al->twake = rdtime();
     al->next = NULL;
 }
 
-void alarm_sleep(struct alarm * al, unsigned long long tcnt)
-{
+void alarm_sleep(struct alarm * al, unsigned long long tcnt){
     unsigned long long now;
-    struct alarm * prev;
     int pie;
 
     now = rdtime();
@@ -93,100 +94,50 @@ void alarm_sleep(struct alarm * al, unsigned long long tcnt)
 
     pie = disable_interrupts();
 
-    if (sleep_list == NULL || al->twake <= sleep_list->twake) {
-        // Insert at head of list. This requires updating the compare register.
+    sleep_list_insert(al);
 
-        debug("[%lu] Inserting alarm %s at head of list",
-            now, al->cond.name);
-
-        al->next = sleep_list;
-        sleep_list = al;
-
-        set_stcmp(al->twake);
-        csrs_sie(RISCV_SIE_STIE);
-    } else {
-        // Insert into list in wake-up order. Interrupts remain disabled during
-        // the walk.
-
-        for (prev = sleep_list; prev->next != NULL; prev = prev->next) {
-            if (al->twake <= prev->next->twake) {
-                debug("[%lu] Inserting alarm %s after %s",
-                    now, al->cond.name, prev->cond.name);
-
-                al->next = prev->next;
-                prev->next = al;
-                break;
-            }
-        }
-
-        // End of list: insert at tail.
-
-        if (prev->next == NULL) {
-            debug("[%lu] Inserting alarm %s at tail",
-                now, al->cond.name);
-
-            al->next = NULL;
-            prev->next = al;
-        }
-    }
-
-    debug("[%lu] Next timer interrupt set for %llu ticks",
-        now, sleep_list->twake);
+    debug("[%lu] Next timer interrupt set for %llu ticks", now, sleep_list->twake);
 
     // condition_wait() must be inside the interrupt-disabled region to avoid a
     // race where the alarm is signalled before we begin waiting.
-    //
-    // The preemption alarm is a special internal alarm: it is used only to
-    // schedule periodic timer interrupts and must never block.
 
-    if (al != &preempt_alarm)
-        condition_wait(&al->cond);
+    condition_wait(&al->cond);
 
     restore_interrupts(pie);
 }
 
-void alarm_reset(struct alarm * al)
-{
+void alarm_reset(struct alarm * al){
     al->twake = rdtime();
 }
 
-void alarm_sleep_sec(struct alarm * al, unsigned int sec)
-{
-    alarm_sleep(al, (unsigned long long)sec * (unsigned long long)TIMER_FREQ);
+void alarm_sleep_sec(struct alarm * al, unsigned int sec) {
+    alarm_sleep(al, sec * TIMER_FREQ);
 }
 
-void alarm_sleep_ms(struct alarm * al, unsigned long ms)
-{
-    alarm_sleep(al, (unsigned long long)ms *
-        (unsigned long long)(TIMER_FREQ / 1000));
+void alarm_sleep_ms(struct alarm * al, unsigned long ms) {
+    alarm_sleep(al, ms * (TIMER_FREQ / 1000UL));
 }
 
-void alarm_sleep_us(struct alarm * al, unsigned long us)
-{
-    alarm_sleep(al, (unsigned long long)us *
-        (unsigned long long)(TIMER_FREQ / 1000 / 1000));
+void alarm_sleep_us(struct alarm * al, unsigned long us) {
+    alarm_sleep(al, us * (TIMER_FREQ / 1000UL / 1000UL));
 }
 
-void sleep_sec(unsigned int sec)
-{
-    sleep_ms(1000UL * (unsigned long)sec);
+void sleep_sec(unsigned int sec) {
+    sleep_ms(1000UL * sec);
 }
 
-void sleep_ms(unsigned long ms)
-{
+void sleep_ms(unsigned long ms) {
     sleep_us(1000UL * ms);
 }
 
-void sleep_us(unsigned long us)
-{
+void sleep_us(unsigned long us) {
     struct alarm al;
 
     alarm_init(&al, "sleep");
     alarm_sleep_us(&al, us);
 }
 
-void handle_timer_interrupt(void)
-{
+void handle_timer_interrupt(void){
     struct alarm * head;
     struct alarm * next;
     uint64_t now;
@@ -215,16 +166,62 @@ void handle_timer_interrupt(void)
 
     sleep_list = head;
 
-    // If preempt alarm was removed re-insert into sleep list.
-    // alarm_sleep_ms() will not block on special preempt alarm.
-    if (preempt_seen)
-        alarm_sleep_ms(&preempt_alarm, PREEMPT_FREQ);
+    // If the preempt alarm fired, schedule the next preempt tick and reinsert
+    // it into the sleep_list. 
+    if (preempt_seen) {
+        unsigned long long tcnt;
+
+        tcnt = PREEMPT_FREQ * (TIMER_FREQ / 1000UL);
+
+        if (UINT64_MAX - preempt_alarm.twake < tcnt)
+            preempt_alarm.twake = UINT64_MAX;
+        else
+            preempt_alarm.twake += tcnt;
+
+        sleep_list_insert(&preempt_alarm);
+    }
 
     head = sleep_list;
- 
-    // /head/ will always point to a valid alarm since the preempt alarm
+
+    // /head/ will always point to a valid alarm since at least the preempt alarm
     // will always be present in /sleep_list/.
+
     debug("[%lu] Setting next alarm for %lu", now, head->twake);
     set_stcmp(head->twake);
+}
 
+// INTERNAL FUNCTION DEFINITIONS
+//
+
+static void sleep_list_insert(struct alarm * al){
+    struct alarm * prev;
+
+    // Assumes interrupts are disabled by the caller.
+
+    al->next = NULL;
+
+    if (sleep_list == NULL || al->twake <= sleep_list->twake) {
+        // Insert at head of list. This requires updating the compare register.
+
+        al->next = sleep_list;
+        sleep_list = al;
+
+        set_stcmp(al->twake);
+        csrs_sie(RISCV_SIE_STIE);
+        return;
+    }
+
+    // Insert into list in wake-up order.
+
+    for (prev = sleep_list; prev->next != NULL; prev = prev->next) {
+        if (al->twake <= prev->next->twake) {
+            al->next = prev->next;
+            prev->next = al;
+            return;
+        }
+    }
+
+    // End of list: insert at tail.
+
+    prev->next = al;
 }
