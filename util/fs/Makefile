@@ -11,5 +11,8 @@ mkfs_ktfs: mkfs_ktfs.c
 unmkfs_ktfs: unmkfs_ktfs.c
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
+mkfs_lffs: mkfs_lffs.c
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
 clean:
-	rm -rf *.o *.elf *.asm mkfs_ktfs unmkfs_ktfs
+	rm -rf *.o *.elf *.asm mkfs_ktfs unmkfs_ktfs mkfs_lffs

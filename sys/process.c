@@ -21,6 +21,7 @@
 
 #include "process.h"
 
+#include "see.h"
 #include "conf.h"
 #include "elf.h"
 #include "error.h"

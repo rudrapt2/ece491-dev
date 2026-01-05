@@ -28,6 +28,7 @@ extern int parse_path(char * path, char ** mpnameptr, char ** flnameptr);
 extern int mount_devfs(const char * name); // device.c
 extern int mount_ktfs(const char * name, struct cache * cache); // fs/ktfs.c
 extern int mount_tarfs(const char * name, struct cache * cache); // fs/tarfs.c
+extern int mount_lffs(const char * name, struct cache * cache, unsigned int size); // fs/lffs.c
 extern int mount_nullfs(const char * name); // fs.c
 
 #endif // _FILESYS_H_

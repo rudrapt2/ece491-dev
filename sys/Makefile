@@ -17,7 +17,7 @@ OBJS = \
 	see.o \
 	uio.o \
 	misc.o \
-	ktfs.o \
+	lffs.o \
 	intr.o \
 	excp.o \
 	plic.o \
@@ -86,7 +86,7 @@ QEMUOPTS += -object rng-random,filename=/dev/urandom,id=rng0
 QEMUOPTS += -device virtio-rng-device,rng=rng0
 # Add more RNG devices
 
-QEMUOPTS += -drive file=ktfs.raw,id=blk0,if=none,format=raw,readonly=false
+QEMUOPTS += -drive file=lffs.raw,id=blk0,if=none,format=raw,readonly=false
 QEMUOPTS += -device virtio-blk-device,drive=blk0
 
 QEMUOPTS += -device virtio-gpu-device

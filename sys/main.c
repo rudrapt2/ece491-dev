@@ -108,10 +108,10 @@ void mount_cdrive(void) {
         halt_failure();
     }
 
-    result = mount_ktfs(CMNTNAME, cache);
+    result = mount_lffs(CMNTNAME, cache, storage_capacity(hd));
 
     if (result != 0) {
-        kprintf("mount_ktfs(%s, cache(%s%d)) failed: %s\n",
+        kprintf("mount_lffs(%s, cache(%s%d)) failed: %s\n",
             CMNTNAME, CDEVNAME, CDEVINST, error_name(result));
         halt_failure();
     }

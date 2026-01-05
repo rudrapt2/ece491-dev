@@ -7,7 +7,7 @@
 #ifndef _CACHE_H_
 #define _CACHE_H_
 
-#define CACHE_BLKSZ 512UL // size of cache block
+#define CACHE_BLKSZ 4096UL // size of cache block
 #define CACHE_DIRTY 1
 #define CACHE_CLEAN 0
 

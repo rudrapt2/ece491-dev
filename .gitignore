@@ -6,6 +6,7 @@
 *.raw
 util/fs/mkfs_ktfs
 util/fs/unmkfs_ktfs
+util/fs/mkfs_lffs
 .vscode
 .clang-format
 .clangd
@@ -20,6 +21,7 @@ usr/bin
 */*.raw
 */util/fs/mkfs_ktfs
 */util/fs/unmkfs_ktfs
+*/util/fs/mkfs_lffs
 */.vscode
 */.clang-format
 */.clangd

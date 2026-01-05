@@ -169,6 +169,21 @@ int test_ktfs() {
     return 0;
 }
 
+int test_lffs() {
+    char buffer[] = "Hello I like Yummy Yummy in my Tummy\n\nGoody be";
+    char * ptr = buffer;
+    char c;
+    struct uio * lffs_file;
+    open_file("c", "small", &lffs_file);
+    while (*ptr != '\0') {
+        uio_read(lffs_file, &c, 1);
+        if (*ptr != c)
+            return -1;
+        ptr++;
+    }
+    return 0;
+}
+
 void run_testsuite_1() {
     int retval = -EINVAL;
     char * test_output;
@@ -181,7 +196,11 @@ void run_testsuite_1() {
     // test_output = (retval == 0) ? "test_open_2_viohi passed!" : "test_open_2_viohi failed!"; 
     // kprintf("%s\n", test_output);
 
-    retval = test_ktfs();
-    test_output = (retval == 0) ? "test_ktfs passed!" : "test_ktfs failed!"; 
+    // retval = test_ktfs();
+    // test_output = (retval == 0) ? "test_ktfs passed!" : "test_ktfs failed!"; 
+    // kprintf("%s\n", test_output);
+
+    retval = test_lffs();
+    test_output = (retval == 0) ? "test_lffs passed!" : "test_lffs failed!"; 
     kprintf("%s\n", test_output);
 }
