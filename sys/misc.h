@@ -55,4 +55,6 @@ void trace_actual(const char * filename, int lineno, const char * fmt, ...);
 #define trace(...) do {} while(0)
 #endif
 
+extern __attribute__ ((noreturn)) void halt(void);
+
 #endif // _MISC_H_

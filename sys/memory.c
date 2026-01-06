@@ -196,8 +196,6 @@ void memory_init(void) {
 
     trace("%s()", __func__);
 
-    assert (RAM_START == _kimg_start);
-
     kprintf("           RAM: [%p,%p): %zu MB\n",
         RAM_START, RAM_END, RAM_SIZE / 1024 / 1024);
     kprintf("  Kernel image: [%p,%p)\n", _kimg_start, _kimg_end);
@@ -210,7 +208,7 @@ void memory_init(void) {
     // Initialize main page table with the following direct mapping:
     // 
     //         0 to RAM_START:           RW gigapages (MMIO region)
-    // RAM_START to _kimg_end:           RX/R/RW pages based on kernel image
+    // _kimg_start to _kimg_end:         RX/R/RW pages based on kernel image
     // _kimg_end to RAM_START+MEGA_SIZE: RW pages (heap and free page pool)
     // RAM_START+MEGA_SIZE to RAM_END:   RW megapages (free page pool)
     //

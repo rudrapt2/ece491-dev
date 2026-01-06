@@ -248,7 +248,7 @@ void running_thread_exit(void) {
     int ctid; // child TID
 
     if (TP == &main_thread)
-        halt_success();
+        halt();
     
     set_thread_state(TP, THREAD_EXITED);
 
@@ -269,7 +269,7 @@ void running_thread_exit(void) {
     // in the context of the next scheduled thread.
 
     running_thread_yield(); // should not return
-    halt_failure();
+    panic(NULL);
 }
 
 void running_thread_yield(void) {

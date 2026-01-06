@@ -18,7 +18,7 @@
 #include "riscv.h"
 #include "intr.h"
 #include "conf.h"
-#include "see.h" // for set_stcmp
+#include "sbi.h" // for sbi_set_timer
 #include "misc.h"
 
 
@@ -46,7 +46,7 @@ static struct alarm * sleep_list;
  */
 
 void timer_init(void) {
-    set_stcmp(UINT64_MAX);
+    sbi_set_timer(UINT64_MAX);
     timer_initialized = 1;
 }
 
@@ -94,7 +94,7 @@ void alarm_sleep(struct alarm * al, unsigned long long tcnt) {
         debug("[%lu] Inserting alarm %s at head of list", now, al->cond.name);
         al->next = sleep_list;
         sleep_list = al;
-        set_stcmp(al->twake);
+        sbi_set_timer(al->twake);
         csrs_sie(RISCV_SIE_STIE);
     } else {
         // Insert current alarm in list in order of wake-up time. Ideally, we
@@ -235,6 +235,6 @@ void handle_timer_interrupt(void) {
         csrc_sie(RISCV_SIE_STIE);
     } else {
         debug("[%lu] Setting next alarm for %lu ", now, head->twake);
-        set_stcmp(head->twake);
+        sbi_set_timer(head->twake);
     }
 }

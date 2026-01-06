@@ -18,6 +18,7 @@
 #include "filesys.h"
 #include "error.h"
 #include "cache.h"
+#include "misc.h" // for halt()
 
 #define INITEXE "shell"
 
@@ -72,7 +73,7 @@ void attach_devices(void) {
     if (result != 0) {
         kprintf("mount_devfs(%s) failed: %s\n",
             CDEVNAME, error_name(result));
-        halt_failure();
+        halt();
     }
 }
 
@@ -90,7 +91,7 @@ void run_init(void) {
 
     if (result != 0) {
         kprintf(INITEXE ": %s; terminating\n", error_name(result));
-        halt_failure();
+        halt();
     }
 
     // Make descriptor 0 be a null uio object, which the shell will need

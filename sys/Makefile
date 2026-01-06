@@ -11,6 +11,8 @@ OBJCOPY=$(PREFIX)objcopy
 OBJDUMP=$(PREFIX)objdump
 
 OBJS = \
+	start.o \
+	sbi.o \
 	misc.o \
 	console.o \
 	dev/uart.o \
@@ -29,8 +31,6 @@ OBJS = \
 	memory.o \
 	plic.o \
 	process.o \
-	see.o \
-	start.o \
 	string.o \
 	thrasm.o \
 	thread.o \
@@ -73,7 +73,7 @@ ASFLAGS = -march=rv64imazicsr
 LDFLAGS = -melf64lriscv
 
 QEMUOPTS = -global virtio-mmio.force-legacy=false
-QEMUOPTS += -machine virt -bios none -nographic
+QEMUOPTS += -machine virt -nographic
 
 # the first rng-random is for reading "true" randomness from /dev/urandom
 # the second one is for testing if they are correctly reading from a source
@@ -85,8 +85,8 @@ QEMUOPTS += -serial mon:stdio
 QEMUOPTS += -serial pty
 # QEMUOPTS += -serial pty
 # QEMUOPTS += -serial pty
-QEMUOPTS += -drive file=ktfs.raw,id=blk0,if=none,format=raw,readonly=false
-QEMUOPTS += -device virtio-blk-device,drive=blk0
+#QEMUOPTS += -drive file=ktfs.raw,id=blk0,if=none,format=raw,readonly=false
+#QEMUOPTS += -device virtio-blk-device,drive=blk0
 #QEMUOPTS += -device virtio-gpu-device -display gtk
 
 all: kernel.elf
