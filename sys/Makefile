@@ -39,7 +39,10 @@ OBJS = \
 	syscall.o \
 	dev/viorng.o \
 	dev/vioblk.o \
-	cache.o
+	cache.o \
+	games_src/trek.o \
+	games_src/glue.o \
+	games_src/rule30.o
 #	ktfs.o
 #   tarfs.o 
 
@@ -49,6 +52,7 @@ CFLAGS += -mcmodel=medany -fno-pie -no-pie -march=rv64imazicsr -mabi=lp64
 CFLAGS += -fno-common -nostdlib -mno-relax -ffreestanding 
 CFLAGS += -fno-asynchronous-unwind-tables -mno-riscv-attribute
 CFLAGS += -I.
+CFLAGS += -DAEE2
 
 # CFLAGS += -DDEBUG -DTRACE # Everything!
 # CFLAGS += -DMEMORY_DEBUG -DMEMORY_TRACE
@@ -73,6 +77,7 @@ ASFLAGS = -march=rv64imazicsr
 LDFLAGS = -melf64lriscv
 
 QEMUOPTS = -global virtio-mmio.force-legacy=false
+# QEMUOPTS += -machine virt,dumpdtb=qemu_dtb.dtb -nographic
 QEMUOPTS += -machine virt -nographic
 
 # the first rng-random is for reading "true" randomness from /dev/urandom
@@ -83,7 +88,7 @@ QEMUOPTS += -object rng-random,filename=/dev/urandom,id=rng0
 QEMUOPTS += -device virtio-rng-device,rng=rng0
 QEMUOPTS += -serial mon:stdio
 QEMUOPTS += -serial pty
-# QEMUOPTS += -serial pty
+QEMUOPTS += -serial pty
 # QEMUOPTS += -serial pty
 #QEMUOPTS += -drive file=ktfs.raw,id=blk0,if=none,format=raw,readonly=false
 #QEMUOPTS += -device virtio-blk-device,drive=blk0

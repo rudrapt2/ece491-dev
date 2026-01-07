@@ -162,6 +162,8 @@ int viorng_serial_open(struct serial * ser) {
     virtio_enable_virtq(vrng->regs, 0);
     enable_intr_source(vrng->irqno, VIORNG_INTR_PRIO, viorng_isr, vrng);
 
+    vrng->opened = 1;
+
     return 0;
 }
 

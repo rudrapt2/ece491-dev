@@ -162,6 +162,7 @@ void plic_init(void) {
 		plic_disable_all_sources_for_context(i);
 	
 	plic_enable_all_sources_for_context(CTX(0,1));
+	plic_set_context_threshold(1, 0);
 }
 
 extern void plic_enable_source(int srcno, int prio) {
