@@ -24,7 +24,7 @@ RULE30_OBJS = rule30.o
 all: rule30.o
 
 rule30.o: rule30.c
-	$(CC) $(CFLAGS) -o $@ -c $<
+	$(CC) $(CFLAGS) -o $@ -c $< -DAEE2
 
 %.s: %.S
 	$(CPP) $(CPPFLAGS) -o $@ -c $<

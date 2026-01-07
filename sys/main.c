@@ -42,7 +42,7 @@ static void attach_devices(void);
 // MP2 stuff
 static void run_mp2(void);
 void trek_start(struct serial* term, unsigned long rngseed);
-// void rule30_start(struct serial* term);
+void rule30_start(struct serial* term);
 
 // static void mount_cdrive(void); // mount primary storage device ("C drive")
 // static void run_init(void);
@@ -114,7 +114,7 @@ void run_init(void) {
 }
 
 void run_mp2(void) {
-    // #define MP2CP3
+    #define MP2CP3
     struct serial* trek_term;
     struct serial* seedsrc;
     unsigned long rngseed;

@@ -1,5 +1,5 @@
-char device redirected to /dev/pts/3 (label serial1)
-char device redirected to /dev/pts/14 (label serial2)
+char device redirected to /dev/pts/15 (label serial1)
+char device redirected to /dev/pts/16 (label serial2)
 
 OpenSBI v1.4
    ____                    _____ ____ _____
@@ -60,9 +60,5 @@ Boot HART PMP Address Bits: 54
 Boot HART MHPM Info       : 16 (0x0007fff8)
 Boot HART MIDELEG         : 0x0000000000001666
 Boot HART MEDELEG         : 0x0000000000f0b509
-           RAM: [0x80000000,0x80800000): 8 MB
-  Kernel image: [0x80080000,0x800a0360)
-Heap allocator: [0x800a0360,0x800a1000): 3 KB free
-Page allocator: [0x800a1000,0x80800000): 1887 pages free
 using viorng as seedsrc
 rngseed = 15524753
