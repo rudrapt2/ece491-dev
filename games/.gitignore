@@ -1,0 +1,9 @@
+.gdbhist
+.gdbinit
+*.o
+*.elf
+*/*.o
+*/*.elf
+.vscode
+games/
+doom/bin

@@ -38,9 +38,8 @@ OBJS = \
 	dev/viorng.o \
 	dev/vioblk.o \
 	cache.o \
-	games_src/trek.o \
-	games_src/glue.o \
-	games_src/rule30.o
+	games/trek_mp2.o \
+# games/rule30.o
 #	ktfs.o
 #   tarfs.o 
 
@@ -51,7 +50,6 @@ CFLAGS += -fno-common -nostdlib -mno-relax -ffreestanding
 CFLAGS += -fno-asynchronous-unwind-tables -mno-riscv-attribute
 CFLAGS += -DRAM_SIZE_MB=$(RAMSIZEMB)
 CFLAGS += -I.
-CFLAGS += -DAEE2
 
 # CFLAGS += -DDEBUG -DTRACE # Everything!
 # CFLAGS += -DMEMORY_DEBUG -DMEMORY_TRACE
