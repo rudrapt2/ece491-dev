@@ -19,7 +19,6 @@ OBJS = \
 	dev/rtc.o \
 	dev/virtio.o \
 	dev/viorng.o \
-	dev/memio.o \
 	dev/ramdisk.o \
 	device.o \
 	filesys.o \
