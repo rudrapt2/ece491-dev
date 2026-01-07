@@ -39,7 +39,9 @@ OBJS = \
 	syscall.o \
 	dev/viorng.o \
 	dev/vioblk.o \
-	cache.o
+	cache.o \
+	games_src/trek.o \
+	games_src/glue.o
 #	ktfs.o
 #   tarfs.o 
 
@@ -49,6 +51,7 @@ CFLAGS += -mcmodel=medany -fno-pie -no-pie -march=rv64imazicsr -mabi=lp64
 CFLAGS += -fno-common -nostdlib -mno-relax -ffreestanding 
 CFLAGS += -fno-asynchronous-unwind-tables -mno-riscv-attribute
 CFLAGS += -I.
+CFLAGS += -DAEE2
 
 # CFLAGS += -DDEBUG -DTRACE # Everything!
 # CFLAGS += -DMEMORY_DEBUG -DMEMORY_TRACE

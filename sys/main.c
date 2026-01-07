@@ -36,6 +36,8 @@
 #endif
 
 static void attach_devices(void);
+static void run_mp2(void);
+void trek_start(struct serial* term, unsigned long rngseed);
 
 // static void mount_cdrive(void); // mount primary storage device ("C drive")
 // static void run_init(void);
@@ -55,8 +57,9 @@ void main(void) {
 
 //    mount_cdrive();
 //    run_init();
-
+    run_mp2();
 }
+
 
 void attach_devices(void) {
     int i;
@@ -100,4 +103,41 @@ void run_init(void) {
 
     process_exec(initexe, 0, argv);
 #endif
+}
+
+void run_mp2(void) {
+    struct serial* trek_term;
+    struct serial* seedsrc;
+    unsigned long rngseed;
+    
+    trek_term = find_serial("uart", 1);
+
+    if (trek_term == NULL) {
+        kprintf("Serial device uart1 not found\n");
+        halt();
+    }
+
+    serial_open(trek_term);
+
+    // seedsrc = find_serial("viorng", 0);
+    // if (seedsrc == NULL) {
+    //     kprintf("viorng 0 is NULL");
+    // }
+
+    // if (seedsrc == NULL) {
+    //     seedsrc = find_serial("rtc0", 0);
+    // }
+
+    // if (seedsrc != NULL) {
+    //     serial_open(seedsrc);
+    //     serial_recv(seedsrc, &rngseed, sizeof(rngseed));
+    //     serial_close(seedsrc);
+    // } else {
+    //     rngseed = 0xECE391;
+    // }
+
+    rngseed = 0xECE391;
+    kprintf("rngseed = %lu\n", rngseed);
+
+    trek_start(trek_term, rngseed);
 }
