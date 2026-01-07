@@ -28,7 +28,7 @@
 #define CDEVINST 0
 
 #ifndef NUART // number of UARTs
-#define NUART 2
+#define NUART 3
 #endif
 
 #ifndef NVIODEV // number of VirtIO devices
@@ -36,8 +36,11 @@
 #endif
 
 static void attach_devices(void);
+
+// MP2 stuff
 static void run_mp2(void);
 void trek_start(struct serial* term, unsigned long rngseed);
+void rule30_start(struct serial* term);
 
 // static void mount_cdrive(void); // mount primary storage device ("C drive")
 // static void run_init(void);
@@ -106,6 +109,7 @@ void run_init(void) {
 }
 
 void run_mp2(void) {
+    #define MP2CP3
     struct serial* trek_term;
     struct serial* seedsrc;
     unsigned long rngseed;
@@ -152,6 +156,23 @@ void run_mp2(void) {
 
     rngseed = 0xECE391;
     kprintf("rngseed = %lu\n", rngseed);
+
+#ifdef MP2CP3
+
+    struct serial * rule30_term;
+
+    rule30_term = find_serial("uart", 2);
+
+    if (rule30_term == NULL) {
+        kprintf("Serial device uart2 not found\n");
+        halt();
+    }
+
+    serial_open(rule30_term);
+
+    spawn_thread("rule30", (void(*)(void))&rule30_start, rule30_term);
+
+#endif
 
     trek_start(trek_term, rngseed);
 }

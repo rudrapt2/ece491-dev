@@ -41,7 +41,8 @@ OBJS = \
 	dev/vioblk.o \
 	cache.o \
 	games_src/trek.o \
-	games_src/glue.o
+	games_src/glue.o \
+	games_src/rule30.o
 #	ktfs.o
 #   tarfs.o 
 
@@ -87,7 +88,7 @@ QEMUOPTS += -object rng-random,filename=/dev/urandom,id=rng0
 QEMUOPTS += -device virtio-rng-device,rng=rng0
 QEMUOPTS += -serial mon:stdio
 QEMUOPTS += -serial pty
-# QEMUOPTS += -serial pty
+QEMUOPTS += -serial pty
 # QEMUOPTS += -serial pty
 #QEMUOPTS += -drive file=ktfs.raw,id=blk0,if=none,format=raw,readonly=false
 #QEMUOPTS += -device virtio-blk-device,drive=blk0
