@@ -76,6 +76,7 @@ ASFLAGS = -march=rv64imazicsr
 LDFLAGS = -melf64lriscv
 
 QEMUOPTS = -global virtio-mmio.force-legacy=false
+# QEMUOPTS += -machine virt,dumpdtb=qemu_dtb.dtb -nographic
 QEMUOPTS += -machine virt -nographic
 
 # the first rng-random is for reading "true" randomness from /dev/urandom
