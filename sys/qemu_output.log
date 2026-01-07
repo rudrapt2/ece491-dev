@@ -63,6 +63,7 @@ Boot HART MEDELEG         : 0x0000000000f0b509
   Kernel image: [0x80080000,0x800a02b0)
 Heap allocator: [0x800a02b0,0x800a1000): 3 KB free
 Page allocator: [0x800a1000,0x80800000): 1887 pages free
+using viorng as seedsrc
 rngseed = 15524753
 QEMU: Terminated
 
