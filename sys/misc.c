@@ -1,8 +1,8 @@
-/*! @file misc.c
-    @brief Miscellaneous functions
-    @copyright Copyright (c) 2024-2025 University of Illinois
-
-*/
+// misc.c - Miscellaneous functions
+//
+// Copyright (c) 2024-2026 University of Illinois
+// SPDX-License-identifier: NCSA
+//
 
 #include "misc.h"
 
@@ -10,6 +10,7 @@
 #include <stddef.h>
 
 #include "console.h"
+#include "sbi.h" // for sbi_shutdown()
 #include "intr.h"
 #include "see.h"  // for halt_failure()
 
@@ -22,12 +23,12 @@ void panic_actual(const char* filename, int lineno, const char* msg) {
     else
         kprintf("PANIC at %s:%d", filename, lineno);
 
-    halt_failure();
+    halt();
 }
 
 void assert_failed(const char* filename, int lineno, const char* stmt) {
     kprintf("ASSERT FAILED at %s:%d (%s)\n", filename, lineno, stmt);
-    halt_failure();
+    halt();
 }
 
 void debug_actual(const char* filename, int lineno, const char* fmt, ...) {
@@ -58,4 +59,8 @@ void trace_actual(const char* filename, int lineno, const char* fmt, ...) {
 
     restore_interrupts(pie);
     va_end(ap);
+}
+
+void halt(void) {
+    sbi_shutdown();
 }

@@ -13,20 +13,14 @@ OBJDUMP=$(PREFIX)objdump
 RAMSIZEMB=8
 
 OBJS = \
-	elf.o \
-	see.o \
-	uio.o \
+	start.o \
+	sbi.o \
 	misc.o \
 	ktfs.o \
 	intr.o \
 	excp.o \
 	plic.o \
-	trap.o \
-	start.o \
-	heap0.o \
-	error.o \
-	timer.o \
-	cache.o \
+	process.o \
 	string.o \
 	thrasm.o \
 	thread.o \
@@ -43,10 +37,12 @@ OBJS = \
 	dev/viorng.o \
 	dev/viorng.o \
 	dev/vioblk.o \
-	dev/viogpu.o \
-	dev/ramdisk.o \
-	cache.o
-
+	cache.o \
+	games_src/trek.o \
+	games_src/glue.o \
+	games_src/rule30.o
+#	ktfs.o
+#   tarfs.o 
 
 CFLAGS = -Wall -Werror=implicit-function-declaration
 CFLAGS += -fno-omit-frame-pointer -ggdb3 -gdwarf-2
@@ -55,6 +51,7 @@ CFLAGS += -fno-common -nostdlib -mno-relax -ffreestanding
 CFLAGS += -fno-asynchronous-unwind-tables -mno-riscv-attribute
 CFLAGS += -DRAM_SIZE_MB=$(RAMSIZEMB)
 CFLAGS += -I.
+CFLAGS += -DAEE2
 
 # CFLAGS += -DDEBUG -DTRACE # Everything!
 # CFLAGS += -DMEMORY_DEBUG -DMEMORY_TRACE
@@ -76,27 +73,21 @@ ASFLAGS = -march=rv64imazicsr
 LDFLAGS = -melf64lriscv
 
 QEMUOPTS = -global virtio-mmio.force-legacy=false
-QEMUOPTS += -machine virt -bios none -nographic
+# QEMUOPTS += -machine virt,dumpdtb=qemu_dtb.dtb -nographic
+QEMUOPTS += -machine virt -nographic
 
-QEMUOPTS += -serial mon:stdio
-QEMUOPTS += -serial pty
-QEMUOPTS += -monitor pty
-# Add more UARTs
-
+# the first rng-random is for reading "true" randomness from /dev/urandom
+# the second one is for testing if they are correctly reading from a source
+# of randomness with the entropy device
 QEMUOPTS += -object rng-random,filename=/dev/urandom,id=rng0
 QEMUOPTS += -device virtio-rng-device,rng=rng0
-# Add more RNG devices
-
-QEMUOPTS += -drive file=ktfs.raw,id=blk0,if=none,format=raw,readonly=false
-QEMUOPTS += -device virtio-blk-device,drive=blk0
-
-QEMUOPTS += -device virtio-gpu-device
-# QEMUOPTS += -display cocoa # For macOS
-QEMUOPTS += -display gtk # For Linux
-
-QEMUOPTS += -device virtio-keyboard-device -device virtio-tablet-device
-
-###########################################################################
+QEMUOPTS += -serial mon:stdio
+QEMUOPTS += -serial pty
+QEMUOPTS += -serial pty
+# QEMUOPTS += -serial pty
+#QEMUOPTS += -drive file=ktfs.raw,id=blk0,if=none,format=raw,readonly=false
+#QEMUOPTS += -device virtio-blk-device,drive=blk0
+#QEMUOPTS += -device virtio-gpu-device -display gtk
 
 all: kernel.elf
 
