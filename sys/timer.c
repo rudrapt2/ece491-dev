@@ -59,13 +59,17 @@ static void sleep_list_insert(struct alarm * al);
 //
 
 void timer_init(void) {
+    unsigned long long tcnt;
     sbi_set_timer(UINT64_MAX);
     timer_initialized = 1;
 
     alarm_init(&preempt_alarm, "preempt");
 
-    // Doesn't block for special preempt alarm
-    alarm_sleep_ms(&preempt_alarm, PREEMPT_FREQ);
+    tcnt = PREEMPT_FREQ * (TIMER_FREQ / 1000UL);
+    preempt_alarm.twake += tcnt;
+
+    sleep_list_insert(&preempt_alarm);
+    csrs_sie(RISCV_SIE_STIE);
 
 }
 
