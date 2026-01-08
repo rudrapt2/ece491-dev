@@ -1,12 +1,13 @@
-/*! @file console.c
-    @brief Console i/o
-    @copyright Copyright (c) 2024-2025 University of Illinois
-
-*/
+// console.c - Console I/O
+//
+// Copyright (c) 2024-2025 University of Illinois
+// SPDX-License-identifier: NCSA
+//
 
 #include "console.h"
 #include "intr.h"
 #include "misc.h"
+#include "sbi.h"
 
 #include <stdarg.h>
 #include <stdint.h>
@@ -17,6 +18,14 @@
 // 
 
 static void vprintf_putc(char c, void * aux);
+
+// The following functions are called to initialize the console device (if any)
+// and perform putchar/getchar I/O. They are declared weak so that they may be
+// overridden elsewhere.
+
+extern void console_device_init(void) __attribute__ ((weak));
+extern void console_putchar(char c) __attribute__ ((weak));
+extern char console_getchar(void) __attribute__ ((weak));
 
 // EXPORTED GLOBAL VARIABLES
 //
@@ -36,15 +45,15 @@ void kputc(char c) {
 
     switch (c) {
     case '\r':
-        console_device_putc(c);
-        console_device_putc('\n');
+        console_putchar(c);
+        console_putchar('\n');
         break;
     case '\n':
         if (cprev != '\r')
-            console_device_putc('\r');
+            console_putchar('\r');
         // nobreak
     default:
-        console_device_putc(c);
+        console_putchar(c);
         break;
     }
 
@@ -58,7 +67,7 @@ char kgetc(void) {
     // Convert \r followed by any number of \n to just \n
 
     do {
-        c = console_device_getc();
+        c = console_getchar();
     } while (c == '\n' && cprev == '\r');
   
     cprev = c;
@@ -143,23 +152,17 @@ void vprintf_putc(char c, void * __attribute__ ((unused)) aux) {
 // DEFAULT CONSOLE FUNCTION DEFINITIONS
 //
 
-// The following functions provide default weak-linked console _putc_ and _getc_
-// operations: _putc_ discards all characters and _getc_ panics if called. For a
-// working console, these should be defined elsewhere. There is an NS8250/16550
-// implementation in dev/uart.c; link with dev/uart.o to get a working console.
-
-extern void console_device_init(void) __attribute__ ((weak));
-extern void console_device_putc(char c) __attribute__ ((weak));
-extern char console_device_getc(void) __attribute__ ((weak));
+// The default implementation of console getchar and putchar use SBI. The
+// functions above may be re-defined elsewhere to provide alternatives.
 
 void console_device_init(void) {
     // nothing
 }
 
-void console_device_putc(char c __attribute__ ((unused))) {
-    // nothing
+void console_putchar(char c) {
+    sbi_console_putchar(c);
 }
 
-char console_device_getc(void) {
-    panic("no getc");
+char console_getchar(void) {
+    return sbi_console_getchar();
 }

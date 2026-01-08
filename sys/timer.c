@@ -13,15 +13,16 @@
 #endif
 
 #include "timer.h"
+#include "thread.h"
+#include "riscv.h"
+#include "intr.h"
+#include "conf.h"
+#include "sbi.h" // for sbi_set_timer
+#include "misc.h"
+
 
 #include <stddef.h>
 
-#include "conf.h"
-#include "intr.h"
-#include "misc.h"
-#include "riscv.h"
-#include "see.h"   // set_stcmp()
-#include "thread.h"
 
 // COMPILE-TIME PARAMETERS
 //
@@ -57,14 +58,15 @@ static void sleep_list_insert(struct alarm * al);
 // EXPORTED FUNCTION DEFINITIONS
 //
 
-void timer_init(void){
-    set_stcmp(UINT64_MAX);
+void timer_init(void) {
+    sbi_set_timer(UINT64_MAX);
     timer_initialized = 1;
 
     alarm_init(&preempt_alarm, "preempt");
 
     // Doesn't block for special preempt alarm
     alarm_sleep_ms(&preempt_alarm, PREEMPT_FREQ);
+
 }
 
 void alarm_init(struct alarm * al, const char * name){
@@ -187,7 +189,7 @@ void handle_timer_interrupt(void){
     // will always be present in /sleep_list/.
 
     debug("[%lu] Setting next alarm for %lu", now, head->twake);
-    set_stcmp(head->twake);
+    sbi_set_timer(head->twake);
 }
 
 // INTERNAL FUNCTION DEFINITIONS
@@ -206,7 +208,7 @@ static void sleep_list_insert(struct alarm * al){
         al->next = sleep_list;
         sleep_list = al;
 
-        set_stcmp(al->twake);
+        sbi_set_timer(al->twake);
         csrs_sie(RISCV_SIE_STIE);
         return;
     }

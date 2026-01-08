@@ -163,6 +163,7 @@ int viorng_serial_open(struct serial * ser) {
     enable_intr_source(vrng->irqno, VIORNG_INTR_PRIO, viorng_isr, vrng);
 
     vrng->opened = 1;
+
     return 0;
 }
 

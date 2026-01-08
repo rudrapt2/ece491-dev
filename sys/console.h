@@ -28,11 +28,4 @@ extern void kprintf(const char * fmt, ...);
 
 extern void kvprintf(const char * fmt, va_list ap);
 
-// The following must be defined elsewhere, to be used for console I/O.
-// Currently, they are provided in uart.c using the NS8250 UART.
-
-extern void console_device_init(void);
-extern void console_device_putc(char c);
-extern char console_device_getc(void);
-
 #endif // _CONSOLE_H_
