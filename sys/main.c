@@ -55,6 +55,7 @@ void main(void) {
     memory_init();
     procmgr_init();
     fsmgr_init();
+    timer_init();
 
     attach_devices();
 
