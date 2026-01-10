@@ -1,9 +1,8 @@
-/*! @file memory.c
-    @brief Physical and virtual memory manager
-    @copyright Copyright (c) 2024-2025 University of Illinois
-    @license SPDX-License-identifier: NCSA
-
-*/
+// memory.c - Physical and virtual memory manager
+//
+// Copyright (c) 2024-2026 University of Illinois
+// SPDX-License-identifier: NCSA
+//
 
 #ifdef MEMORY_TRACE
 #define TRACE
@@ -77,19 +76,11 @@ char memory_initialized = 0;
 // are in a single large chunk. To allocate a block of pages, we break up the
 // smallest chunk on the list.
 
-/**
- * @brief Section of consecutive physical pages. We keep free physical pages in a
- * linked list of chunks. Initially, all free pages are in a single large chunk. To
- * allocate a block of pages, we break up the smallest chunk in the list
- */
 struct page_chunk {
-    struct page_chunk *next;  ///< Next page in list
-    unsigned long pagecnt;    ///< Number of pages in chunk
+    struct page_chunk * next;   // next page chunk in list
+    unsigned long pagecnt;      // number of pages in chunk
 };
 
-/**
- * @brief RISC-V PTE. RTDC (RISC-V docs) for what each of these fields means!
- */
 struct pte {
     uint64_t flags : 8;
     uint64_t rsw : 2;
@@ -116,41 +107,40 @@ struct pte {
 
 #define PT_INDEX(lvl, vpn) \
     (((vpn) & (0x1FF << (lvl * (PAGE_ORDER - PTE_ORDER)))) >> (lvl * (PAGE_ORDER - PTE_ORDER)))
+
 // INTERNAL FUNCTION DECLARATIONS
 //
 
-static void ptab_reset(struct pte *ptab  // page table to reset
+static void ptab_reset(struct pte * ptab);
+
+static struct pte * ptab_clone (struct pte * ptab);
+
+static void ptab_discard(struct pte * ptab  // page table to discard
 );
 
-static struct pte *ptab_clone(struct pte *ptab  // page table to clone
-);
-
-static void ptab_discard(struct pte *ptab  // page table to discard
-);
-
-static void ptab_insert(struct pte *ptab,   // page table to modify
+static void ptab_insert(struct pte * ptab,   // page table to modify
                         unsigned long vpn,  // virtual page number to insert
-                        void *pp,           // pointer to physical page to insert
+                        void * pp,           // pointer to physical page to insert
                         int rwxug_flags     // flags for inserted mapping
 );
 
-static void *ptab_remove(struct pte *ptab, unsigned long vpn);
+static void * ptab_remove(struct pte * ptab, unsigned long vpn);
 
-static void ptab_adjust(struct pte *ptab, unsigned long vpn, int rwxug_flags);
+static void ptab_adjust(struct pte * ptab, unsigned long vpn, int rwxug_flags);
 
-struct pte *ptab_fetch(struct pte *ptab, unsigned long vpn);
+struct pte * ptab_fetch(struct pte * ptab, unsigned long vpn);
 
 static inline mtag_t active_space_mtag(void);
-static inline mtag_t ptab_to_mtag(struct pte *root, unsigned int asid);
-static inline struct pte *mtag_to_ptab(mtag_t mtag);
-static inline struct pte *active_space_ptab(void);
+static inline mtag_t ptab_to_mtag(struct pte * root, unsigned int asid);
+static inline struct pte * mtag_to_ptab(mtag_t mtag);
+static inline struct pte * active_space_ptab(void);
 
-static inline void *pageptr(uintptr_t n);
-static inline uintptr_t pagenum(const void *p);
+static inline void * pageptr(uintptr_t n);
+static inline uintptr_t pagenum(const void * p);
 static inline int wellformed(uintptr_t vma);
 
-static inline struct pte leaf_pte(const void *pp, uint_fast8_t rwxug_flags);
-static inline struct pte ptab_pte(const struct pte *pt, uint_fast8_t g_flag);
+static inline struct pte leaf_pte(const void * pp, uint_fast8_t rwxug_flags);
+static inline struct pte ptab_pte(const struct pte * pt, uint_fast8_t g_flag);
 static inline struct pte null_pte(void);
 
 // INTERNAL GLOBAL VARIABLES
@@ -166,23 +156,23 @@ static struct pte main_pt1_0x80000[PTE_CNT]
 static struct pte main_pt0_0x80000[PTE_CNT]
     __attribute__((section(".bss.pagetable"), aligned(4096)));
 
-static struct page_chunk *free_chunk_list;
+static struct page_chunk * free_chunk_list;
 
 // EXPORTED FUNCTION DECLARATIONS
 //
 
 void memory_init(void) {
-    const void *const text_start = _kimg_text_start;
-    const void *const text_end = _kimg_text_end;
-    const void *const rodata_start = _kimg_rodata_start;
-    const void *const rodata_end = _kimg_rodata_end;
-    const void *const data_start = _kimg_data_start;
+    const void * const text_start = _kimg_text_start;
+    const void * const text_end = _kimg_text_end;
+    const void * const rodata_start = _kimg_rodata_start;
+    const void * const rodata_end = _kimg_rodata_end;
+    const void * const data_start = _kimg_data_start;
 
-    void *heap_start;
-    void *heap_end;
+    void * heap_start;
+    void * heap_end;
 
     uintptr_t pma;
-    const void *pp;
+    const void * pp;
 
     trace("%s()", __func__);
 
@@ -206,7 +196,7 @@ void memory_init(void) {
 
     // Identity mapping of MMIO region as two gigapage mappings
     for (pma = 0; pma < RAM_START_PMA; pma += GIGA_SIZE)
-        main_pt2[VPN2(pma)] = leaf_pte((void *)pma, PTE_R | PTE_W | PTE_G);
+        main_pt2[VPN2(pma)] = leaf_pte((void * )pma, PTE_R | PTE_W | PTE_G);
 
     // Third gigarange has a second-level subtable
     main_pt2[VPN2(RAM_START_PMA)] = ptab_pte(main_pt1_0x80000, PTE_G);
@@ -244,7 +234,7 @@ void memory_init(void) {
     // HEAP_INIT_MIN bytes.
 
     heap_start = _kimg_end;
-    heap_end = (void *)ROUND_UP((uintptr_t)heap_start, PAGE_SIZE);
+    heap_end = (void * )ROUND_UP((uintptr_t)heap_start, PAGE_SIZE);
 
     if (heap_end - heap_start < HEAP_INIT_MIN) {
         heap_end += ROUND_UP(HEAP_INIT_MIN - (heap_end - heap_start), PAGE_SIZE);
@@ -448,7 +438,7 @@ void free_phys_page(void * pp) {
 
 void * alloc_phys_pages(unsigned int cnt) {
     struct page_chunk * best = NULL;
-    struct page_chunk ** chunkptr;
+    struct page_chunk * * chunkptr;
     struct page_chunk * chunk;
 
     // Find smallest chunk that fits request. We maintain a pointer to the
@@ -458,12 +448,12 @@ void * alloc_phys_pages(unsigned int cnt) {
    
     chunkptr = &free_chunk_list;
 
-    while ((chunk = *chunkptr) != NULL) {
+    while ((chunk = * chunkptr) != NULL) {
         if (cnt <= chunk->pagecnt) {
             if (cnt == chunk->pagecnt) {
                 // We found a chunk of the exact size we need. Remove it from
                 // the list and return it.
-                *chunkptr = chunk->next;
+                * chunkptr = chunk->next;
                 return (void*)chunk;
             }
 
@@ -509,6 +499,10 @@ unsigned long free_phys_page_count(void) {
     return cnt;
 }
 
+int handle_smode_page_fault(struct trap_frame * tfr, uintptr_t vma) {
+    // ...
+}
+
 int handle_umode_page_fault(struct trap_frame * tfr, uintptr_t vma) {
     struct pte * pte;
     void * pp;
@@ -523,21 +517,12 @@ int handle_umode_page_fault(struct trap_frame * tfr, uintptr_t vma) {
         }
     }
 
-    return 0; // no handled
+    return 0; // not handled
 }
 
 // INTERNAL FUNCTION DEFINITIONS
 //
 
-/**
- * @brief Recursive helper function for ptab_reset()
- * @details Iterates over all PTEs in page table, freeing physical pages if page table is
- * base level, otherwise walking down page table until base level is reached. Should _not_
- * free globally mapped pages
- * @param lvl Level of passed page table (2-0, 2 is root)
- * @param pt Pointer to page table to reset
- * @return 1 if page table was successfully freed, 0 if some mappings remain
- */
 int _ptab_reset(unsigned int lvl, struct pte * pt) {
     int empty = 1; // subtable contains a mapping
     unsigned int i;
@@ -571,25 +556,10 @@ int _ptab_reset(unsigned int lvl, struct pte * pt) {
     return empty;
 }
 
-/**
- * @brief Unmaps and frees all non-global pages from a root-level page table.
- * Used for resetting an address space
- * @param ptab Pointer to page table to reset
- */
 void ptab_reset(struct pte * ptab) {
     _ptab_reset(ROOT_LEVEL, ptab);
 }
 
-/**
- * @brief Recursive helper function for ptab_clone()
- * @details Iterates over all PTEs in src; allocating new memory, copying pages from src,
- * and adding new pages with proper flags to dst. Should walk down page table, copying mappings,
- * until base level is reached and physical pages have been copied.
- * @param lvl Level of passed page table (2-0, 2 is root)
- * @param dst Page table to copy cloned mappings into
- * @param src Page table to copy mappings from
- * @return None
- */
 void _ptab_clone(unsigned int lvl, struct pte * dst, struct pte * src) {
     unsigned int i;
     void * pp;
@@ -611,13 +581,6 @@ void _ptab_clone(unsigned int lvl, struct pte * dst, struct pte * src) {
     }
 }
 
-
-/**
- * @brief Creates a copy of a root level page table containing shallow copies of
- * global PTEs and deep copies of non-global PTEs. Used for cloning an address space
- * @param ptab Page table to copy
- * @return Pointer to root-level page table of cloned address space
- */
 struct pte * ptab_clone(struct pte * ptab) {
     struct pte * clone;
 
@@ -627,28 +590,11 @@ struct pte * ptab_clone(struct pte * ptab) {
     return clone;
 }
 
-/**
- * @brief Resets and frees the passed root-level page table
- * @param ptab Page table to free
- * @return None
- */
 void ptab_discard(struct pte * ptab) {
     _ptab_reset(ROOT_LEVEL, ptab);
     free_phys_page(ptab);
 }
 
-/**
- * @brief Recursive helper function for ptab_insert()
- * @details Walks down page tables, finding the proper location to insert physical
- * page based on passed vpn. If any page tables are not mapped along walk, allocates
- * new page tables.
- * @param lvl Level of passed page table (2-0, 2 is root)
- * @param pt Current page table in walk
- * @param vpn Virtual page number to insert
- * @param pp Pointer to physical page to insert
- * @param rwxug_flags Flags for inserted mapping
- * @return None
- */
 void _ptab_insert (
     unsigned int lvl,
     struct pte * pt,
@@ -680,14 +626,6 @@ void _ptab_insert (
     }
 }
 
-/**
- * @brief Inserts new mapping into root-level page table. Used for mapping pages
- * @param ptab Page table to modify
- * @param vpn Virtual page number to insert
- * @param pp Pointer to physical page to insert
- * @param rwxug_flags Flags for inserted mapping
- * @return None
- */
 void ptab_insert (
     struct pte * ptab,
     unsigned long vpn,
@@ -697,17 +635,6 @@ void ptab_insert (
     _ptab_insert(ROOT_LEVEL, ptab, vpn, pp, rwxug_flags);
 }
 
-/**
- * @brief Recursive helper function for ptab_adjust()
- * @details Walks down page tables searching for mapping corresponding
- * to passed virtual page number, modifying flags on mapping. If global flag on
- * mapping is modified, should also change global flag on upper-level mappings
- * @param lvl Level of passed page table (2-0, 2 is root)
- * @param ptab Page table currently being searched
- * @param vpn Virtual page number to modify
- * @param rwxug_flags Flags for modified mapping
- * @return Global flag of modified page table entry
- */
 int _ptab_adjust (
     unsigned int lvl,
     struct pte * pt,
@@ -736,23 +663,10 @@ int _ptab_adjust (
     return pt[i].flags & PTE_G;
 }
 
-/**
- * @brief Modifies flags at provided virtual address to match passed flags
- * @param ptab Root-level page table to begin search for vpn
- * @param vpn Virtual page number to modify
- * @param rwxug_flags Flags for modified mapping
- * @return None
- */
 void ptab_adjust(struct pte * ptab, unsigned long vpn, int rwxug_flags) {
     _ptab_adjust(ROOT_LEVEL, ptab, vpn, rwxug_flags);
 }
 
-/**
- * @brief Removes mapping corresponding to passed virtual page number from page table
- * @param ptab Root-level page table to begin search for vpn
- * @param vpn Virtual page number to remove mapping for
- * @return Pointer to physical page of removed mapping if mapping is found, NULL otherwise
- */
 void * ptab_remove(struct pte * ptab, unsigned long vpn) {
     struct pte * pte;
     void * pp;
@@ -761,22 +675,12 @@ void * ptab_remove(struct pte * ptab, unsigned long vpn) {
 
     if (pte != NULL && PTE_VALID(*pte)) {
         pp = pageptr(pte->ppn);
-        *pte = null_pte();
+        * pte = null_pte();
         return pp;
     } else
         return NULL;
 }
 
-/**
- * @brief Recursive helper function for ptab_fetch()
- * @details Should walk down page tables until base level is reached or unmapped
- * memory is encountered
- * @param lvl Level of passed page table (2-0, 2 is root)
- * @param pt Page table currently being searched
- * @param vpn Virtual page number to search for
- * @return Pointer to page table entry matching passed virtual page number, 
- * NULL if virtual page number is unmapped. 
- */
 struct pte * _ptab_fetch(int lvl, struct pte * pt, unsigned long vpn) {
     unsigned int const i = PT_INDEX(lvl, vpn); // vpn >> (lvl*(PAGE_ORDER - PTE_ORDER));
 
@@ -788,32 +692,14 @@ struct pte * _ptab_fetch(int lvl, struct pte * pt, unsigned long vpn) {
         return NULL;
 }
 
-/**
- * @brief Searches page table for entry matching passed virtual page number
- * @param ptab Root-level page table for beginning search
- * @param vpn Virtual page number to search for
- * @return Pointer to page table entry matching passed virtual page number, 
- * NULL if virtual page number is unmapped. 
- * @todo 2 should be ROOT_LEVEL for consistency with above code
- */
 struct pte * ptab_fetch(struct pte * ptab, unsigned long vpn) {
     return _ptab_fetch(2, ptab, vpn);
 }
 
-/**
- * @brief Reads satp to retrieve tag for active memory space
- * @return Tag for active memory space
- */
 mtag_t active_space_mtag(void) {
     return csrr_satp();
 }
 
-/**
- * @brief Constructs tag from page table address and address space identifier
- * @param ptab Pointer to page table to use in tag
- * @param asid Address space identifier to use in tag
- * @return Memory tag formed from paging mode, page table address, and ASID
- */
 static inline mtag_t ptab_to_mtag(struct pte * ptab, unsigned int asid) {
     return (
         ((unsigned long)PAGING_MODE << RISCV_SATP_MODE_shift) |
@@ -821,59 +707,28 @@ static inline mtag_t ptab_to_mtag(struct pte * ptab, unsigned int asid) {
         pagenum(ptab) << RISCV_SATP_PPN_shift);
 }
 
-/**
- * @brief Retrives a page table address from a tag
- * @param mtag Tag to extract page table address from
- * @return Pointer to page table retrieved from tag
- */
 static inline struct pte * mtag_to_ptab(mtag_t mtag) {
-    return (struct pte *)((mtag << 20) >> 8);
+    return (struct pte * )((mtag << 20) >> 8);
 }
 
-/**
- * @brief Returns the address of the page table corresponding to the active memory space
- * @return Pointer to page table extracted from active memory space tag
- */
 static inline struct pte * active_space_ptab(void) {
     return mtag_to_ptab(active_space_mtag());
 }
 
-/**
- * @brief Constructs a physical pointer from a physical page number
- * @param n Physical page number to derive physical pointer from
- * @return Pointer to memory corresponding to physical page
- */
 static inline void * pageptr(uintptr_t n) {
     return (void*)(n << PAGE_ORDER);
 }
 
-/**
- * @brief Constructs a physical page number from a pointer
- * @param p Pointer to derive physical page number from
- * @return Physical page number corresponding to pointer
- */
 static inline unsigned long pagenum(const void * p) {
     return (unsigned long)p >> PAGE_ORDER;
 }
 
-/**
- * @brief Checks if bits 63:38 of passed virtual memory address are all 1 or all 0
- * @param vma Virtual memory address to check well-formedness of
- * @return 1 if pointer is well-formed, 0 otherwise
- */
 static inline int wellformed(uintptr_t vma) {
     // Address bits 63:38 must be all 0 or all 1
     uintptr_t const bits = (intptr_t)vma >> 38;
     return (!bits || !(bits+1));
 }
 
-/**
- * @brief Constructs a page table entry corresponding to a leaf
- * @details For our purposes, a leaf PTE has the A, D, and V flags set
- * @param pp Physical address to set physical page number of PTE from
- * @param rwxug_flags Flags to set on PTE
- * @return PTE initialized with proper flags and PPN
- */
 static inline struct pte leaf_pte(const void * pp, uint_fast8_t rwxug_flags) {
     return (struct pte) {
         .flags = rwxug_flags | PTE_A | PTE_D | PTE_V,
@@ -881,12 +736,6 @@ static inline struct pte leaf_pte(const void * pp, uint_fast8_t rwxug_flags) {
     };
 }
 
-/**
- * @brief Constructs a page table entry corresponding to a page table
- * @param pt Physical address to set physical page number of PTE from
- * @param g_flag Flags to set on PTE (should either be G flag or nothing)
- * @return PTE initialized with proper flags and PPN
- */
 static inline struct pte ptab_pte(const struct pte * pt, uint_fast8_t g_flag) {
     return (struct pte) {
         .flags = g_flag | PTE_V,
@@ -894,10 +743,6 @@ static inline struct pte ptab_pte(const struct pte * pt, uint_fast8_t g_flag) {
     };
 }
 
-/**
- * @brief Returns an empty pte
- * @return An empty pte
- */
 static inline struct pte null_pte(void) {
     return (struct pte) { };
 }

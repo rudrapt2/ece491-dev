@@ -25,8 +25,12 @@ extern void thrmgr_init(void);
 // is the distinguished thread /main/ with TID 0. Additional threads may be
 // created using spawn_thread().
 //
-// * This function must be called once at system initialization time.
-// 
+// On return thrmgr_init() guarantees:
+// - /thrmgr_initialized/ is set to 1.
+//
+// * This function must be called once at system initialization time before any
+//   other functions declared in thread.h.
+//
 // See spawn_thread().
 
 
@@ -226,20 +230,22 @@ extern void thread_attach_process(int tid, struct process * proc);
 
 extern const char * thread_name(int tid);
 
-// Returns the name of thread /tid/. For spawned threads, this is pointer that
-// was passed as the /name/ argument to spawn_thread() if /name/ was not NULL.
-// If spawn_thread() was called with a NULL /name/ argument, the returned name
-// is an implementation-defined null-terminated string.
+// Returns the name of a thread. The /tid/ argument gives the TID of the thread
+// whose name is returned. If spawn_thread() was called with a non-NULL /name/
+// argument, then the same pointer is returned by thread_name(). Otherwise, if
+// spawn_thread() was called with a NULL /name/ argument, thread_name() returns
+// the implementation-defined name assigned to the thread. In all cases, the
+// returned value is a pointer to a null-terminated string.
 //
 // On entry thread_name() assumes:
 // - /tid/ is a thread id of an existing thread.
 //
 // On return thread_name() guarantees:
-// - If thread /tid/ was created using spawn_thread(), the value is the same as
-//   the /name/ argument passed to spawn_thread() when /tid/ was created, which
-//   may be NULL.
-// - If thread /tid/ refers to either the main or the idle thread, the return
-//   value is a pointer to a null-terminated string.
+// - If the thread associated with /tid/ was created using spawn_thread() with a
+//   non-NULL /name/ argument, the value returned is /name/.
+// - If the thread associated with /tid/ was created using spawn_thread() with a
+//   NULL /name/ argument, the value returned is a pointer to an
+//   imlementation-defined null-terminated string.
 //
 // See also spawn_thread(), running_thread_name().
 
@@ -287,7 +293,7 @@ extern void * running_thread_stack_anchor(void);
 // variables.
 
 // The /thread_list/ structure is used internally by the thread manager and must
-// not be accessed outside thread.c. (Inside thread.c use only the provided
+// not be accessed outside thread.c. (Inside thread.c, use only the provided
 // tl-prefixed functions.) It is included here because it is required for the
 // definition of the condition structure below.
 
@@ -312,11 +318,13 @@ struct condition {
 extern void condition_init(struct condition * cond, const char * name);
 
 // Initializes a condition variable. The /cond/ argument must point to a region
-// of memory large enough to hold an instance of `struct condition`. (This
-// function does _not_ allocate space for this structure.) The /name/ argument
-// must be a pointer to a null-terminated string or NULL, which will serve as
-// the name of the condition variable for diagnostics and debugging. The value
-// of the /name/ argument be be retrived later using condition_name().
+// of memory large enough to hold an instance of a /condition/ structure. This
+// function does _not_ allocate space for this structure.
+//
+// The /name/ argument must be a pointer to a null-terminated string or NULL,
+// which will serve as the name of the condition variable. If /name/ is NULL,
+// the condition variable is given an implementation-defined name. The value of
+// the /name/ argument may be retrived later using condition_name().
 //
 // The condition variable is initialized to a state with no threads waiting for
 // the condition.
@@ -326,9 +334,16 @@ extern void condition_init(struct condition * cond, const char * name);
 // condition` variable is equivalent to calling condition_init() with a NULL
 // /name/ argument.
 //
+// When a condition variable is no longer needed, the memory associated with the
+// /condition/ structure may be reclaimed. After that point, a pointer to this
+// structure is no longer considered to be a valid condition variable and must
+// not be used. It is safe, however, to initialize and use a stack-allocated
+// /condition/ structure, provided that the condition variable is only used
+// during the lifetime of the structure.
+//
 // On entry condition_init() assumes:
-// - /cond/ is a pointer to a region of memory large enough to hold an
-//   instance of `struct condition`.
+// - /cond/ is a pointer to a region of memory large enough to hold an instance
+//   of a /condition/ structure.
 // - /name/ is a pointer to a null-terminated string or NULL.
 //
 // On return condition_init() guarantees:
@@ -342,6 +357,29 @@ extern void condition_init(struct condition * cond, const char * name);
 
 
 static inline const char * condition_name(const struct condition * cond);
+
+// Returns the name of a condition variable. The /cond/ argument must be a
+// properly initialized condition variable. If condition_init() was called with
+// a non-NULL /name/ argument, then the same pointer is returned by
+// condition_name(). Otherwise, if condition_init() was called with a NULL
+// /name/ argument, condition_name() returns the implementation-defined name
+// assigned to the condition variable. In all cases, the returned value is a
+// pointer to a null-terminated string.
+//
+// On entry condition_name() assumes:
+// - /cond/ is a pointer to properly initialized condition structure (either
+//   zero-initialized or initialized using condition_init()).
+//
+// On return condition_name() guarantees:
+// - The return value is a pointer to a null-terminated string.
+// - If the condition variable /cond/ was initialized with a non-NULL /name/
+//   argument, the value returned is /name/.
+// - If the condition variable /cond/ was initialized with a NULL /name/
+//   argument, the value returned is a pointer to an imlementation-defined
+//   null-terminated string.
+//
+// See also condition_init().
+
 
 // Returns the name of a condition variable. The return value is the /name/
 // argument passed to condition_init() when condition /cond/ was initialized.
@@ -373,6 +411,9 @@ extern void condition_wait(struct condition * cond);
 //
 // Performance guarantees:
 // - The number of threads waiting on a condition variable is unlimited.
+// - The calling thread becomes RUNNABLE after the next call to
+//   condition_broadcast(), necessarily made in another thread or in an ISR,
+//   returns.
 //
 // While a call to condition_broadcast() is guaranteed to wake up all waiting
 // threads, there are _no_ guarantees about the order in which such threads will
@@ -382,8 +423,8 @@ extern void condition_wait(struct condition * cond);
 // particular condition, in the broad sense of the word, holds when
 // condition_wait() returns.
 //
-// This function may switch to another thread context.
-// This function may _not_ be called from an ISR.
+// This function may switch to another thread context. This function may _not_
+// be called from an ISR.
 //
 // See also: condition_init(), condition_broadcast().
 
@@ -400,7 +441,7 @@ extern void condition_broadcast(struct condition * cond);
 //
 // On return condition_wait() guarantees:
 // - All threads that were waiting on the condition associated with /cond/ on
-//   entry are woken up.
+//   entry are now RUNNABLE.
 // - No threads are considered to be waiting on the condition variable.
 //
 // Note that there are _no_ guarantees about the order in which woken threads
@@ -450,6 +491,12 @@ extern void rwlock_init(struct rwlock * rwlk);
 // Initializes a readers-writer (shared-exclusive) lock in the _unlocked_ state.
 // Any thread may acquire it shared (as a reader) or exclusively (as a writer).
 //
+// When a readers-writer lock is no longer needed, the memory associated with
+// the /rwlock/ structure may be reclaimed. After that point, a pointer to this
+// structure is no longer considered to be a valid lock and must not be used. It
+// is safe, however, to initialize and use a stack-allocated /rwlock/ structure,
+// provided that the lock is only used during the lifetime of the structure.
+//
 // On entry rwlock_init() assumes:
 // - /rwlk/ is a valid pointer to a region of memory large enough to hold an
 //   instance of `struct rwlock`.
@@ -491,6 +538,9 @@ extern void rwlock_acquire_shared(struct rwlock * rwlk);
 // - The number of threads waiting to acquire a shared lock is unlimited.
 // - If the lock is not currently held exclusively, rwlock_acquire_shared()
 //   returns immediately without a context switch.
+// - The calling thread becomes RUNNABLE after the next call to
+//   rwlock_release_exclusive(), necessarily made in another thread, returns
+//   without the lock being held exclusively by another thread.
 //
 // This function may switch to another thread context.
 //

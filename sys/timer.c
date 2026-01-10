@@ -39,6 +39,8 @@ char timer_initialized = 0;
 // INTERNAL GLOBAL VARIABLES
 //
 
+static unsigned int timer_freq;
+
 // Alarm used to periodically trigger preemption. This alarm is inserted into
 // the same pending-alarm list as user alarms, but alarm_sleep() should
 // never be called on the preempt_alarm.
@@ -58,7 +60,7 @@ static void sleep_list_insert(struct alarm * al);
 // EXPORTED FUNCTION DEFINITIONS
 //
 
-void timer_init(void) {
+void timer_init(unsigned int freq) {
     unsigned long long tcnt;
     sbi_set_timer(UINT64_MAX);
     timer_initialized = 1;

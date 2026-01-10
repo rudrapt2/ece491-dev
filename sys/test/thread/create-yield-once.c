@@ -23,17 +23,18 @@ static void test_name_init(void) {
 
 static void thread_func(void) {
     kprintf("PASS %s\n", test_name);
-    halt_success();
+    halt();
 }
 
 void main(void) {
-    static char miniheap[1][4096];
+    static char miniheap[1][8192];
     int pass = 0;
     int tid;
 
     test_name_init();
     console_init();
     thrmgr_init();
+    
     heap_init(miniheap[0], miniheap[1]);
 
     // The test itself
@@ -41,10 +42,10 @@ void main(void) {
     running_thread_yield();
 
     kprintf("FAIL %s\n", test_name);
-    halt_failure();
+    halt();
 }
 
-// DUMMY FUNCTION DEFINITIONS
+// REPLACEMENT FUNCTION DEFINITIONS
 //
 
 #define PAGE_CNT 8
@@ -57,8 +58,4 @@ void * alloc_phys_page(void) {
         panic("Too many physical pages requested");
     
     return pages[pgno++];
-}
-
-void free_phys_page(void * pp) {
-    // nothing
 }

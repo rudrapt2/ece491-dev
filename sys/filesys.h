@@ -20,7 +20,7 @@ extern int open_file(const char * mpname, const char * flname, struct uio ** uio
 extern int create_file(const char * mpname, const char * flname);
 extern int delete_file(const char * mpname, const char * flname);
 
-extern int attach_filesystem(const char *name, struct filesystem *fs);
+extern int attach_filesystem(const char * name, struct filesystem * fs);
 
 // Splits a string path into two strings: a mount point name and a file name.
 // The existing string /path/ in modified and the /mpname/ and /flname/ are set

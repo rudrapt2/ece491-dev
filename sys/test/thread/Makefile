@@ -16,7 +16,7 @@ OBJS = \
 	../../dev/uart.o \
 	../../error.o \
 	../../excp.o \
-	../../heap0.o \
+	../../heap.o \
 	../../see.o \
 	../../start.o \
 	../../string.o \
