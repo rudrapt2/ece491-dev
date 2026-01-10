@@ -36,7 +36,7 @@
 // INTERNAL TYPE DEFINITIONS
 //
 
-#define HEAP_GRANT_MULT 3
+#define HEAP_PRIST_MULT 3
 #define HEAP_ALLOC_MULT 5
 #define HEAP_FREE_MULT  7
 
@@ -74,6 +74,9 @@ static struct heap_free_chunk * sort_chunks(struct heap_free_chunk * list);
 static struct heap_free_chunk * coalesce_chunks (
     struct heap_free_chunk * colist, struct heap_free_chunk * uclist);
 
+static uint32_t calc_prist_chkval(const struct heap_chunk_header * hdr);
+static uint32_t calc_alloc_chkval(const struct heap_chunk_header * hdr);
+static uint32_t calc_free_chkval(const struct heap_chunk_header * hdr);
 
 // INTERNAL VARIABLE DEFINITIONS
 //
@@ -223,11 +226,13 @@ void kfree(void * ptr) {
 // INTERNAL FUNCTION DEFINITIONS
 //
 
+#ifndef TEST
 void * __attribute__ ((weak)) alloc_phys_page(void) {
     // If the system does not have a memory manager (memory.c), the heap_alloc()
     // function below will call this weak definition instead.
     panic("Out of memory");
 }
+#endif
 
 void * heap_alloc(size_t size, void * call_ra) {
     struct heap_free_chunk ** cptr;
@@ -285,7 +290,7 @@ void * heap_alloc(size_t size, void * call_ra) {
     }
 
     ptr = ahdr + 1; // next address after chunk header
-    ahdr->chkval = (uint32_t)(uintptr_t)ahdr * HEAP_ALLOC_MULT;
+    ahdr->chkval = calc_alloc_chkval(ahdr);
     debug("Allocated %zu bytes at %p", ahdr->size, ptr);
     heap_cumul_bytes += ahdr->size;
     heap_alloc_bytes += ahdr->size;
@@ -315,15 +320,15 @@ void heap_free(void * ptr, void * call_ra) {
     if (hdr->size % HEAP_ALIGN != 0)
         panic("kfree() called with invalid pointer");    
 
-    if (hdr->chkval != (uint32_t)(uintptr_t)hdr * HEAP_ALLOC_MULT) {
-        if (hdr->chkval != (uint32_t)(uintptr_t)hdr * HEAP_FREE_MULT)
+    if (hdr->chkval != calc_alloc_chkval(hdr)) {
+        if (hdr->chkval != calc_free_chkval(hdr))
             panic("kfree() called with previously freed pointer");
         else
             panic("kfree() called with invalid pointer");
     }
 
     chunk = (struct heap_free_chunk*)hdr;
-    hdr->chkval = (uint32_t)(uintptr_t)hdr * HEAP_FREE_MULT;
+    hdr->chkval = calc_free_chkval(hdr);
     memset(ptr, HEAP_FREE_FILL, hdr->size);
     chunk->next = unsorted_free_chunks;
     unsorted_free_chunks = chunk;
@@ -338,26 +343,37 @@ struct heap_free_chunk * make_chunk(void * start, size_t size) {
     chunk = start;
     assert (HFCSZ <= size);
     chunk->hdr.size = size - HCHSZ;
-    chunk->hdr.chkval = (uint32_t)(uintptr_t)&chunk->hdr * HEAP_GRANT_MULT;
+    chunk->hdr.chkval = calc_prist_chkval(&chunk->hdr);
     chunk->next = NULL;
 
     memset(chunk+1, HEAP_GRANT_FILL, size - HFCSZ);
     return chunk;
 }
 
+// Folks, I've added a reclaiming heap allocator, heap.c, to replace the
+// non-reclaiming heap0.c. There has been at least one case of students running
+// out of heap memory because they ran their system for a long time. The new
+// heap allocator
+
 struct heap_free_chunk ** find_best_fit_chunk (
     struct heap_free_chunk ** cptr, uint32_t size)
 {
     struct heap_free_chunk ** best_cptr = NULL;
     uint32_t best_size = UINT32_MAX;
+    int best_pristine = 0;
     struct heap_free_chunk * chunk;
 
     trace("%s(%p,%u)", __func__, cptr, size);
 
     while ((chunk = *cptr) != NULL) {
-        if (size <= chunk->hdr.size && chunk->hdr.size <= best_size) {
-            best_size = chunk->hdr.size;
-            best_cptr = cptr;
+        if (size <= chunk->hdr.size) {
+            int const p = (chunk->hdr.chkval == calc_prist_chkval(&chunk->hdr));
+            int const s = (chunk->hdr.size < best_size);
+            if ((!best_pristine && s) || (!best_pristine && p) || (p && s)) {
+                best_size = chunk->hdr.size;
+                best_cptr = cptr;
+                best_pristine = p;
+            }
         }
 
         cptr = &chunk->next;
@@ -535,3 +551,16 @@ struct heap_free_chunk * coalesce_chunks (
     
     return head;
 }
+
+uint32_t calc_prist_chkval(const struct heap_chunk_header * hdr) {
+    return (uint32_t)(uintptr_t)hdr / HEAP_ALIGN * HEAP_PRIST_MULT;
+}
+
+uint32_t calc_alloc_chkval(const struct heap_chunk_header * hdr) {
+    return (uint32_t)(uintptr_t)hdr / HEAP_ALIGN * HEAP_ALLOC_MULT;
+}
+
+uint32_t calc_free_chkval(const struct heap_chunk_header * hdr) {
+    return (uint32_t)(uintptr_t)hdr / HEAP_ALIGN * HEAP_FREE_MULT;
+}
+

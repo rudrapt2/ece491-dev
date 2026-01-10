@@ -25,7 +25,7 @@ OBJS = \
 	elf.o \
 	error.o \
 	excp.o \
-	heap0.o \
+	heap.o \
 	intr.o \
 	uio.o \
 	memory.o \
