@@ -350,11 +350,6 @@ struct heap_free_chunk * make_chunk(void * start, size_t size) {
     return chunk;
 }
 
-// Folks, I've added a reclaiming heap allocator, heap.c, to replace the
-// non-reclaiming heap0.c. There has been at least one case of students running
-// out of heap memory because they ran their system for a long time. The new
-// heap allocator
-
 struct heap_free_chunk ** find_best_fit_chunk (
     struct heap_free_chunk ** cptr, uint32_t size)
 {
