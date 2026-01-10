@@ -120,17 +120,14 @@ void parse_and_exec(char* head) {
         term = find_terminator(head, &end);
         *end = '\0';
         
-        argv[argc++] = head;
+        if (head != end)
+            argv[argc++] = head;
         
-        if (term == ' ') {
-            end++;
-            SKIP_SPACES(end);
-            head = end;
-            if(!is_terminator(*end)) continue;
-            term = *end;
-        }
+        if (term != ' ') break;
 
-        break;
+        end++;
+        SKIP_SPACES(end);
+        head = end;
     }
 
     if (argc == 0) return; // nothing to do

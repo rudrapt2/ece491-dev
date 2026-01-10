@@ -1,6 +1,6 @@
 /*! @file lffs.c
     @brief LFFS Implementation.
-    @copyright Copyright (c) 2024-2025 University of Illinois
+    @copyright Copyright (c) 2025-2026 University of Illinois
 
 */
 
@@ -86,8 +86,8 @@ uint32_t get_free_data_block();
 long set_next_data_block(uint32_t block, uint32_t next);
 uint32_t get_next_data_block(uint32_t block);
 void free_blocks(uint32_t start);
-void* get_cache_from_block(uint32_t block);
-uint32_t get_nth_data_block(struct lffs_dir_entry* file, unsigned int n);
+void * get_cache_from_block(uint32_t block);
+uint32_t get_nth_data_block(struct lffs_dir_entry * file, unsigned int n);
 void update_root_dir();
 struct lffs_dir_entry * find_dir_entry(const char * name);
 void free_associated_cache_block(struct lffs_dir_entry * entry, int dirty);
@@ -164,6 +164,7 @@ int mount_lffs(const char * name, struct cache * cache, unsigned int size) {
 }
 
 int lffs_open(struct filesystem * fs, const char * name, struct uio ** uioptr) {
+    trace("%s(%s,%p)", __func__, name, uioptr);
     if (name == NULL || *name == '\0')
         return lffs_open_listing(uioptr);
     else
@@ -174,6 +175,7 @@ int lffs_open_file(const char * name, struct uio ** uioptr) {
     struct lffs_uio * file_uio;
     struct lffs_file * curr_file;
     struct lffs_dir_entry * dentry;
+    trace("%s(%s,%p)", __func__, name, uioptr);
 
     for(curr_file = files_list; curr_file != NULL; 
         curr_file = curr_file->next) {
@@ -205,25 +207,41 @@ int lffs_open_file(const char * name, struct uio ** uioptr) {
     file_uio->block = curr_file->dentry.start_block;
     file_uio->file = curr_file;
     uio_init1(&file_uio->uio, &file_intf);
-    debug("lffs_open: SUCCESS - file=%s, reset pos=0, refcnt=1", name);
+    debug("lffs_open: SUCCESS - file=%s, pos=0, refcnt=1", name);
     
     *uioptr = &file_uio->uio;
     return 0;
 }
 
-void lffs_close(struct uio* uio) {
-    struct lffs_uio* curr_uio = (void*)uio - offsetof(struct lffs_uio, uio);
-    struct lffs_file* curr_file = curr_uio->file;
+void lffs_close(struct uio * uio) {
+    struct lffs_uio * curr_uio = (void*)uio - offsetof(struct lffs_uio, uio);
+    struct lffs_file * curr_file = curr_uio->file;
+    struct lffs_dir_entry * curr_dentry = &curr_file->dentry;
+    struct lffs_dir_entry * dentry = find_dir_entry(curr_dentry->name);
     
     debug("lffs_close: file=%s, pos=%ld, refcnt=%d",
-          curr_ufile->dentry.name, curr_uio->pos, curr_file->refcnt);
+          curr_dentry->name, curr_uio->pos, curr_file->refcnt);
+    
+    // update dentry (if needed)
+    if (dentry->size != curr_dentry->size ||
+        dentry->start_block != curr_dentry->start_block) {
+        debug("Updating dentry for file=%s, old size=%ld, new size=%ld",
+            curr_dentry->name, dentry->size, curr_dentry->size);
+        
+        dentry->start_block = curr_dentry->start_block;
+        dentry->size = curr_dentry->size;
+        free_associated_cache_block(dentry, CACHE_DIRTY);
+    }
+    else {
+        free_associated_cache_block(dentry, CACHE_CLEAN);
+    }
 
     kfree(curr_uio);
     assert(curr_file->refcnt > 0);
     curr_file->refcnt--;
 }
 
-long lffs_fetch(struct uio *uio, void *buf, unsigned long len) {
+long lffs_fetch(struct uio * uio, void * buf, unsigned long len) {
     long total_num_bytes_to_read = len;
     trace("%s(%p,%ld)", __func__, buf, len);
     
@@ -265,7 +283,7 @@ long lffs_fetch(struct uio *uio, void *buf, unsigned long len) {
     return num_bytes_read;
 }
 
-long lffs_store(struct uio* uio, const void* buf, unsigned long len){
+long lffs_store(struct uio * uio, const void * buf, unsigned long len){
     struct lffs_uio * curr_uio = (void*) uio - offsetof(struct lffs_uio, uio);
     struct lffs_file * f = curr_uio->file;
     long pos = curr_uio->pos;
@@ -298,7 +316,7 @@ long lffs_store(struct uio* uio, const void* buf, unsigned long len){
     return num_bytes_written;
 }
 
-int lffs_create(struct filesystem * fs, const char* name) {
+int lffs_create(struct filesystem * fs, const char * name) {
     uint32_t new_size, file_idx;
     struct lffs_dir_entry * root_entries;
     if (!name || strlen(name) > LFFS_MAX_FILENAME_LEN) {
@@ -332,8 +350,9 @@ int lffs_create(struct filesystem * fs, const char* name) {
     return 0;
 }
 
-int lffs_delete(struct filesystem * fs, const char* name) {
+int lffs_delete(struct filesystem * fs, const char * name) {
     struct lffs_file ** indirect;
+    struct lffs_file * tmp;
     struct lffs_dir_entry * dentry;
     struct lffs_dir_entry last_dentry;
     uint32_t last_block, last_offset, new_size;
@@ -350,8 +369,10 @@ int lffs_delete(struct filesystem * fs, const char* name) {
 
             if ((*indirect)->refcnt > 0) return -EBUSY;
 
-            *indirect = (*indirect)->next;
+            tmp = (*indirect)->next;
             kfree(*indirect);
+            *indirect = tmp;
+            break;
         }
     }
 
@@ -475,6 +496,7 @@ void lffs_flush(struct filesystem * fs) {
 
 int lffs_open_listing(struct uio ** uioptr) {
     struct lffs_listing_uio * ls;
+    trace("%s(%p)", __func__, uioptr);
 
     ls = kcalloc(1, sizeof(struct lffs_listing_uio));
     uio_init1(&ls->base, &lffs_listing_uio_intf);
@@ -504,6 +526,9 @@ long lffs_listing_read(struct uio * uio, void * buf, unsigned long bufsz) {
     arbitrary_read(
         BLOCK_NO_TO_POS(block) + offset*sizeof(struct lffs_dir_entry), 
         &dentry, sizeof(struct lffs_dir_entry));
+    
+    debug("lffs_listing_read: reading listing %d (%s)", 
+        ls->dir_idx, dentry.name);
     
     ls->dir_idx++;
     strncpy(buf, dentry.name, len);
@@ -546,7 +571,7 @@ long arbitrary_read(unsigned long pos, void* buf, long bufsz) {
     return bytes_to_read - bytes_remaining;
 }
 
-long arbitrary_write(unsigned long pos, void* buf, long len) {    
+long arbitrary_write(unsigned long pos, void* buf, long len) {
     trace("%s(0x%llx,%p,%ld)", __func__, pos, buf, len);
 
     // Null checks

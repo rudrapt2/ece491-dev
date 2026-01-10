@@ -1,6 +1,6 @@
 /*! @file lffs.h
     @brief LFFS Header File. 
-    @copyright Copyright (c) 2024-2025 University of Illinois
+    @copyright Copyright (c) 2025-2026 University of Illinois
 
 */
 
