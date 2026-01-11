@@ -14,8 +14,8 @@
 
 // SYSTEM TIMER
 //
-// The timer subsystem provides two services: putting a thread to sleep until
-// some future time and periodic routines.
+// The timer subsystem provides two services: one-time alarms for placing
+// threads to sleep until a specified time and a system preemption interrupt.
 
 extern char timer_initialized;
 extern unsigned int timer_frequency;
@@ -47,6 +47,62 @@ extern void timer_init(unsigned int freq);
 //
 // See also: alarm_init(), start_period_rountine().
 
+
+extern void set_preempt_time(unsigned long long tpre);
+
+// Sets the preemption set-time. The /tint/ argument is the system preemption
+// set-time; the timer subsystem guarantees that a timer interrupt will be
+// generated no later than this time. This function may be used to ensure that
+// control always returns to the system (via a timer interrupt) no later than a
+// certain time. Calling set_preempt_time() before the previously set preemption
+// set-time modifies the preemption set-time; the previous preemption set-time
+// is no longer in effect. Calling set_preempt_time() with a preemption set-time
+// earlier the current time still modifies the preemption set-time; this will
+// cause a timer interrupt immediately as soon as interrupts are enabled.
+//
+// NOTE: The handle_timer_interrupt() function declared below, which must be
+// called to service timer interrupts, sets the preemption set-time to
+// ULLONG_MAX _regardless of the current preemption set-time_. This has the
+// effect of disabling guaranteed preeption interrupts until set_preempt_time()
+// is called again.
+//
+// The following trace illustrates the described behavior, assuming no alarms:
+//
+// current   preempt time                                  preempt time
+// time      before stmt   statement/event                 after stmt
+// ========  ============  ==============================  ============
+// 1000      0             set_preempt_time(2000);         2000
+// 2000                    **** TIMER INTERRUPT ****
+// 2010      2000          handle_timer_interrupt();       ULLONG_MAX
+//
+// 2200      ULLONG_MAX    set_preempt_time(3000);         3000
+// 2300      3000          set_preempt_time(4000);         4000
+// 3000                    // no timer interrupt
+// 4000                    **** TIMER INTERRUPT ****
+// 4000      4000          handle_timer_interrupt();       ULLONG_MAX
+// 
+// 4100      ULLONG_MAX    set_preempt_time(1000);         1000
+// 4101                    **** TIMER INTERRUPT ****
+// 4011      1000          handle_timer_interrupt();       ULLONG_MAX
+//
+// 5000      ULLONG_MAX   set_preempt_time(6000);          6000
+// 6000                   **** TIMER INTERRUPT ****
+// 6004      6000         set_timer_interrupt(7000);       7000
+// 6010      7000         handle_timer_interrupt();        ULLONG_MAX
+// 7000                   // no timer interrupt
+//
+
+// On return set_preempt_time() guarantees:
+// - If /tint/ is earlier than the current time, the next timer interrupt will
+//   occur as soon as interrupts are enabled. If interrupts were enabled before
+//   calling set_preept_time(), the timer interupt may occur _before_
+//   set_preempt_time() returns.
+// - If /tint/ is later than the current time, the next timer interrupt will
+//   occur no later than /tint/, unless set_preept_time() is called again before
+//   /tint/.
+//
+// Note: If set_preempt_time() is called after the previous preempt set-time but
+// before handle_timer_interrupt() interrupt returns, 
 
 extern void handle_timer_interrupt(void);
 
