@@ -18,15 +18,20 @@
 #include "timer.h"
 #include "string.h"
 #include "filesys.h"
+#include "lffs.h"
+#include "ktfs.h"
 #include "error.h"
 #include "cache.h"
 
 #define INITEXE "shell"
 
-#define CMNTNAME "c"
+#define CMNTNAME "c" // lffs
+#define DMNTNAME "d" // ktfs
 #define DEVMNTNAME "dev"
 #define CDEVNAME "vioblk"
-#define CDEVINST 0
+#define CDEVINST 1
+#define DDEVNAME "vioblk"
+#define DDEVINST 0
 
 #ifndef NUART // number of UARTs
 #define NUART 2
@@ -38,6 +43,7 @@
 
 static void attach_devices(void);
 static void mount_cdrive(void); // mount primary storage device ("C drive")
+static void mount_ddrive(void); // mount secondary storage device ("D drive")
 static void run_init(void);
 
 void main(void) {
@@ -54,6 +60,7 @@ void main(void) {
     enable_interrupts();
 
     mount_cdrive();
+    mount_ddrive();
     run_init();
 }
 
@@ -100,7 +107,7 @@ void mount_cdrive(void) {
         halt_failure();
     }
 
-    result = create_cache(hd, &cache);
+    result = create_cache(hd, &cache, LFFS_BLKSZ);
 
     if (result != 0) {
         kprintf("create_cache(%s%d) failed: %s\n",
@@ -113,6 +120,45 @@ void mount_cdrive(void) {
     if (result != 0) {
         kprintf("mount_lffs(%s, cache(%s%d)) failed: %s\n",
             CMNTNAME, CDEVNAME, CDEVINST, error_name(result));
+        halt_failure();
+    }
+#endif
+}
+
+void mount_ddrive(void) {
+#if 1
+    struct storage * hd;
+    struct cache * cache;
+    int result;
+
+    hd = find_storage(DDEVNAME, DDEVINST);
+
+    if (hd == NULL) {
+        kprintf("Storage device %s%d not found\n", DDEVNAME, DDEVINST);
+        halt_failure();
+    }
+
+    result = storage_open(hd);
+
+    if (result != 0) {
+        kprintf("storage_open failed on %s%d: %s\n",
+            DDEVNAME, DDEVINST, error_name(result));
+        halt_failure();
+    }
+
+    result = create_cache(hd, &cache, KTFS_BLKSZ);
+
+    if (result != 0) {
+        kprintf("create_cache(%s%d) failed: %s\n",
+            DDEVNAME, DDEVINST, error_name(result));
+        halt_failure();
+    }
+
+    result = mount_ktfs(DMNTNAME, cache);
+
+    if (result != 0) {
+        kprintf("mount_ktfs(%s, cache(%s%d)) failed: %s\n",
+            DMNTNAME, DDEVNAME, DDEVINST, error_name(result));
         halt_failure();
     }
 #endif

@@ -79,18 +79,18 @@ void lffs_listing_close(struct uio * uio);
 long lffs_listing_read (struct uio * uio, void * buf, unsigned long bufsz);
 
 // Interal helper functions
-long arbitrary_read(unsigned long pos, void * buf, long bufsz);
-long arbitrary_write(unsigned long pos, void* buf, long bufsz);
+static long arbitrary_read(unsigned long pos, void * buf, long bufsz);
+static long arbitrary_write(unsigned long pos, void* buf, long bufsz);
 
-uint32_t get_free_data_block();
-long set_next_data_block(uint32_t block, uint32_t next);
-uint32_t get_next_data_block(uint32_t block);
-void free_blocks(uint32_t start);
-void * get_cache_from_block(uint32_t block);
-uint32_t get_nth_data_block(struct lffs_dir_entry * file, unsigned int n);
-void update_root_dir();
-struct lffs_dir_entry * find_dir_entry(const char * name);
-void free_associated_cache_block(struct lffs_dir_entry * entry, int dirty);
+static uint32_t get_free_data_block();
+static long set_next_data_block(uint32_t block, uint32_t next);
+static uint32_t get_next_data_block(uint32_t block);
+static void free_blocks(uint32_t start);
+static void * get_cache_from_block(uint32_t block);
+static uint32_t get_nth_data_block(struct lffs_dir_entry * file, unsigned int n);
+static inline long update_root_dir();
+static struct lffs_dir_entry * find_dir_entry(const char * name);
+static int free_associated_cache_block(struct lffs_dir_entry * entry, int dirty);
 
 
 static inline int min(int a, int b) {
@@ -155,7 +155,12 @@ int mount_lffs(const char * name, struct cache * cache, unsigned int size) {
         &root_dir, 
         sizeof(root_dir));
 
-    debug("Starting wirh %d files\n", 
+    // well-formed fs
+    assert(strncmp(root_dir.name, ".", LFFS_MAX_FILENAME_LEN) == 0);
+    assert(root_dir.start_block == 0);
+    assert(root_dir.size % sizeof(struct lffs_dir_entry) == 0);
+
+    debug("Starting with %d files\n", 
         root_dir.size / sizeof(struct lffs_dir_entry));
 
     files_list = NULL;
@@ -263,6 +268,7 @@ long lffs_fetch(struct uio * uio, void * buf, unsigned long len) {
     long num_bytes_left_to_read = total_num_bytes_to_read;
     long num_bytes_read = 0;
     while (num_bytes_left_to_read > 0){
+        assert(cur_data_block != LFFS_BLOCK_END);
         offset = pos % LFFS_BLKSZ;
 
         // we are in the data block in which pos is located
@@ -295,11 +301,16 @@ long lffs_store(struct uio * uio, const void * buf, unsigned long len){
         result = lffs_setend(&f->dentry, pos + len);
         if (result != 0)
             return result;
+
+        // check if start block updated
+        if (cur_data_block == LFFS_BLOCK_END)
+            cur_data_block = f->dentry.start_block;
     }
 
     long num_bytes_left_to_write = len;
     long num_bytes_written = 0;
     while (num_bytes_left_to_write > 0){
+        assert(cur_data_block != LFFS_BLOCK_END);
         uint32_t offset = pos % LFFS_BLKSZ;
         uint32_t write_len = min(num_bytes_left_to_write, LFFS_BLKSZ - offset);
 
@@ -319,22 +330,24 @@ long lffs_store(struct uio * uio, const void * buf, unsigned long len){
 int lffs_create(struct filesystem * fs, const char * name) {
     uint32_t new_size, file_idx;
     struct lffs_dir_entry * root_entries;
+    uint32_t curr_size = root_dir.size;
     if (!name || strlen(name) > LFFS_MAX_FILENAME_LEN) {
         return -EINVAL;
     }
 
     // Check if the file already exists
-    if (find_dir_entry(name) != NULL)
+    // if the cache block was freed successfully, an entry was found
+    if (free_associated_cache_block(find_dir_entry(name), CACHE_CLEAN) == 0)
         return -EMFILE;
 
-    file_idx = root_dir.size / sizeof(struct lffs_dir_entry);
+    file_idx = curr_size / sizeof(struct lffs_dir_entry);
     file_idx %= DENTRIES_PER_BLOCK;
 
-    new_size = root_dir.size + sizeof(struct lffs_dir_entry);
-    if (lffs_setend(&root_dir, new_size))
+    if (lffs_setend(&root_dir, curr_size + sizeof(struct lffs_dir_entry)))
         return -ENODATABLKS;
+
     root_entries = (struct lffs_dir_entry *)get_cache_from_block(
-        get_nth_data_block(&root_dir, new_size / LFFS_BLKSZ));
+        get_nth_data_block(&root_dir, curr_size / LFFS_BLKSZ));
 
     // Add to root directory
     root_entries[file_idx].size = 0;
@@ -383,6 +396,9 @@ int lffs_delete(struct filesystem * fs, const char * name) {
     last_offset = new_size % LFFS_BLKSZ;
     arbitrary_read(BLOCK_NO_TO_POS(last_block) + last_offset, 
         &last_dentry, sizeof(last_dentry));
+
+    if (last_dentry.name[0] == '\0')
+        panic(NULL);
     
     dentry = find_dir_entry(name);
     if (dentry == NULL) return -ENOENT;
@@ -430,8 +446,17 @@ int lffs_getend(struct lffs_dir_entry * entry, void *arg) {
 }
 
 int lffs_setend(struct lffs_dir_entry * entry, uint32_t end) {
-    uint32_t num_new_blocks, new_block;
-    uint32_t block = get_nth_data_block(entry, end / LFFS_BLKSZ);
+    uint32_t num_new_blocks, block, new_block;
+
+    // check if any blocks allocated yet
+    if (entry->start_block == LFFS_BLOCK_END) {
+        block = get_free_data_block();
+        if (block == LFFS_BLOCK_END) return -ENODATABLKS;
+        entry->start_block = block;
+    }
+    else {
+        block = get_nth_data_block(entry, end / LFFS_BLKSZ);
+    }
 
     if (end > entry->size) { // extend
         num_new_blocks = end / LFFS_BLKSZ - entry->size / LFFS_BLKSZ;
@@ -548,15 +573,15 @@ long arbitrary_read(unsigned long pos, void* buf, long bufsz) {
     unsigned long bytes_remaining = bytes_to_read;
 
     while (bytes_remaining > 0) {
-        const uint64_t block_index = pos / CACHE_BLKSZ;
-        const uint64_t block_offset = pos % CACHE_BLKSZ;
+        const uint64_t block_index = pos / LFFS_BLKSZ;
+        const uint64_t block_offset = pos % LFFS_BLKSZ;
         void* block_data = NULL;
         
-        if (cache_get_block(lffs_cache, block_index * CACHE_BLKSZ, &block_data) != 0) {
+        if (cache_get_block(lffs_cache, block_index * LFFS_BLKSZ, &block_data) != 0) {
             return -1;
         }
 
-        const uint64_t bytes_available = CACHE_BLKSZ - block_offset;
+        const uint64_t bytes_available = LFFS_BLKSZ - block_offset;
         const uint64_t bytes_to_copy = min(bytes_remaining, bytes_available);
 
         memcpy(buf, (uint8_t*)block_data + block_offset, bytes_to_copy);
@@ -584,15 +609,15 @@ long arbitrary_write(unsigned long pos, void* buf, long len) {
     unsigned long bytes_remaining = bytes_to_write;
 
     while (bytes_remaining > 0) {
-        const uint64_t block_index = pos / CACHE_BLKSZ;
-        const uint64_t block_offset = pos % CACHE_BLKSZ;
+        const uint64_t block_index = pos / LFFS_BLKSZ;
+        const uint64_t block_offset = pos % LFFS_BLKSZ;
         void* block_data = NULL;
         
-        if (cache_get_block(lffs_cache, block_index * CACHE_BLKSZ, &block_data) != 0) {
+        if (cache_get_block(lffs_cache, block_index * LFFS_BLKSZ, &block_data) != 0) {
             return -1;
         }
 
-        const uint64_t bytes_available = CACHE_BLKSZ - block_offset;
+        const uint64_t bytes_available = LFFS_BLKSZ - block_offset;
         const uint64_t bytes_to_copy = min(bytes_remaining, bytes_available);
 
         memcpy((uint8_t*)block_data + block_offset, buf, bytes_to_copy);
@@ -611,23 +636,30 @@ uint32_t get_free_data_block() {
     struct lffs_fat * fat = NULL;
     uint32_t free_block;
 
-    for (int table = 0; table < num_fat_blocks; table++) {
-        if (fat) cache_release_block(lffs_cache, (void *)fat, CACHE_CLEAN);
+    for (uint32_t fat_block = 0; fat_block < num_fat_blocks; fat_block++) {
         assert(0 == cache_get_block(lffs_cache, 
-            table * LFFS_BLKSZ, (void**)&fat));
+            fat_block * LFFS_BLKSZ, (void**)&fat));
 
         for (int idx = 0; idx < LFFS_FAT_ENTRIES_PER_BLOCK; idx++) {
             if (fat->fat[idx] == LFFS_BLOCK_FREE) {
                 fat->fat[idx] = LFFS_BLOCK_END;
                 cache_release_block(lffs_cache, (void *)fat, CACHE_DIRTY);
-                free_block = table * LFFS_FAT_ENTRIES_PER_BLOCK + idx;
+
+                // this line is needed bc it breaks otherwise
+                // i think this means theres a race condition
+                // in the cache? not sure though
+                cache_flush(lffs_cache);
+
+                free_block = fat_block * LFFS_FAT_ENTRIES_PER_BLOCK + idx;
                 return (free_block < fs_size / LFFS_BLKSZ - num_fat_blocks) ?
                     free_block : LFFS_BLOCK_END;
             }
         }
+
+        cache_release_block(lffs_cache, (void *)fat, CACHE_CLEAN);
     }
 
-    cache_release_block(lffs_cache, (void *)fat, CACHE_CLEAN);
+    // no free blocks
     return LFFS_BLOCK_END;
 }
 
@@ -647,6 +679,8 @@ void free_blocks(uint32_t start) {
     uint32_t next;
     uint32_t cur = start;
     while (cur != LFFS_BLOCK_END) {
+        if (cur == LFFS_BLOCK_FREE)
+            panic(NULL);
         next = get_next_data_block(cur);
         set_next_data_block(cur, LFFS_BLOCK_FREE);
         cur = next;
@@ -677,8 +711,8 @@ uint32_t get_nth_data_block(struct lffs_dir_entry * file, unsigned int n) {
     return block;
 }
 
-void update_root_dir() {
-    arbitrary_write(BLOCK_NO_TO_POS(LFFS_ROOT_DATA_BLOCK), 
+inline long update_root_dir() {
+    return arbitrary_write(BLOCK_NO_TO_POS(LFFS_ROOT_DATA_BLOCK), 
         &root_dir, sizeof(root_dir));
 }
 
@@ -708,8 +742,9 @@ struct lffs_dir_entry * find_dir_entry(const char * name) {
     return NULL;
 }
 
-void free_associated_cache_block(struct lffs_dir_entry * entry, int dirty) {
-    if (entry == NULL) return;
+int free_associated_cache_block(struct lffs_dir_entry * entry, int dirty) {
+    if (entry == NULL) return -1;
     cache_release_block(lffs_cache, 
-        (void *)ROUND_DOWN((uintptr_t)entry, CACHE_BLKSZ), dirty);
+        (void *)ROUND_DOWN((uintptr_t)entry, LFFS_BLKSZ), dirty);
+    return 0;
 }

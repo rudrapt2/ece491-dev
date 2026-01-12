@@ -7,7 +7,6 @@
 #ifndef _CACHE_H_
 #define _CACHE_H_
 
-#define CACHE_BLKSZ 4096UL // size of cache block
 #define CACHE_DIRTY 1
 #define CACHE_CLEAN 0
 
@@ -24,7 +23,7 @@ extern int cache_get_backing_device(struct cache * cache, struct storage ** disk
  * @param cptr Pointer to the cache to create.
  * @return 0 on success, negative error code if error
  */
-extern int create_cache(struct storage* sto, struct cache** cptr);
+extern int create_cache(struct storage* sto, struct cache** cptr, unsigned long blksz);
 
 /**
  * @brief Reads a CACHE_BLKSZ sized block from the backing interface into the cache.

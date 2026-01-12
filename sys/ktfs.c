@@ -809,15 +809,15 @@ long arbitrary_read(unsigned long pos, void* buf, long bufsz) {
     unsigned long bytes_remaining = bytes_to_read;
 
     while (bytes_remaining > 0) {
-        const uint64_t block_index = pos / CACHE_BLKSZ;
-        const uint64_t block_offset = pos % CACHE_BLKSZ;
+        const uint64_t block_index = pos / KTFS_BLKSZ;
+        const uint64_t block_offset = pos % KTFS_BLKSZ;
         void* block_data = NULL;
         
-        if (cache_get_block(ktfs_block_cache, block_index * CACHE_BLKSZ, &block_data) != 0) {
+        if (cache_get_block(ktfs_block_cache, block_index * KTFS_BLKSZ, &block_data) != 0) {
             return -1;
         }
 
-        const uint64_t bytes_available = CACHE_BLKSZ - block_offset;
+        const uint64_t bytes_available = KTFS_BLKSZ - block_offset;
         const uint64_t bytes_to_copy = min(bytes_remaining, bytes_available);
 
         memcpy(buf, (uint8_t*)block_data + block_offset, bytes_to_copy);
@@ -852,15 +852,15 @@ long arbitrary_write(unsigned long pos, void* buf, long len) {
     unsigned long bytes_remaining = bytes_to_write;
 
     while (bytes_remaining > 0) {
-        const uint64_t block_index = pos / CACHE_BLKSZ;
-        const uint64_t block_offset = pos % CACHE_BLKSZ;
+        const uint64_t block_index = pos / KTFS_BLKSZ;
+        const uint64_t block_offset = pos % KTFS_BLKSZ;
         void* block_data = NULL;
         
-        if (cache_get_block(ktfs_block_cache, block_index * CACHE_BLKSZ, &block_data) != 0) {
+        if (cache_get_block(ktfs_block_cache, block_index * KTFS_BLKSZ, &block_data) != 0) {
             return -1;
         }
 
-        const uint64_t bytes_available = CACHE_BLKSZ - block_offset;
+        const uint64_t bytes_available = KTFS_BLKSZ - block_offset;
         const uint64_t bytes_to_copy = min(bytes_remaining, bytes_available);
 
         memcpy((uint8_t*)block_data + block_offset, buf, bytes_to_copy);

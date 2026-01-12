@@ -7,8 +7,8 @@
 #include <stdint.h>
 #include "uioimpl.h"
 
-#define LFFS_BLKSZ                  4096
-#define LFFS_DENSZ                  32
+#define LFFS_BLKSZ                  4096UL
+#define LFFS_DENSZ                  32UL
 #define LFFS_MAX_FILENAME_LEN       (LFFS_DENSZ  - sizeof(uint8_t) - 2*sizeof(uint32_t))
 #define LFFS_FAT_ENTRIES_PER_BLOCK  (LFFS_BLKSZ / sizeof(uint32_t))
 #define LFFS_ROOT_DATA_BLOCK 0

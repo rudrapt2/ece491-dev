@@ -62,6 +62,7 @@ struct cache {
     unsigned short evictable_cnt; // number of evictable entries
     unsigned short dirty_cnt; // number of dirty blocks in cache
     int wtid; // writer thread id (we don't actually use it for anything)
+    unsigned long blksz;
     void * blkbuf; // all block are in a single contiguous buffer
     struct cache_entry entries[CACHE_CAPACITY];
 };
@@ -128,7 +129,7 @@ int cache_get_backing_device(struct cache * cache, struct storage ** disk){
     return 0;
 }
 
-int create_cache(struct storage * disk, struct cache ** cptr) {
+int create_cache(struct storage * disk, struct cache ** cptr, unsigned long blksz) {
     struct cache * cache;
     int bkgblksz;
     int i;
@@ -138,9 +139,11 @@ int create_cache(struct storage * disk, struct cache ** cptr) {
     // Get backing device block size. Make sure it divides cache block size.
 
     bkgblksz = disk->intf->blksz;
-    assert (bkgblksz < 0 || CACHE_BLKSZ % bkgblksz == 0);
+    assert (bkgblksz < 0 || blksz % bkgblksz == 0);
 
     cache = kcalloc(1, sizeof(struct cache));
+
+    cache->blksz = blksz;
 
     cache->disk = disk;
     condition_init(&cache->unlocked, "cache.unlocked");
@@ -149,7 +152,7 @@ int create_cache(struct storage * disk, struct cache ** cptr) {
     condition_init(&cache->nodirty, "cache.nodirty");
 
     cache->blkbuf = alloc_phys_pages (
-        (CACHE_CAPACITY * CACHE_BLKSZ + PAGE_SIZE-1) / PAGE_SIZE);
+        (CACHE_CAPACITY * blksz + PAGE_SIZE-1) / PAGE_SIZE);
 
     for (i = 0; i < CACHE_CAPACITY; i++)
         cache->entries[i].pos = -1ULL;
@@ -175,7 +178,7 @@ int cache_get_block(struct cache * cache, unsigned long long pos, void ** pptr) 
 
     trace("%s(0x%llx)", __func__, pos);
 
-    if (pos % CACHE_BLKSZ != 0)
+    if (pos % cache->blksz != 0)
         return -EINVAL;
 
     for (;;) {
@@ -267,7 +270,7 @@ int cache_get_block(struct cache * cache, unsigned long long pos, void ** pptr) 
 
     *pptr = blkidx_to_blkptr(cache, i);
     debug("Reading block from 0x%llx into cache at %d (pblk = %lp)", pos, i, *pptr);
-    rcnt = storage_fetch(cache->disk, pos, *pptr, CACHE_BLKSZ);
+    rcnt = storage_fetch(cache->disk, pos, *pptr, cache->blksz);
 
     debug("%08lx: "
         "%02x %02x %02x %02x %02x %02x %02x %02x "
@@ -298,7 +301,7 @@ int cache_get_block(struct cache * cache, unsigned long long pos, void ** pptr) 
     if (rcnt < 0)
         return rcnt;
     
-    if (rcnt != CACHE_BLKSZ)
+    if (rcnt != cache->blksz)
         return -EIO;
     
     return 0;
@@ -373,13 +376,13 @@ int cache_flush(struct cache * cache) {
 //
 
 void * blkidx_to_blkptr(const struct cache * cache, unsigned long idx) {
-    return cache->blkbuf + idx * CACHE_BLKSZ;
+    return cache->blkbuf + idx * cache->blksz;
 }
 
 unsigned long blkptr_to_blkidx(const struct cache * cache, void * pblk) {
     assert (cache->blkbuf <= pblk);
-    assert (pblk < cache->blkbuf + CACHE_CAPACITY * CACHE_BLKSZ);
-    return (pblk - cache->blkbuf) / CACHE_BLKSZ;
+    assert (pblk < cache->blkbuf + CACHE_CAPACITY * cache->blksz);
+    return (pblk - cache->blkbuf) / cache->blksz;
 }
 
 int find_evictable(struct cache * cache) {
@@ -429,9 +432,9 @@ void cache_writeback_thrfn(struct cache * cache) {
                 debug("Writing dirty block 0x%llx to storage", ents[i].pos);
 
                 wcnt = storage_store(cache->disk,
-                    ents[i].pos, blkidx_to_blkptr(cache, i), CACHE_BLKSZ);
+                    ents[i].pos, blkidx_to_blkptr(cache, i), cache->blksz);
                 
-                if (wcnt != CACHE_BLKSZ) {
+                if (wcnt != cache->blksz) {
                     kprintf("ERROR Cache write-back failed: %s",
                         (wcnt < 0) ? error_name(wcnt) : "short write");
                 }
