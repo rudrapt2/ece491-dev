@@ -7,15 +7,25 @@
 #ifndef _TIMER_H_
 #define _TIMER_H_
 
-#include <stdint.h>
-
-#include "conf.h"   // TIMER_FREQ
 #include "thread.h" // struct condition
 
-// SYSTEM TIMER
+// SYSTEM TIMER AND PREEMPTION INTERRUPTS
 //
-// The timer subsystem provides two services: one-time alarms for placing
-// threads to sleep until a specified time and a system preemption interrupt.
+// The timer subsystem provides two services:
+//
+// - One-time alarms for placing threads to sleep until a specified time.
+// - Coarse periodic interrupts.
+//
+// The timer subsystem guarantees that a timer interrupt will be generated at a
+// frequency (given as interrupts per second) specified by the compile-time
+// constant BOLT_FREQ when interrupts are enabled for at least some part of the
+// period.
+//
+// All timer services use the system timer, which may beread using rdtime(), as
+// their time reference.
+//
+// Timer interrupts are serviced by the handle_timer_interrupt(), which must be
+// called in response to a timer interrupt.
 
 extern char timer_initialized;
 extern unsigned int timer_frequency;
@@ -36,78 +46,28 @@ extern void timer_init(unsigned int freq);
 // Interrupts must be enabled for the timer system to function, however, they
 // need not be enabled when timer_init() is called.
 //
-// Both one-time alarms and periodic routines are based on the system timer. The
-// system timer can be read using the rdtime() function (riscv.h).
-//
 // On return timer_init() guarantees:
 // - /timer_initialized/ is set to 1.
+// - A timer interrupt will be generated at least /BOLT_FREQ/ times per second
+//   when interrupts are enabled.
 //
 // * This function must be called once at system initialization time before any
 //   other functions declared in timer.h.
 //
-// See also: alarm_init(), start_period_rountine().
+// See also: alarm_init().
 
-
-extern void set_preempt_time(unsigned long long tpre);
-
-// Sets the preemption set-time. The /tint/ argument is the system preemption
-// set-time; the timer subsystem guarantees that a timer interrupt will be
-// generated no later than this time. This function may be used to ensure that
-// control always returns to the system (via a timer interrupt) no later than a
-// certain time. Calling set_preempt_time() before the previously set preemption
-// set-time modifies the preemption set-time; the previous preemption set-time
-// is no longer in effect. Calling set_preempt_time() with a preemption set-time
-// earlier the current time still modifies the preemption set-time; this will
-// cause a timer interrupt immediately as soon as interrupts are enabled.
-//
-// NOTE: The handle_timer_interrupt() function declared below, which must be
-// called to service timer interrupts, sets the preemption set-time to
-// ULLONG_MAX _regardless of the current preemption set-time_. This has the
-// effect of disabling guaranteed preeption interrupts until set_preempt_time()
-// is called again.
-//
-// The following trace illustrates the described behavior, assuming no alarms:
-//
-// current   preempt time                                  preempt time
-// time      before stmt   statement/event                 after stmt
-// ========  ============  ==============================  ============
-// 1000      0             set_preempt_time(2000);         2000
-// 2000                    **** TIMER INTERRUPT ****
-// 2010      2000          handle_timer_interrupt();       ULLONG_MAX
-//
-// 2200      ULLONG_MAX    set_preempt_time(3000);         3000
-// 2300      3000          set_preempt_time(4000);         4000
-// 3000                    // no timer interrupt
-// 4000                    **** TIMER INTERRUPT ****
-// 4000      4000          handle_timer_interrupt();       ULLONG_MAX
-// 
-// 4100      ULLONG_MAX    set_preempt_time(1000);         1000
-// 4101                    **** TIMER INTERRUPT ****
-// 4011      1000          handle_timer_interrupt();       ULLONG_MAX
-//
-// 5000      ULLONG_MAX   set_preempt_time(6000);          6000
-// 6000                   **** TIMER INTERRUPT ****
-// 6004      6000         set_timer_interrupt(7000);       7000
-// 6010      7000         handle_timer_interrupt();        ULLONG_MAX
-// 7000                   // no timer interrupt
-//
-
-// On return set_preempt_time() guarantees:
-// - If /tint/ is earlier than the current time, the next timer interrupt will
-//   occur as soon as interrupts are enabled. If interrupts were enabled before
-//   calling set_preept_time(), the timer interupt may occur _before_
-//   set_preempt_time() returns.
-// - If /tint/ is later than the current time, the next timer interrupt will
-//   occur no later than /tint/, unless set_preept_time() is called again before
-//   /tint/.
-//
-// Note: If set_preempt_time() is called after the previous preempt set-time but
-// before handle_timer_interrupt() interrupt returns, 
 
 extern void handle_timer_interrupt(void);
 
 // Services a timer interrupt. This function must be called by the system
-// interrupt handler in response to a supervisor timer interrupt.
+// interrupt handler in response to a supervisor timer interrupt. It should be
+// called with interrupts disabled, or in a manner that ensures mutual exclusion
+// with respect to other timer functions.
+//
+// On entry handle_timer_interrupt() assumes:
+// - It is called either (a) only when timer interrupts are enabled (sie.STIE=1
+//   and sstatus.SIE=1), or (b) in a manner that ensures that it does not
+//   execute concurrently with any other functions declared in timer.h.
 //
 // On return handle_timer_interrupt() guarantees:
 // - All suspended threads that were waiting for an alarm not later than when
@@ -115,8 +75,11 @@ extern void handle_timer_interrupt(void);
 // - If there are suspended threads still waiting for an alarm, the next timer
 //   interrupt is set to occur no later than the earliest alarm time of any
 //   threads still waiting for future alarms.
-// - If there are any periodic routines, the next timer interrupt is set to
-//   occur no later than the earliest next activation time of all such routines.
+// - The next timer interrupt is set to occur no more than N ticks from the
+//   current time, where N = timer_frequency / BOLT_FREQ.
+//
+// * This function should be called from an ISR in response to a timer
+//   interrupt.
 
 
 // ONE-TIME ALARMS
@@ -150,8 +113,9 @@ extern void handle_timer_interrupt(void);
 
 struct alarm {
     // NO DIRECT ACCESS!
-    struct condition cond;
     struct alarm * next;
+    const char * name;
+    struct condition cond;
     unsigned long long twake;
 };
 
@@ -165,6 +129,8 @@ extern void alarm_init(struct alarm * al, const char * name);
 // which will serve as the name of the alarm. If /name/ is NULL, the alarm is
 // given an implementation-defined name. The value of the /name/ argument may be
 // retrived later using alarm_name().
+//
+// alarm_init() must be called before any other operations on an alarm.
 //
 // When an alarm is no longer needed, the memory associated with the /alarm/
 // structure may be reclaimed. After that point, a pointer to this structure is
@@ -183,7 +149,8 @@ extern void alarm_init(struct alarm * al, const char * name);
 // Performance guarantees:
 // - The number of alarms in the system is unlimited.
 //
-// * This function may _not_ be called from an ISR.
+// * This function may be called from an ISR provided no other functions
+//   operating on the same alarm are executed concurrently.
 //
 // See also: alarm_sleep_until().
 
@@ -207,8 +174,8 @@ extern void alarm_sleep_until(struct alarm * al, unsigned long long twake);
 // Performance guarantees:
 // - If alarm_sleep_until() is called at or after /twake/, it returns
 //   immediately without suspending the calling thread.
-// - The calling thread becomes RUNNABLE no later than after the next call to
-//   handle_timer_interrupt() after /twake/ returns.
+// - The calling thread becomes RUNNABLE no later than after the next call after
+//   /twake/ to handle_timer_interrupt() returns.
 
 // * This function may switch to another thread context.
 // * This function may _not_ be called from an ISR.
@@ -240,17 +207,5 @@ extern void sleep_us(unsigned long us);
 //
 // * These functions may switch to another thread context.
 // * These functions may _not_ be called from an ISR.
-
-// PERIODIC ROUTINES
-//
-
-typedef unsigned int (*timer_rfun_t) (
-    unsigned int period,
-    unsigned long long tnow,
-    void * aux
-);
-
-extern int start_routine(timer_rfun_t rfun, unsigned int period, void * rfaux);
-extern void stop_routine(int tag);
 
 #endif // _TIMER_H_

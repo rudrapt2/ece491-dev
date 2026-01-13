@@ -16,6 +16,7 @@
 
 #include <stddef.h>
 
+#include "conf.h"
 #include "misc.h"
 #include "plic.h"
 #include "riscv.h"
@@ -28,31 +29,19 @@
 
 char intrmgr_initialized = 0;
 
+
 // INTERNAL GLOBAL VARIABLE DEFINITIONS
 //
 
-/**
- * @brief isr table, associates srnos with isrs
- */
 static struct {
-    void (*isr)(int, void*);  ///< isr function
-    void* isr_aux;            ///< isr auxilary var
+    void (*isr)(int, void*);
+    void* isr_aux;
 } isrtab[NIRQ];
 
 // INTERNAL FUNCTION DECLARATIONS
 //
 
-/**
- * @brief to be called when an interrupt fires in S mode
- * @param cause Supervisor trap cause
- * @return void
- */
 static void handle_interrupt(unsigned int cause);
-
-/**
- * @brief to be called when an external fires
- * @return void
- */
 static void handle_extern_interrupt(void);
 
 // EXPORTED FUNCTION DEFINITIONS
@@ -99,7 +88,10 @@ void handle_smode_interrupt(unsigned int cause) {
 void handle_umode_interrupt(unsigned int cause) {
     // called from trap.s
     handle_interrupt(cause);
-    running_thread_yield();
+
+    enable_interrupts();
+
+    running_thread_submit();
 }
 
 // INTERNAL FUNCTION DEFINITIONS

@@ -27,14 +27,17 @@
 #include "error.h"
 #include "misc.h"
 #include "see.h"
+#include "timer.h"
 
 // COMPILE-TIME PARAMETERS
 //
 
-// NTHR is the maximum number of threads
-
-#ifndef NTHR
+#ifndef NTHR // maximum number of threads
 #define NTHR 16
+#endif
+
+#ifndef TIME_SLICE_MS // maximum time slice
+#define TIME_SLICE_MS 20
 #endif
 
 // EXPORTED GLOBAL VARIABLES
@@ -76,6 +79,14 @@ struct thread {
     struct thread * list_next;
     struct condition * wait_cond;
     struct condition child_exit;
+
+    // Accounting. All times and durations (ticks) are based on rdtime()
+
+    unsigned long long time_spawned;    // when thread was spawned
+    unsigned long long time_exited;     // when thread exited
+    unsigned long long time_resumed;    // when thread was last resumed
+    unsigned long long running_ticks;   // number of ticks in RUNNING state
+    unsigned int tick_overrun;          // excess time used by thread
 };
 
 // INTERNAL MACRO DEFINITIONS
@@ -217,6 +228,7 @@ int spawn_thread (
     child->parent = TP;
     child->proc = TP->proc;
     set_thread_state(child, THREAD_READY);
+    child->time_spawned = rdtime();
 
     // Prepare arguments to child thread function. We use a special startup
     // function to pass arguments to the child thread function. See
@@ -272,6 +284,18 @@ void running_thread_exit(void) {
     panic(NULL);
 }
 
+void running_thread_submit(void) {
+    unsigned int const slice_ticks = TIME_SLICE_MS * 1000 * timer_frequency;
+    unsigned long long time_must_suspend; // time thread must suspend
+    unsigned long long time_now;
+
+    time_now = rdtime();
+    time_must_suspend = TP->time_resumed + slice_ticks;
+
+    if (time_must_suspend <= time_now)
+        running_thread_yield();
+}
+
 void running_thread_yield(void) {
     extern void switch_running_thread(struct thread *); // thrasm.s
     struct thread * susp_thread; // suspending thread
@@ -287,24 +311,25 @@ void running_thread_yield(void) {
 
     susp_thread = TP;
 
-    // Get a READY thread from the ready list and mark it running
+    // Get a READY thread from the ready list and add current thread to the list
+    // if it is still considered RUNNING. (Its stgate may be set to EXITED or
+    // WAITING before running_thread_yield() is called). Interrupts must be
+    // disabled while we manipulate the ready list.
 
     pie = disable_interrupts();
 
     next_thread = tlremove(&ready_list);
     assert(next_thread->state == THREAD_READY);
-    set_thread_state(next_thread, THREAD_RUNNING);
-    
-    // If the suspending thread is still running, mark it ready-to-run and put
-    // it in the back of the ready-to-run list.
 
     if (susp_thread->state == THREAD_RUNNING) {
         set_thread_state(susp_thread, THREAD_READY);
         tlinsert(&ready_list, susp_thread);
     }
+    
+    set_thread_state(next_thread, THREAD_RUNNING);
 
     enable_interrupts();
-    
+
     // If the thread to be resumed has an associated process, switch to its
     // memory space. Otherwise, switch to the main thread's memory space. If
     // there is no process associated with the main thread, then virtual address
@@ -318,13 +343,15 @@ void running_thread_yield(void) {
         switch_mspace(main_thread.proc->mtag);
     }
 
-    trace("Thread <%s:%d> calling switch_threads(<%s:%d>)",
-        TP->name, TP->id, next_thread->name, next_thread->id);
-    
+    trace("Thread <%s:%d> calling switch_running_thread(<%s:%d>)",
+        TP->name, TP->id, resuming_thread->name, resuming_thread->id);
+
+    next_thread->time_resumed = rdtime();
+
     switch_running_thread(next_thread);
 
-    trace("switch_threads() returned in <%s:%d>", TP->name, TP->id);
-
+    trace("switch_running_thread() returned in <%s:%d>", TP->name, TP->id);
+    
     restore_interrupts(pie);
 }
 
@@ -332,15 +359,22 @@ void running_thread_yield(void) {
 // thrasm.s. It is not declared in thread.h. It's responsible for freeing the
 // stack of an exited thread.
 
-void finish_thread_switch(struct thread * suspended_thread) {
-    // If the suspended thread exited, free its stack. We can't do it any
+void finish_thread_switch(struct thread * susp_thread) {
+    unsigned long long tnow;
+
+    tnow = rdtime();
+
+    susp_thread->running_ticks += tnow - susp_thread->time_resumed;
+
+        // If the suspended thread exited, free its stack. We can't do it any
     // earlier as we are still using the stack. This function is tail-called by
     // switch_threads().
 
-    if (suspended_thread->state == THREAD_EXITED) {
-        free_phys_page(suspended_thread->stack_lowest);
-        suspended_thread->stack_lowest = NULL;
-        suspended_thread->stack_anchor = NULL;
+    if (susp_thread->state == THREAD_EXITED) {
+        free_phys_page(susp_thread->stack_lowest);
+        susp_thread->stack_lowest = NULL;
+        susp_thread->stack_anchor = NULL;
+        susp_thread->time_exited = tnow;
     }
 }
 
