@@ -464,6 +464,8 @@ int lffs_setend(struct lffs_dir_entry * entry, uint32_t end) {
             new_block = get_free_data_block();
             if (new_block == LFFS_BLOCK_END) return -ENODATABLKS;
             set_next_data_block(block, new_block);
+            // i think this is also related to the cache race cond
+            cache_flush(lffs_cache);
         }
     }
     else { // truncate
@@ -707,6 +709,8 @@ uint32_t get_nth_data_block(struct lffs_dir_entry * file, unsigned int n) {
     block = file->start_block;
     for (int bno = 0; bno < n; bno++) 
         block = get_next_data_block(block);
+
+    assert(block != LFFS_BLOCK_END);
 
     return block;
 }

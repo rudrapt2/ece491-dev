@@ -38,7 +38,7 @@ there is no padding between the members or struct alignment requirements.
 */
 
 struct lffs_dir_entry {
-    char name[LFFS_MAX_FILENAME_LEN+sizeof(uint8_t)]; 
+    char name[LFFS_MAX_FILENAME_LEN+sizeof(char)]; 
     uint32_t size;
     uint32_t start_block;
 } __attribute__((packed));

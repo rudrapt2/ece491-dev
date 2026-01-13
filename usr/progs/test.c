@@ -177,6 +177,86 @@ void test_delete(int argc, char * argv[]) {
     }
 }
 
+void test_write_long(int argc, char * argv[]) {
+    int num_files;
+    int num_writes;
+    char path[26];
+    int result,fd;
+    size_t written;
+    char* mp = "/c/";
+
+    if (argc < 3) {
+        printf("USAGE: %s [NUM_FILES] [NUM_WRITES] [MOUNTPOINT (c)]\n", argv[0]);
+        return;
+    }
+
+    num_files = strtoul(argv[1], NULL, 10);
+    num_writes = strtoul(argv[2], NULL, 10);
+    if (argc >= 4)
+        mp = argv[3];
+
+    // testing write
+    for (int i = 1; i <= num_files; i++) {
+        written = snprintf(path, 26, "%s%d", mp, i);
+        fd = _open(-1, path);
+        if (fd < 0) {
+            printf("Failed to open %s: %s\n", path, error_name(fd));
+            return;
+        }
+        for (int j = 0; j < num_writes; j++) {
+            result = _write(fd, path, written);
+            if (result < 0) {
+                printf("Failed to write to %s on iteration %d: %s\n", path, j, error_name(result));
+                return;
+            }
+        }
+        dprintf(STDOUT, "SUCCESS: wrote long to %s\n", path);
+        _close(fd);
+    }
+}
+
+void test_read_long(int argc, char * argv[]) {
+    int num_files;
+    int num_reads;
+    char path[26];
+    char buffer[26];
+    int result,fd;
+    size_t written;
+    char* mp = "/c/";
+
+    if (argc < 3) {
+        printf("USAGE: %s [NUM_FILES] [NUM_READS] [MOUNTPOINT (c)]\n", argv[0]);
+        return;
+    }
+
+    num_files = strtoul(argv[1], NULL, 10);
+    num_reads = strtoul(argv[2], NULL, 10);
+    if (argc >= 4)
+        mp = argv[3];
+
+    for (int i = 1; i <= num_files; i++) {
+        written = snprintf(path, 26, "%s%d", mp, i);
+        fd = _open(-1, path);
+        if (fd < 0) {
+            printf("Failed to open %s: %s\n", path, error_name(fd));
+            return;
+        }
+        for (int j = 0; j < num_reads; j++) {
+            result = _read(fd, buffer, written);
+            if (result <= 0) {
+                printf("Failed to read from %s on iteration %d: %s\n", path, j, error_name(result));
+                return;
+            }
+            if (strncmp(path, buffer, written) != 0) {
+                printf("FAIL: Expected %s but got %s on iteration %d\n", path, buffer, j);
+                return;
+            }
+        }
+        dprintf(STDOUT, "SUCCESS: read long from %s\n", path);
+        _close(fd);
+    }
+}
+
 struct testcase {
     const char * name;
     void (*main)(int argc, char * argv[]);
@@ -186,8 +266,10 @@ const struct testcase testcases[] = {
     {.name="malloc",    .main=test_malloc},
     {.name="create",    .main=test_create},
     {.name="write",     .main=test_write},
-    {.name="delete",    .main=test_delete},
     {.name="read",      .main=test_read},
+    {.name="delete",    .main=test_delete},
+    {.name="write_long",.main=test_write_long},
+    {.name="read_long", .main=test_read_long},
 };
 
 void main (int argc, char* argv[]) {

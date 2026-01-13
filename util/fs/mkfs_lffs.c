@@ -70,7 +70,7 @@ uint32_t parse_size(const char* size_str) {
     }
 
     if (size % LFFS_BLKSZ != 0) {
-        fprintf(stderr, "Disk size must be a multiple of %d bytes\n", LFFS_BLKSZ);
+        fprintf(stderr, "Disk size must be a multiple of %lu bytes\n", LFFS_BLKSZ);
         exit(1);
     }
 
@@ -232,7 +232,7 @@ void load_binary(FILE* fp, const char* binary_path) {
     fprintf(stdout, "Added file %s\n", binary_path);
     fprintf(stdout, "File size: %d bytes\n", file_size);
     fprintf(stdout, "File start data block index: %d\n", dentry.start_block);
-    fprintf(stdout, "File start address: %d\n", (num_fat_blocks + dentry.start_block) * LFFS_BLKSZ);
+    fprintf(stdout, "File start address: %lu\n", (num_fat_blocks + dentry.start_block) * LFFS_BLKSZ);
 }
 
 int main(int argc, char *argv[]) {
