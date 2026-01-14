@@ -240,11 +240,12 @@ void memory_init(void) {
         heap_end += ROUND_UP(HEAP_INIT_MIN - (heap_end - heap_start), PAGE_SIZE);
     }
 
-    if (RAM_END < heap_end) panic("out of memory");
+    if (RAM_END < heap_end)
+        panic("out of memory");
 
     // Initialize heap memory manager
 
-    heap_init(heap_start, heap_end);
+    heap_init(heap_start, heap_end - heap_end);
 
     debug("Heap allocator: [%p,%p): %zu KB free", heap_start, heap_end,
           (heap_end - heap_start) / 1024);
@@ -272,11 +273,12 @@ void memory_init(void) {
 mtag_t active_mspace(void) { return active_space_mtag(); }
 
 mtag_t switch_mspace(mtag_t mtag) {
-    mtag_t prev;
+    mtag_t prev_mtag;
 
-    prev = csrrw_satp(mtag);
+    prev_mtag = csrrw_satp(mtag);
     sfence_vma();
-    return prev;
+    
+    return prev_mtag;
 }
 
 mtag_t clone_active_mspace(void) {
@@ -501,6 +503,7 @@ unsigned long free_phys_page_count(void) {
 
 int handle_smode_page_fault(struct trap_frame * tfr, uintptr_t vma) {
     // ...
+    return 0;
 }
 
 int handle_umode_page_fault(struct trap_frame * tfr, uintptr_t vma) {

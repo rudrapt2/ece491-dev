@@ -109,7 +109,7 @@ void heap_init(void * start, size_t size) {
 
     if (size == 0) {
         debug("Heap initialized without initial grant");
-        return;
+        goto heap_init_success;
     }
     
     // Internally we use 32-bit uints, so heap can't be too large
@@ -135,13 +135,15 @@ void heap_init(void * start, size_t size) {
 
     if (size == 0) {
         debug("Heap initialized without initial grant");
-        return;
+        goto heap_init_success;
     }
 
     // Initialize pristine chunk (first choice for all allocations)
 
     sorted_free_chunks = make_chunk(start, size);
     heap_managed_bytes = size;
+
+heap_init_success:
     heap_initialized = 1;
 }
 
@@ -226,13 +228,11 @@ void kfree(void * ptr) {
 // INTERNAL FUNCTION DEFINITIONS
 //
 
-#ifndef TEST
 void * __attribute__ ((weak)) alloc_phys_page(void) {
     // If the system does not have a memory manager (memory.c), the heap_alloc()
     // function below will call this weak definition instead.
     panic("Out of memory");
 }
-#endif
 
 void * heap_alloc(size_t size, void * call_ra) {
     struct heap_free_chunk ** cptr;

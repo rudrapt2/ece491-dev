@@ -36,8 +36,8 @@
 #define NTHR 16
 #endif
 
-#ifndef TIME_SLICE_MS // maximum time slice
-#define TIME_SLICE_MS 20
+#ifndef SCHED_SLICE_MS // scheduler time slice
+#define SCHED_SLICE_MS 20
 #endif
 
 // EXPORTED GLOBAL VARIABLES
@@ -86,7 +86,7 @@ struct thread {
     unsigned long long time_exited;     // when thread exited
     unsigned long long time_resumed;    // when thread was last resumed
     unsigned long long running_ticks;   // number of ticks in RUNNING state
-    unsigned int tick_overrun;          // excess time used by thread
+    int ticks_balance;                  // how many ticks available in slice
 };
 
 // INTERNAL MACRO DEFINITIONS
@@ -137,9 +137,11 @@ static struct thread * create_thread(const char * name);
 
 static void tlclear(struct thread_list * list);
 static int tlempty(const struct thread_list * list);
+static struct thread * tlpeek(const struct thread_list * list);
 static void tlinsert(struct thread_list * list, struct thread * thr);
 static struct thread * tlremove(struct thread_list * list);
 static void tlappend(struct thread_list * l0, struct thread_list * l1);
+static void tlprepend(struct thread_list * l0, struct thread_list * l1);
 
 static void idle_thread_func(void);
 
@@ -161,6 +163,9 @@ static struct thread idle_thread;
 
 extern char _main_stack_lowest[]; // from start.s
 extern char _main_stack_anchor[]; // from start.s
+
+static int sched_slice_ticks; // ticks in a scheduler time slice
+static int sched_min_ticks;   // minimum tick balance needed to run
 
 static struct thread main_thread = {
     .id = MAIN_TID,
@@ -204,6 +209,14 @@ int running_thread(void) {
 
 void thrmgr_init(void) {
     trace("%s()", __func__);
+
+    assert (timer_frequency > 0);
+    sched_slice_ticks = timer_frequency / 1000 * SCHED_SLICE_MS;
+    sched_min_ticks = sched_slice_ticks / 16;
+
+    debug("sched_slice_ticks = %u", sched_slice_ticks);
+    debug("sched_min_ticks = %u", sched_min_ticks);
+
     init_main_thread();
     init_idle_thread();
     set_thread_pointer(&main_thread);
@@ -285,12 +298,11 @@ void running_thread_exit(void) {
 }
 
 void running_thread_submit(void) {
-    unsigned int const slice_ticks = TIME_SLICE_MS * 1000 * timer_frequency;
     unsigned long long time_must_suspend; // time thread must suspend
     unsigned long long time_now;
 
     time_now = rdtime();
-    time_must_suspend = TP->time_resumed + slice_ticks;
+    time_must_suspend = TP->time_resumed + TP->ticks_balance;
 
     if (time_must_suspend <= time_now)
         running_thread_yield();
@@ -300,6 +312,7 @@ void running_thread_yield(void) {
     extern void switch_running_thread(struct thread *); // thrasm.s
     struct thread * susp_thread; // suspending thread
     struct thread * next_thread; // resuming thread
+    mtag_t next_mtag;
     int pie;
 
     trace("%s() in <%s:%d>", __func__, TP->name, TP->id);
@@ -311,40 +324,79 @@ void running_thread_yield(void) {
 
     susp_thread = TP;
 
-    // Get a READY thread from the ready list and add current thread to the list
-    // if it is still considered RUNNING. (Its stgate may be set to EXITED or
-    // WAITING before running_thread_yield() is called). Interrupts must be
-    // disabled while we manipulate the ready list.
+    // Add current thtread to the ready list if it is still considered RUNNING.
+    // (Its stgate may be set to EXITED or WAITING before running_thread_yield()
+    // is called). Interrupts must be disabled while we manipulate the ready
+    // list. 
 
     pie = disable_interrupts();
-
-    next_thread = tlremove(&ready_list);
-    assert(next_thread->state == THREAD_READY);
 
     if (susp_thread->state == THREAD_RUNNING) {
         set_thread_state(susp_thread, THREAD_READY);
         tlinsert(&ready_list, susp_thread);
     }
     
-    set_thread_state(next_thread, THREAD_RUNNING);
+    // Determine which thread we want to run next. We use round-robin scheduling
+    // with accounting for time used. Each thread gets /sched_slice_ticks/ of
+    // time added to its /ticks_balance/ variable each time its turn comes up in
+    // the round-robin schedule. If the balance is less than /sched_ticks_min/,
+    // we skip it.
+
+    for (;;) {
+        next_thread = tlremove(&ready_list);
+        assert(next_thread->state == THREAD_READY);
+
+        debug("Next thread candidate <%s:%d> has tick balance of %d",
+            next_thread->name, next_thread->id, next_thread->ticks_balance);
+
+        // Optional: if the next thread ready to run is the idle thread and
+        // there are other threads on the ready list, skip it.
+
+        if (next_thread == &idle_thread && tlpeek(&ready_list) != NULL) {
+            tlinsert(&ready_list, next_thread);
+            continue;
+        }
+
+        next_thread->ticks_balance += sched_slice_ticks;
+
+        if (next_thread->ticks_balance < sched_min_ticks) {
+            tlinsert(&ready_list, next_thread);
+            continue;
+        } else
+            break;
+    }
 
     enable_interrupts();
+
+    // No hoarding!
+
+    if (next_thread->ticks_balance > 2*sched_slice_ticks)
+        next_thread->ticks_balance = 2*sched_slice_ticks;
+
+    debug("Next thread to run is <%s:%d> with a balance of %d ticks",
+        next_thread->name, next_thread->id, next_thread->ticks_balance);
+    
+    set_thread_state(next_thread, THREAD_RUNNING);
 
     // If the thread to be resumed has an associated process, switch to its
     // memory space. Otherwise, switch to the main thread's memory space. If
     // there is no process associated with the main thread, then virtual address
     // translation is not active, and we don't need to switch memory spaces.
 
-    if (next_thread->proc != NULL) {
-        debug("Switching to memory space 0x%lx", next_thread->proc->mtag);
-        switch_mspace(next_thread->proc->mtag);
-    } else if (main_thread.proc != NULL) {
-        debug("Switching to main memory space");
-        switch_mspace(main_thread.proc->mtag);
+    if (main_thread.proc != NULL) {
+        if (next_thread->proc != NULL)
+            next_mtag = next_thread->proc->mtag;
+        else
+            next_mtag = main_thread.proc->mtag;
+    
+        if (active_mspace() != next_mtag) {
+            debug("Switching to main memory space");
+            switch_mspace(next_mtag);
+        }
     }
 
     trace("Thread <%s:%d> calling switch_running_thread(<%s:%d>)",
-        TP->name, TP->id, resuming_thread->name, resuming_thread->id);
+        TP->name, TP->id, next_thread->name, next_thread->id);
 
     next_thread->time_resumed = rdtime();
 
@@ -360,13 +412,22 @@ void running_thread_yield(void) {
 // stack of an exited thread.
 
 void finish_thread_switch(struct thread * susp_thread) {
-    unsigned long long tnow;
+    unsigned long long time_now;
+    unsigned int ticks_used;
 
-    tnow = rdtime();
+    trace("%s(<%s:%d>)", __func__, susp_thread->name, susp_thread->id);
 
-    susp_thread->running_ticks += tnow - susp_thread->time_resumed;
+    time_now = rdtime();
 
-        // If the suspended thread exited, free its stack. We can't do it any
+    // Accounting: add number of ticks used to total and subtract ticks used
+    // from current balance.
+
+    ticks_used = time_now - susp_thread->time_resumed;
+    debug("Thread <%s:%d> used %u of %d ticks", susp_thread->name, susp_thread->id, ticks_used, susp_thread->ticks_balance);
+    susp_thread->running_ticks += ticks_used;
+    susp_thread->ticks_balance -= ticks_used;
+
+    // If the suspended thread exited, free its stack. We can't do it any
     // earlier as we are still using the stack. This function is tail-called by
     // switch_threads().
 
@@ -374,7 +435,7 @@ void finish_thread_switch(struct thread * susp_thread) {
         free_phys_page(susp_thread->stack_lowest);
         susp_thread->stack_lowest = NULL;
         susp_thread->stack_anchor = NULL;
-        susp_thread->time_exited = tnow;
+        susp_thread->time_exited = time_now;
     }
 }
 
@@ -522,7 +583,13 @@ void condition_broadcast(struct condition * cond) {
     // Append condition variable wait list to run list
 
     pie = disable_interrupts();
+
+    #if 0
     tlappend(&ready_list, &list);
+#else
+    tlprepend(&ready_list, &list);
+#endif
+
     restore_interrupts(pie);
 }
 
@@ -599,15 +666,28 @@ void rwlock_release_exclusive(struct rwlock * rwlk) {
 //
 
 void init_main_thread(void) {
+    unsigned long long time_now;
+
+    time_now = rdtime();
+
     // Most of the main thread structure is initialized statically (near the top
     // of this file). What's left is to initialize the main thread stack anchor
-    // to point to the main thread structure itself (a circular reference).
+    // to point to the main thread structure itself (a circular reference), and
+    // the thread start time.
+
     main_thread.stack_anchor->ktp = &main_thread;
+    main_thread.time_spawned = time_now;
+    main_thread.time_resumed = time_now;
 }
 
 void init_idle_thread(void) {
+    unsigned long long time_now;
+
+    time_now = rdtime();
+
     // Initialize stack anchor with pointer to self (see init_main_thread()).
     idle_thread.stack_anchor->ktp = &idle_thread;
+    main_thread.time_spawned = time_now;
 }
 
 const char * thread_state_name(enum thread_state state) {
@@ -671,6 +751,10 @@ int tlempty(const struct thread_list * list) {
     return (list->head == NULL);
 }
 
+struct thread * tlpeek(const struct thread_list * list) {
+    return list->head;
+}
+
 void tlinsert(struct thread_list * list, struct thread * thr) {
     thr->list_next = NULL;
 
@@ -722,6 +806,27 @@ void tlappend(struct thread_list * l0, struct thread_list * l1) {
         l0->tail = l1->tail;
     }
 
+    l1->head = NULL;
+    l1->tail = NULL;
+}
+
+void tlprepend(struct thread_list * l0, struct thread_list * l1) {
+    if (l1->head == NULL) {
+        assert (l1->tail == NULL);
+        return;
+    }
+
+    assert(l1->tail != NULL);
+        
+    if (l0->head != NULL) {
+        assert(l0->tail != NULL);
+        l1->tail->list_next = l0->head;
+    } else {
+        assert(l0->tail == NULL);
+        l0->tail = l1->tail;
+    }
+
+    l0->head = l1->head;
     l1->head = NULL;
     l1->tail = NULL;
 }

@@ -1,14 +1,12 @@
-/*! @file riscv.h
-    @brief This file contains all the RISCV CSR magic numbers and functions
-    @copyright Copyright (c) 2024-2025 University of Illinois
-    @license SPDX-License-identifier: NCSA
+// riscv.h - RISC-V special register operations
+//
+// Copyright (c) 2024-2026 University of Illinois
+// SPDX-License-identifier: NCSA
+//
 
-*/
 
 #ifndef _RISCV_H_
 #define _RISCV_H_
-
-// #include <stdint.h>
 
 // scause
 
@@ -57,7 +55,9 @@ static inline unsigned long csrr_stval(void) {
  * @param val new sepc value
  * @return None
  */
-static inline void csrw_sepc(const void* val) { asm("csrw sepc, %0" ::"r"(val)); }
+static inline void csrw_sepc(const void* val) {
+    asm("csrw sepc, %0" ::"r"(val));
+}
 
 /**
  * @brief This function retrieves sepc
@@ -70,17 +70,11 @@ static inline const void* csrr_sepc(void) {
 }
 
 // sscratch
-/**
- * @brief This function writes into sscratch
- * @param val new sscratch value
- * @return None
- */
-static inline void csrw_sscratch(unsigned long val) { asm("csrw sscratch, %0" ::"r"(val)); }
 
-/**
- * @brief This function retrieves sscratch
- * @return sepc CSR value
- */
+static inline void csrw_sscratch(unsigned long val) {
+    asm("csrw sscratch, %0" ::"r"(val));
+}
+
 static inline unsigned long csrr_sscratch(void) {
     unsigned long val;
 
@@ -100,12 +94,9 @@ static inline unsigned long csrr_sscratch(void) {
 #define RISCV_STVEC_BASE_nbits 62
 #endif
 
-/**
- * @brief This function writes into stvec
- * @param val new stvec value
- * @return None
- */
-static inline void csrw_stvec(unsigned long val) { asm("csrw stvec, %0" ::"r"(val)); }
+static inline void csrw_stvec(unsigned long val) {
+    asm("csrw stvec, %0" ::"r"(val));
+}
 
 // sie
 
@@ -113,26 +104,21 @@ static inline void csrw_stvec(unsigned long val) { asm("csrw stvec, %0" ::"r"(va
 #define RISCV_SIE_STIE (1 << 5)
 #define RISCV_SIE_SEIE (1 << 9)
 
-/**
- * @brief This function overwrite sie with given mask
- * @param mask bit mask
- * @return None
- */
-static inline void csrw_sie(unsigned long mask) { asm("csrw sie, %0" ::"r"(mask)); }
+static inline void csrw_sie(unsigned long mask) {
+    // This function may cause an an interrupt trap immediately upon execution,
+    // so we need to ensure there is a compiler memory barrier.
+    asm("csrw sie, %0" ::"r"(mask) : "memory");
+}
 
-/**
- * @brief This function sets bits in sie provided by mask
- * @param mask bit mask
- * @return None
- */
-static inline void csrs_sie(unsigned long mask) { asm("csrrs zero, sie, %0" ::"r"(mask)); }
+static inline void csrs_sie(unsigned long mask) {
+    // This function may cause an an interrupt trap immediately upon execution,
+    // so we need to ensure there is a compiler memory barrier.
+    asm("csrrs zero, sie, %0" ::"r"(mask) : "memory");
+}
 
-/**
- * @brief This function clears bits in sie provided by mask
- * @param mask bit mask
- * @return None
- */
-static inline void csrc_sie(unsigned long mask) { asm("csrrc zero, sie, %0" ::"r"(mask)); }
+static inline void csrc_sie(unsigned long mask) {
+    asm("csrrc zero, sie, %0" ::"r"(mask));
+}
 
 // sip
 
@@ -145,21 +131,31 @@ static inline void csrc_sie(unsigned long mask) { asm("csrrc zero, sie, %0" ::"r
  * @param mask bit mask
  * @return None
  */
-static inline void csrw_sip(unsigned long mask) { asm("csrw sip, %0" ::"r"(mask)); }
+static inline void csrw_sip(unsigned long mask) {
+    // This function may cause an an interrupt trap immediately upon execution,
+    // so we need to ensure there is a compiler memory barrier.
+    asm("csrw sip, %0" ::"r"(mask));
+}
 
 /**
  * @brief This function sets bits in sip provided by mask
  * @param mask bit mask
  * @return None
  */
-static inline void csrs_sip(unsigned long mask) { asm("csrrs zero, sip, %0" ::"r"(mask)); }
+static inline void csrs_sip(unsigned long mask) {
+    // This function may cause an an interrupt trap immediately upon execution,
+    // so we need to ensure there is a compiler memory barrier.
+    asm("csrrs zero, sip, %0" ::"r"(mask) : "memory");
+}
 
 /**
  * @brief This function clears bits in sip provided by mask
  * @param mask bit mask
  * @return None
  */
-static inline void csrc_sip(unsigned long mask) { asm("csrrc zero, sip, %0" ::"r"(mask)); }
+static inline void csrc_sip(unsigned long mask) {
+    asm("csrrc zero, sip, %0" ::"r"(mask));
+}
 
 // sstatus
 
@@ -184,14 +180,15 @@ static inline unsigned long csrr_sstatus(void) {
  * @param mask bit mask
  * @return None
  */
-static inline void csrs_sstatus(unsigned long mask) { asm("csrs sstatus, %0" ::"r"(mask)); }
+static inline void csrs_sstatus(unsigned long mask) {
+    // This function may cause an an interrupt trap immediately upon execution,
+    // so we need to ensure there is a compiler memory barrier.
+    asm("csrs sstatus, %0" ::"r"(mask) : "memory");
+}
 
-/**
- * @brief This function clears bits in status provided by mask
- * @param mask bit mask
- * @return None
- */
-static inline void csrc_sstatus(unsigned long mask) { asm("csrc sstatus, %0" ::"r"(mask)); }
+static inline void csrc_sstatus(unsigned long mask) {
+    asm("csrc sstatus, %0" ::"r"(mask));
+}
 
 // satp
 
@@ -216,40 +213,27 @@ static inline void csrc_sstatus(unsigned long mask) { asm("csrc sstatus, %0" ::"
 #define RISCV_SATP_PPN_nbits 44
 #endif
 
-/**
- * @brief This function retrieves satp
- * @return satp CSR value
- */
 static inline unsigned long csrr_satp(void) {
     unsigned long val;
+
     asm("csrr %0, satp" : "=r"(val));
     return val;
 }
 
-/**
- * @brief This function writes into satp
- * @param val new satp value
- * @return None
- */
-static inline void csrw_satp(unsigned long val) { asm("csrw satp, %0" ::"r"(val)); }
+static inline void csrw_satp(unsigned long val) {
+    asm("csrw satp, %0" ::"r"(val));
+}
 
-/**
- * @brief This function reads and writes into satp atomically
- * @param new_val new satp value
- * @return old satp value that was read
- */
 static inline unsigned long csrrw_satp(unsigned long new_val) {
     unsigned long prev_val;
 
-    asm volatile("csrrw %0, satp, %1" : "=r"(prev_val) : "r"(new_val));
+    asm volatile ("csrrw %0, satp, %1" : "=r"(prev_val) : "r"(new_val));
     return prev_val;
 }
 
-/**
- * @brief This function flushes the cached memory page table with updated value
- * @return None
- */
-static inline void sfence_vma(void) { asm inline("sfence.vma" ::: "memory"); }
+static inline void sfence_vma(void) {
+    asm inline("sfence.vma" ::: "memory");
+}
 
 /**
  * @brief This function gets the value in the mtime register
@@ -273,52 +257,43 @@ static inline void set_thread_pointer(void * tp) {
     asm inline ("mv tp, %0" :: "r"(tp) : "tp");
 }
 
-// csrrsi_sstatus_SIE() and csrrci_sstatus_SIE() set and clear sstatus.SIE. They
-// return the previous value of the sstatus CSR.
-/**
- * @brief This function sets SIE bit in sstatus, and returns the old value of sstatus
- * @return old sstatus that was read
- */
 static inline long csrrsi_sstatus_SIE(void) {
     long sstatus;
 
-    asm volatile("csrrsi %0, sstatus, %1" : "=r"(sstatus) : "I"(RISCV_SSTATUS_SIE));
+    // This function may cause an an interrupt trap immediately upon execution,
+    // so we need to ensure there is a compiler memory barrier.
+    
+    asm volatile (
+        "csrrsi %0, sstatus, %1"
+        : "=r"(sstatus)
+        : "I"(RISCV_SSTATUS_SIE)
+        : "memory"
+    );
 
     return sstatus;
 }
 
-/**
- * @brief This function clears SIE bit in sstatus, and returns the old value of sstatus
- * @return old sstatus that was read
- */
 static inline long csrrci_sstatus_SIE(void) {
     long sstatus;
 
-    asm volatile("csrrci %0, sstatus, %1" : "=r"(sstatus) : "I"(RISCV_SSTATUS_SIE));
+    asm volatile (
+        "csrrci %0, sstatus, %1"
+        : "=r"(sstatus)
+        : "I"(RISCV_SSTATUS_SIE)
+    );
 
     return sstatus;
 }
 
+static inline void csrwi_sstatus_SIE(long newval) {
 // csrwi_sstatus_SIE() updates the SIE bit in the sstatus CSR. If the
-// corresponding bit is set is _val_, then csrwi_sstatus_SIE() sets sstatus.SIE.
+// SIE bit in set in /newval/, then csrwi_sstatus_SIE() sets sstatus.SIE.
 // Otherwise, it clears SIE. Note that there is no csrwi instruction: the _i_ is
 // meant to suggest that the value is masked by RISCV_SSTATUS_SIE before being
 // written to the sstatus CSR.
 
-/**
- * @brief This function updates the SIE bit in sstatus according to new value. SIE bit value is set
- * to the value in that particular bit in the newval
- * @details csrwi_sstatus_SIE() updates the SIE bit in the sstatus CSR. If the
- * corresponding bit is set is _val_, then csrwi_sstatus_SIE() sets sstatus.SIE.
- * Otherwise, it clears SIE. Note that there is no csrwi instruction: the _i_ is
- * meant to suggest that the value is masked by RISCV_SSTATUS_SIE before being
- * written to the sstatus CSR.
- * @param newval
- */
-static inline void csrwi_sstatus_SIE(long newval) {
-    asm volatile(
-        "csrci sstatus, %0"
-        "\n\t"
+    asm volatile (
+        "csrci sstatus, %0" " ; "
         "csrs sstatus, %1" ::"I"(RISCV_SSTATUS_SIE),
         "r"(newval & RISCV_SSTATUS_SIE)
         : "memory");

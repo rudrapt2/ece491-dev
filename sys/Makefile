@@ -45,7 +45,7 @@ OBJS = \
 #	ktfs.o
 #   tarfs.o 
 
-CFLAGS = -Wall -Werror=implicit-function-declaration
+CFLAGS = -Wall -Werror=implicit-function-declaration -Wno-unused-function
 CFLAGS += -fno-omit-frame-pointer -ggdb3 -gdwarf-2
 CFLAGS += -mcmodel=medany -fno-pie -no-pie -march=rv64imazicsr -mabi=lp64
 CFLAGS += -fno-common -nostdlib -mno-relax -ffreestanding 
@@ -56,12 +56,10 @@ CFLAGS += -DAEE2
 # CFLAGS += -DDEBUG -DTRACE # Everything!
 # CFLAGS += -DMEMORY_DEBUG -DMEMORY_TRACE
 # CFLAGS += -DHEAP_DEBUG -DHEAP_TRACE
-# CFLAGS += -DEZFS_DEBUG -DEZFS_TRACE
 # CFLAGS += -DLOCK_DEBUG -DLOCK_TRACE
 # CFLAGS += -DPROCESS_DEBUG -DPROCESS_TRACE
 # CFLAGS += -DMAIN_DEBUG -DMAIN_TRACE
 # CFLAGS += -DSYSCALL_DEBUG -DSYSCALL_TRACE
-# CFLAGS += -DUIO_DEBUG -DUIO_TRACE
 # CFLAGS += -DTHREAD_DEBUG -DTHREAD_TRACE
 # CFLAGS += -DTIMER_DEBUG -DTIMER_TRACE
 # CFLAGS += -DVIOGPU_DEBUG -DVIOGPU_TRACE

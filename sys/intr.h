@@ -56,21 +56,26 @@ static inline long enable_interrupts(void) {
  * @return opaque value that can be passed to restore_interrupts() to restore the
  * previous interrupt enable/disable state
  */
-static inline long disable_interrupts(void) { return csrrci_sstatus_SIE(); }
+static inline long disable_interrupts(void) { 
+    return csrrci_sstatus_SIE();
+}
 
 /**
  * @brief restores the previously saved interrupt enable/disable state.
  * @param prev_state value returned by enable_interrupts() or disable_interrupts()
  * @return void
  */
-static inline void restore_interrupts(int prev_state) { csrwi_sstatus_SIE(prev_state); }
+static inline void restore_interrupts(int prev_state) {
+    csrwi_sstatus_SIE(prev_state);
+}
 
 /**
  * @brief returns if interrupts are currently enabled
  * @return 1 if interrupts are currently enabled, 0 if they are currently disabled
  */
 static inline int interrupts_enabled(void) {
-    return ((csrr_sstatus() & RISCV_SSTATUS_SIE) != 0); }
+    return ((csrr_sstatus() & RISCV_SSTATUS_SIE) != 0);
+}
 
 /**
  * @brief returns if interrupts are currently disabled

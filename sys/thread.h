@@ -111,14 +111,27 @@ extern int spawn_thread (
 // See also: running_thread_exit(), thread_join().
 
 
-extern void running_thread_yield(void);
+extern void running_thread_submit(void);
 
-// Yields control to the scheduler, possibly suspending the calling thread.
-// Note, however, that running_thread_yield() may return immediately, without
-// suspending the calling thread, if there are no other runnable threads.
+// Suspends the calling thread if it has used up its running time allocation.
+// Returns without suspending the calling thread if it still has time remaining
+// in its allocation or no other threads are runnable.
 //
 // * This function may switch to another thread context.
 // * This function may _not_ be called from an ISR.
+// 
+// See also: running_thread_yield().
+
+
+extern void running_thread_yield(void);
+
+// Suspends the current thread if there are other threads ready to run. Returns
+// without suspending the calling thread if no other threads are runnable.
+//
+// * This function may switch to another thread context.
+// * This function may _not_ be called from an ISR.
+//
+// See also: running_thread_submit().
 
 
 extern int thread_join(int u_tid);
@@ -327,12 +340,6 @@ extern void condition_init(struct condition * cond, const char * name);
 // the /name/ argument may be retrived later using condition_name().
 //
 // The condition variable is initialized to a state with no threads waiting for
-// the condition.
-//
-// As an alternative to calling this function, the condition structure may be
-// zero-initialized. The result of zero-initializing the memory of a `struct
-// condition` variable is equivalent to calling condition_init() with a NULL
-// /name/ argument.
 //
 // When a condition variable is no longer needed, the memory associated with the
 // /condition/ structure may be reclaimed. After that point, a pointer to this

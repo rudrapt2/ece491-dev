@@ -18,6 +18,7 @@
 #include "sbi.h" // for sbi_set_timer
 #include "intr.h"
 #include "misc.h"
+#include "string.h"
 
 #include <stddef.h>
 #include <limits.h> // for ULLONG_MAX
@@ -71,10 +72,13 @@ void timer_init(unsigned int freq) {
     enable_timer_interrupts();
 }
 
-void alarm_init(struct alarm * al, const char * name){
-    condition_init(&al->cond, name ? name : "alarm");
-    al->twake = rdtime();
-    al->next = NULL;
+void alarm_init(struct alarm * al, const char * name) {
+    if (name == NULL)
+        name = "unnamed";
+    
+    memset(al, 0, sizeof(*al));
+    condition_init(&al->cond, name);
+    al->name = name;
 }
 
 void alarm_sleep_until(struct alarm * al, unsigned long long twake) {
@@ -83,10 +87,12 @@ void alarm_sleep_until(struct alarm * al, unsigned long long twake) {
 
     tnow = rdtime();
 
-    trace("[%llu] %s(<%s>, %llu) at %llu," tnow, al->name, twake);
+    trace("[%llu] %s(<%s>, %llu)", tnow, __func__, al->name, twake);
 
-    if (al->twake < tnow)
+    if (twake < tnow)
         return;
+
+    al->twake = twake;
 
     // We need to have timer interrupts disabled while modifying the sleep list
     // and changing the S mode timer compare register. We could disable all
@@ -104,35 +110,53 @@ void alarm_sleep_until(struct alarm * al, unsigned long long twake) {
     pie = disable_interrupts();
     enable_timer_interrupts();
 
-    while (al->twake < rdtime())
+    while (rdtime() < twake)
         condition_wait(&al->cond);
     restore_interrupts(pie);
+
+    trace("[%llu] alarm_sleep_until(): twake = %llu", rdtime(), twake);
+    trace("[%llu] alarm_sleep_until() returning", rdtime());
 }
 
 void alarm_sleep_sec(struct alarm * al, unsigned int sec) {
-    alarm_sleep_until(al, rdtime() + sec * timer_frequency);
+    unsigned long long duration_ticks;
+
+    duration_ticks = (unsigned long long)sec * timer_frequency;
+    alarm_sleep_until(al, rdtime() + duration_ticks);
 }
 
-void alarm_sleep_ms(struct alarm * al, unsigned long ms) {
-    alarm_sleep_until(al, rdtime() + ms * (timer_frequency / 1000UL));
+void alarm_sleep_ms(struct alarm * al, unsigned int ms) {
+    unsigned long long duration_ticks;
+
+    duration_ticks = (unsigned long long)ms * timer_frequency / 1000;
+    alarm_sleep_until(al, rdtime() + duration_ticks);
 }
 
-void alarm_sleep_us(struct alarm * al, unsigned long us) {
-    alarm_sleep_until(al, rdtime() + us * (timer_frequency / 1000UL / 1000UL));
+void alarm_sleep_us(struct alarm * al, unsigned int us) {
+    unsigned long long duration_ticks;
+
+    duration_ticks = (unsigned long long)us * timer_frequency / 1000 / 1000;
+    alarm_sleep_until(al, rdtime() + duration_ticks);
 }
 
 void sleep_sec(unsigned int sec) {
-    sleep_ms(1000UL * sec);
-}
-
-void sleep_ms(unsigned long ms) {
-    sleep_us(1000UL * ms);
-}
-
-void sleep_us(unsigned long us) {
     struct alarm al;
 
-    alarm_init(&al, "sleep");
+    alarm_init(&al, __func__);
+    alarm_sleep_sec(&al, sec);
+}
+
+void sleep_ms(unsigned int ms) {
+    struct alarm al;
+
+    alarm_init(&al, __func__);
+    alarm_sleep_ms(&al, ms);
+}
+
+void sleep_us(unsigned int us) {
+    struct alarm al;
+
+    alarm_init(&al, __func__);
     alarm_sleep_us(&al, us);
 }
 
@@ -150,7 +174,7 @@ void handle_timer_interrupt(void) {
 
     tnow = rdtime();
 
-    trace("[%lu] %s()", now, __func__);
+    trace("[%lu] %s()", tnow, __func__);
 
     while (head != NULL && head->twake <= tnow) {
         debug("[%lu] Waking threads sleeping on <%s>", tnow, head->name);
@@ -167,7 +191,10 @@ void handle_timer_interrupt(void) {
     // and set timer interrupt for the earlier of the two
 
     tbolt = ROUND_UP(tnow+1, bolt_period);
-    talarm = (sleep_list != NULL) ? head->twake : ULLONG_MAX;
+    talarm = (head != NULL) ? head->twake : ULLONG_MAX;
+    debug("[%llu] %s(): tbolt = %llu", rdtime(), __func__, tbolt);
+    debug("[%llu] %s(): talarm = %llu", rdtime(), __func__, talarm);
+    debug("[%llu] %s(): Calling sbi_set_timer(%llu)", rdtime(), __func__, MIN(tbolt, talarm));
     sbi_set_timer(MIN(tbolt, talarm));
 }
 
@@ -175,10 +202,10 @@ void handle_timer_interrupt(void) {
 //
 
 static void add_alarm(struct alarm * al) {
-    unsigned long long tpreempt; // next preempt interupt time
     struct alarm * prev;
 
-    trace("[%llu] %s(<%s>)", rdtime(), __func__, al->name);
+    trace("[%llu] %s({\"%s\",%llu})", rdtime(), __func__, al->name, al->twake);
+    debug("[%llu] tbolt = %llu", rdtime(), tbolt);
 
     // Timer interrupts MUST be disabled by caller while we are manipulating the
     // alarm list.
@@ -192,8 +219,14 @@ static void add_alarm(struct alarm * al) {
         al->next = sleep_list;
         sleep_list = al;
 
-        if (al->twake < tbolt)
+        debug("[%llu] %s(): tbolt = %llu", rdtime(), __func__, tbolt);
+        debug("[%llu] %s(): al->twake = %llu", rdtime(), __func__, al->twake);
+
+        if (al->twake < tbolt) {
+            debug("[%llu] %s(): Calling sbi_set_timer(%llu)", rdtime(), __func__, al->twake);
             sbi_set_timer(al->twake);
+        }
+        
         return;
     }
 

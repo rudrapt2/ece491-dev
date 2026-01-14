@@ -49,13 +49,14 @@ void rule30_start(struct serial* term);
 
 void main(void) {
     console_init();
+    timer_init(TIMER_FREQ);
+    memory_init();
+
     intrmgr_init();
     devmgr_init();
     thrmgr_init();
-    memory_init();
     procmgr_init();
     fsmgr_init();
-    timer_init();
 
     attach_devices();
 

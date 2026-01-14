@@ -17,15 +17,22 @@
 // - Coarse periodic interrupts.
 //
 // The timer subsystem guarantees that a timer interrupt will be generated at a
-// frequency (given as interrupts per second) specified by the compile-time
-// constant BOLT_FREQ when interrupts are enabled for at least some part of the
-// period.
+// minimum frequency (given as interrupts per second) specified by the
+// compile-time constant BOLT_FREQ, provided interrupts are enabled for at least
+// some part of the period. The interrupt frequency and timing are not exact.
 //
 // All timer services use the system timer, which may beread using rdtime(), as
 // their time reference.
 //
-// Timer interrupts are serviced by the handle_timer_interrupt(), which must be
-// called in response to a timer interrupt.
+// The timer subsystem uses the RISC-V hardware timer associated with the
+// supervisor timer interrupt, and is intended to be the sole subsystem using
+// that timer. The timer subsystem manages the STIE (supervisor timer interrupt
+// enable) bit of the /sie/ register. This bit must _not_ be modified outside
+// timer.c after timer_init() is called.
+//
+// The timer system does _not_ modify the global interrupt enable state except
+// during short critical sections.
+//
 
 extern char timer_initialized;
 extern unsigned int timer_frequency;
@@ -93,15 +100,6 @@ extern void handle_timer_interrupt(void);
 //
 // The timer interrupt handler wakes sleeping threads by broadcasting the alarm
 // condition variables associated with expired alarms.
-//
-// The timer subsystem uses the RISC-V hardware timer associated with the
-// supervisor timer interrupt, and is intended to be the sole subsystem using
-// that timer. The timer subsystem manages the STIE (supervisor timer interrupt
-// enable) bit of the /sie/ register. This bit must _not_ be modified outside
-// timer.c after timer_init() is called.
-//
-// The timer system does _not_ modify the global interrupt enable state except
-// during short critical sections.
 //
 // Interrupts must be enabled for the timer subsystem to provide alarm service.
 // The system interrupt handler _must_ call handle_timer_interrupt() declared
@@ -183,8 +181,8 @@ extern void alarm_sleep_until(struct alarm * al, unsigned long long twake);
 // See also: alarm_sleep_ms(), alarm_sleep_us(), alarm_sleep_sec().
 
 extern void alarm_sleep_sec(struct alarm * al, unsigned int sec);
-extern void alarm_sleep_ms(struct alarm * al, unsigned long ms);
-extern void alarm_sleep_us(struct alarm * al, unsigned long us);
+extern void alarm_sleep_ms(struct alarm * al, unsigned int ms);
+extern void alarm_sleep_us(struct alarm * al, unsigned int us);
 
 // Convenience wrappers around alarm_sleep_until() that sleep for a duration
 // expressed in seconds, milliseconds, or microseconds. The /sec/, /ms/, and
@@ -199,8 +197,8 @@ extern void alarm_sleep_us(struct alarm * al, unsigned long us);
 // * These functions may _not_ be called from an ISR.
 
 extern void sleep_sec(unsigned int sec);
-extern void sleep_ms(unsigned long ms);
-extern void sleep_us(unsigned long us);
+extern void sleep_ms(unsigned int ms);
+extern void sleep_us(unsigned int us);
 
 // Convenience sleep functions that create a temporary alarm and sleep for the
 // specified duration.

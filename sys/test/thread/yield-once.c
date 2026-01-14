@@ -1,4 +1,4 @@
-// test/thread.c - Test of thread system
+// test/thread/create-yield-once.c
 //
 // Copyright (c) 2025 University of Illinois
 // SPDX-License-identifier: NCSA
@@ -10,6 +10,7 @@
 #include "string.h"
 #include "heap.h"
 #include "misc.h"
+#include "timer.h"
 
 static char test_name[] = __FILE__;
 
@@ -27,35 +28,16 @@ static void thread_func(void) {
 }
 
 void main(void) {
-    static char miniheap[1][8192];
-    int pass = 0;
-    int tid;
-
     test_name_init();
     console_init();
+    timer_init(/* qemu virt timer frequency*/ 24000000);
+    memory_init();
     thrmgr_init();
     
-    heap_init(miniheap[0], miniheap[1]);
-
     // The test itself
-    tid = spawn_thread("dummy", thread_func);
+    spawn_thread("dummy", thread_func);
     running_thread_yield();
 
     kprintf("FAIL %s\n", test_name);
     halt();
-}
-
-// REPLACEMENT FUNCTION DEFINITIONS
-//
-
-#define PAGE_CNT 8
-
-void * alloc_phys_page(void) {
-    static char pages[PAGE_CNT][PAGE_SIZE] __attribute__ ((aligned(PAGE_SIZE)));
-    static int pgno;
-
-    if (PAGE_CNT <= pgno)
-        panic("Too many physical pages requested");
-    
-    return pages[pgno++];
 }

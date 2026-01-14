@@ -23,9 +23,10 @@ OBJS = \
 	../../thrasm.o \
 	../../thread.o \
 	../../trap.o \
-	../stubs.o
+	../../sbi.o \
+	../panic-stubs.o
 
-CFLAGS = -Wall -Werror=implicit-function-declaration
+CFLAGS = -Wall -Werror=implicit-function-declaration -Wno-unused-function
 CFLAGS += -fno-omit-frame-pointer -ggdb3 -gdwarf-2
 CFLAGS += -mcmodel=medany -fno-pie -no-pie -march=rv64imazicsr -mabi=lp64
 CFLAGS += -fno-common -nostdlib -mno-relax -ffreestanding 
@@ -54,25 +55,43 @@ ASFLAGS = -march=rv64imazicsr
 LDFLAGS = -melf64lriscv
 
 QEMUOPTS = -global virtio-mmio.force-legacy=false
-QEMUOPTS += -machine virt -bios none -nographic
+QEMUOPTS += -machine virt -nographic
 
 QEMUOPTS += -serial mon:stdio
 
 run-all: \
-	run-create-thread-returns \
-	run-create-yield-once
+	run-thread-returns \
+	run-yield-once
 
-create-thread-returns.elf: $(OBJS) create-thread-returns.o
+thread-returns.elf: $(OBJS) thread-returns.o ../fake-memory.o ../fake-timer.o
 	$(LD) $(LDFLAGS) -T ../../kernel.ld -o $@ $^
 
-run-create-thread-returns: create-thread-returns.elf
-	$(QEMU) $(QEMUOPTS) -m 8M -kernel $<
+run-thread-returns: thread-returns.elf
+	timeout --foreground 5s $(QEMU) $(QEMUOPTS) -m 8M -kernel $<
 
-create-yield-once.elf: $(OBJS) create-yield-once.o
+yield-once.elf: $(OBJS) yield-once.o ../fake-memory.o ../fake-timer.o
 	$(LD) $(LDFLAGS) -T ../../kernel.ld -o $@ $^
 
-run-create-yield-once: create-yield-once.elf
-	$(QEMU) $(QEMUOPTS) -m 8M -kernel $<
+run-yield-once: yield-once.elf
+	timeout --foreground 5s $(QEMU) $(QEMUOPTS) -m 8M -kernel $<
+
+yield-twice.elf: $(OBJS) yield-twice.o ../fake-memory.o ../fake-timer.o
+	$(LD) $(LDFLAGS) -T ../../kernel.ld -o $@ $^
+
+run-yield-twice: yield-twice.elf
+	timeout --foreground 5s $(QEMU) $(QEMUOPTS) -m 8M -kernel $<
+
+yield-hotpotato.elf: $(OBJS) yield-hotpotato.o ../fake-memory.o ../fake-timer.o
+	$(LD) $(LDFLAGS) -T ../../kernel.ld -o $@ $^
+
+run-yield-hotpotato: yield-hotpotato.elf
+	timeout --foreground 5s $(QEMU) $(QEMUOPTS) -m 8M -kernel $<
+
+correct-tids.elf: $(OBJS) correct-tids.o ../fake-memory.o ../fake-timer.o
+	$(LD) $(LDFLAGS) -T ../../kernel.ld -o $@ $^
+
+correct-tids: correct-tids.elf
+	timeout --foreground 5s $(QEMU) $(QEMUOPTS) -m 8M -kernel $<
 
 clean:
 	rm -rf *.o ../*.o *.elf
