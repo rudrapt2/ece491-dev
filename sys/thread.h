@@ -63,7 +63,7 @@ extern int spawn_thread (
 //    myfunc("one", 2);
 //
 // If /entry/ is a function and it returns, this is equivalent to calling
-// running_thread_exit() in the context of the new thread.
+// exit_running_thread() in the context of the new thread.
 //
 // Note: spawn_thread() does *not* suspend the calling thread. The thread
 // created by spawn_thread() will be scheduled to run after the calling thread
@@ -81,7 +81,7 @@ extern int spawn_thread (
 // In addition, spawn_thread() may call panic(), halting the system, if there is
 // insufficient memory to create a new thread.
 //
-// The calling thread may wait for the new thread to exit using thread_join().
+// The calling thread may wait for the new thread to exit using join_thread().
 //
 // On entry spawn_thread() assumes:
 // - /name/ is a pointer to a null-terminated string or NULL.
@@ -108,10 +108,10 @@ extern int spawn_thread (
 //
 // * This function may _not_ be called from an ISR.
 //
-// See also: running_thread_exit(), thread_join().
+// See also: exit_running_thread(), join_thread().
 
 
-extern void running_thread_submit(void);
+extern void submit_running_thread(void);
 
 // Suspends the calling thread if it has used up its running time allocation.
 // Returns without suspending the calling thread if it still has time remaining
@@ -120,10 +120,10 @@ extern void running_thread_submit(void);
 // * This function may switch to another thread context.
 // * This function may _not_ be called from an ISR.
 // 
-// See also: running_thread_yield().
+// See also: yield_running_thread().
 
 
-extern void running_thread_yield(void);
+extern void yield_running_thread(void);
 
 // Suspends the current thread if there are other threads ready to run. Returns
 // without suspending the calling thread if no other threads are runnable.
@@ -131,45 +131,15 @@ extern void running_thread_yield(void);
 // * This function may switch to another thread context.
 // * This function may _not_ be called from an ISR.
 //
-// See also: running_thread_submit().
+// See also: submit_running_thread().
 
 
-extern int thread_join(int u_tid);
-
-// Waits for a child of the calling thread to exit. If /u_tid/ is not zero,
-// thread_join() waits until the child identified by /u_tid/ exits. If that
-// child has already exited, thread_join() returns immediately. If /u_tid/ is
-// zero, thread_join() waits for _any_ of the calling thread's children to exit.
-// If there is a child thread that has already exited, but has not yet been
-// joined, thread_join() returns immediately. If successful, thread_join()
-// returns the TID of the joined child. After being joined, all resources
-// associated with the child thread are considered to be reclaimed by the system
-// and the joined thread no longer counts towards the number of threads in the
-// system.
-//
-// The /u_/ prefix in /u_tid/ indicates that this function checks it for
-// validity. The parameter may be passed unchecked from a system call.
-//
-// If a non-zero /u_tid/ is not the TID of a child of the calling thread,
-// thread_join() returns -ECHILD. If /u_tid/ is zero but the calling thread has
-// no children, thread_join() also returns -ECHILD.
-//
-// * This function may switch to another thread context.
-// * This function may _not_ be called from an ISR.
-//
-// On sucessful (non-error) return thread_join() guarantees:
-// - The returned TID is is a child of the calling thread and the child has
-//   exited but has not yet been joined.
-//
-// See also: thread_exit().
-
-
-extern void __attribute__ ((noreturn)) running_thread_exit(void);
+extern void __attribute__ ((noreturn)) exit_running_thread(void);
 
 // Termimates the currently running thread. This function does not return. If
 // the calling thread is the main thread, the system halts. If the calling
 // thread is not the main thread, its parent will be able to join the calling
-// thread using thread_join(). If the calling thread has any children, the
+// thread using join_thread(). If the calling thread has any children, the
 // /main/ thread becomes the new parent of the children.
 //
 // After exiting, a child is still considered to exist in the system until it is
@@ -187,7 +157,38 @@ extern void __attribute__ ((noreturn)) running_thread_exit(void);
 // * This function switches to another thread context.
 // * This function may _not_ be called from an ISR.
 //
-// See also: thread_join().
+// See also: join_thread().
+
+
+extern int join_thread(int u_tid);
+
+// Waits for a child of the calling thread to exit. If /u_tid/ is not zero,
+// join_thread() waits until the child identified by /u_tid/ exits. If that
+// child has already exited, join_thread() returns immediately. If /u_tid/ is
+// zero, join_thread() waits for _any_ of the calling thread's children to exit.
+// If there is a child thread that has already exited, but has not yet been
+// joined, join_thread() returns immediately. If successful, join_thread()
+// returns the TID of the joined child. After being joined, all resources
+// associated with the child thread are considered to be reclaimed by the system
+// and the joined thread no longer counts towards the number of threads in the
+// system.
+//
+// The /u_/ prefix in /u_tid/ indicates that this function checks it for
+// validity. The parameter may be passed unchecked from a system call.
+//
+// If a non-zero /u_tid/ is not the TID of a child of the calling thread,
+// join_thread() returns -ECHILD. If /u_tid/ is zero but the calling thread has
+// no children, join_thread() also returns -ECHILD.
+//
+// * This function may switch to another thread context.
+// * This function may _not_ be called from an ISR.
+//
+// On sucessful (non-error) return join_thread() guarantees:
+// - The returned TID is is a child of the calling thread and the child has
+//   exited but has not yet been joined.
+//
+// See also: thread_exit().
+
 
 extern struct process * thread_process(int tid);
 
@@ -324,7 +325,7 @@ struct thread_list {
 
 struct condition {
     // NO DIRECT ACCESS!
-    const char * name; // optional
+    const char * name;
 	struct thread_list wait_list;
 };
 
@@ -334,12 +335,12 @@ extern void condition_init(struct condition * cond, const char * name);
 // of memory large enough to hold an instance of a /condition/ structure. This
 // function does _not_ allocate space for this structure.
 //
-// The /name/ argument must be a pointer to a null-terminated string or NULL,
-// which will serve as the name of the condition variable. If /name/ is NULL,
-// the condition variable is given an implementation-defined name. The value of
-// the /name/ argument may be retrived later using condition_name().
+// The /name/ argument specifies the name of the condition variable. It must be
+// either a pointer to a null-terminated string or NULL. If NULL,
+// condition_init() assigns it an implementation-defined name.
 //
-// The condition variable is initialized to a state with no threads waiting for
+// The condition variable is initialized to a state with no threads are
+// considered to be waiting on the condition variable.
 //
 // When a condition variable is no longer needed, the memory associated with the
 // /condition/ structure may be reclaimed. After that point, a pointer to this
@@ -351,7 +352,6 @@ extern void condition_init(struct condition * cond, const char * name);
 // On entry condition_init() assumes:
 // - /cond/ is a pointer to a region of memory large enough to hold an instance
 //   of a /condition/ structure.
-// - /name/ is a pointer to a null-terminated string or NULL.
 //
 // On return condition_init() guarantees:
 // - /cond/ points to an initialized instance of a condition variable.
@@ -359,11 +359,12 @@ extern void condition_init(struct condition * cond, const char * name);
 //
 // Performance guarantees:
 // - The number of condition variables in the system is unlimited.
+// - condition_init() does not allocate memory.
 //
 // See also condition_name(), condition_wait(), condition_broadcast().
 
 
-static inline const char * condition_name(const struct condition * cond);
+extern const char * condition_name(const struct condition * cond);
 
 // Returns the name of a condition variable. The /cond/ argument must be a
 // properly initialized condition variable. If condition_init() was called with
@@ -374,8 +375,7 @@ static inline const char * condition_name(const struct condition * cond);
 // pointer to a null-terminated string.
 //
 // On entry condition_name() assumes:
-// - /cond/ is a pointer to properly initialized condition structure (either
-//   zero-initialized or initialized using condition_init()).
+// - /cond/ is a pointer to properly initialized condition structure.
 //
 // On return condition_name() guarantees:
 // - The return value is a pointer to a null-terminated string.
@@ -386,15 +386,6 @@ static inline const char * condition_name(const struct condition * cond);
 //   null-terminated string.
 //
 // See also condition_init().
-
-
-// Returns the name of a condition variable. The return value is the /name/
-// argument passed to condition_init() when condition /cond/ was initialized.
-// Note that the name may be NULL. However, if not NULL, it is a pointer to a
-// null-terminated string.
-//
-// See also: condition_init().
-
 
 extern void condition_wait(struct condition * cond);
 
@@ -407,6 +398,10 @@ extern void condition_wait(struct condition * cond);
 // In cases where a thread needs to wait for a condition to be signalled by an
 // ISR, condition_wait() should be called with interrupts disabled to ensure
 // avoid a race condition.
+//
+// Despite the name _condition variable_, there no no guarantee that any
+// particular condition, in the broad sense of the word, holds when
+// condition_wait() returns.
 //
 // On entry condition_wait() assumes:
 // - /cond/ is a pointer to properly initialized condition structure (either
@@ -421,17 +416,12 @@ extern void condition_wait(struct condition * cond);
 // - The calling thread becomes RUNNABLE after the next call to
 //   condition_broadcast(), necessarily made in another thread or in an ISR,
 //   returns.
+// - condition_wait() does not allocate memory.
 //
-// While a call to condition_broadcast() is guaranteed to wake up all waiting
-// threads, there are _no_ guarantees about the order in which such threads will
-// be resumed.
+// There are _no_ guarantees on the order in which waiting threads are resumed.
 //
-// Despite the name _condition variable_, there no no guarantee that any
-// particular condition, in the broad sense of the word, holds when
-// condition_wait() returns.
-//
-// This function may switch to another thread context. This function may _not_
-// be called from an ISR.
+// * This function may switch to another thread context.
+// * This function may _not_ be called from an ISR.
 //
 // See also: condition_init(), condition_broadcast().
 
@@ -454,37 +444,39 @@ extern void condition_broadcast(struct condition * cond);
 // Note that there are _no_ guarantees about the order in which woken threads
 // will be executed.
 //
+// * This function may be called from an ISR.
+//
 // See also: condition_init(), condition_wait().
 
 //
 // READERS-WRITER LOCK
 //
-
-// The thread manager provides a readers-writer lock (also called a
-// shared-exclusive lock) for managing access to shared resources between
-// threads. The lock may either be _unlocked_, held _shared_ by one or more
-// threads, or held _exclusvely_ by a single thread. Recursive locking is
-// supported: A thread may acquire the lock as a reader multiple times, in which
-// case it must also release it the same number of times in order to be
-// considered no longer holding the lock. A thread may acquire the lock as a
-// writer multiple times, in which case it must also release the lock the same
-// number of times in order to be considered no longer holding the lock. If a
-// thread acquired the lock multiple times, it is said to be holding the lock
-// _with multiplicity_.
+// A readers-writer lock, or rw-lock for short, also called a shared-exclusive
+// lock, allows threads to synchronize shared or exclusive access to an object.
+// The The lock may either be _unlocked_ (not held by any threads), held
+// _shared_ by one or more threads, or held _exclusvely_ by a single thread.
+// Recursive locking is supported: A thread may acquire the lock as a reader
+// multiple times, in which case it must also release it the same number of
+// times in order to be considered no longer holding the lock. A thread may
+// acquire the lock as a writer multiple times, in which case it must also
+// release the lock the same number of times in order to be considered no longer
+// holding the lock. If a thread acquired the lock multiple times, it is said to
+// be holding the lock _with multiplicity_.
 //
 // The following important restrictions must be followed:
 //
 // - A thread must _not_ attempt to release a lock it is not holding,
-// - A thread must _not_ attempt to acquire a lock as a reader if it is already
-//   holding the lock as a writer, and vice versa.
-// - None of the readers-writer lock functions may be called from an ISR.
+// - A thread must _not_ attempt to acquire a lock exclusively if it is already
+//   holding it shared.
+// - None of the rw-lock functions may be called from an ISR.
 //
-// The /rwlock/ structure defined below implements a readers-writer lock. The
-// definition is given here to allow locks to be allocated statically. The
-// structure must only be manipulated using the functions declared below.
+// The /rwlock/ structure defined below implements an rw-lock. The definition is
+// given here to allow locks to be allocated statically. The structure must only
+// be manipulated using the functions declared below.
 
 struct rwlock {
     // NO DIRECT ACCESS!
+    const char * name;
     struct condition released;
     struct thread * owner;
     unsigned long cnt;
@@ -493,105 +485,134 @@ struct rwlock {
 // EXPORTED FUNCTION DECLARATIONS
 //
 
-extern void rwlock_init(struct rwlock * rwlk);
+extern void rwlock_init(struct rwlock * rwlk, const char * name);
 
-// Initializes a readers-writer (shared-exclusive) lock in the _unlocked_ state.
-// Any thread may acquire it shared (as a reader) or exclusively (as a writer).
+// Initializes an rw-lock in the _unlocked_ state. Any thread may then acquire
+// the lock either in shared or exclusive mode.
 //
-// When a readers-writer lock is no longer needed, the memory associated with
-// the /rwlock/ structure may be reclaimed. After that point, a pointer to this
-// structure is no longer considered to be a valid lock and must not be used. It
-// is safe, however, to initialize and use a stack-allocated /rwlock/ structure,
-// provided that the lock is only used during the lifetime of the structure.
+// When an rw-lock is no longer needed, the memory associated with the /rwlock/
+// structure may be reclaimed. After that point, a pointer to this structure is
+// no longer considered to be a valid lock and must not be used. It is safe,
+// however, to initialize and use a stack-allocated /rwlock/ structure, provided
+// that the lock is only used during the lifetime of the structure.
 //
 // On entry rwlock_init() assumes:
 // - /rwlk/ is a valid pointer to a region of memory large enough to hold an
-//   instance of `struct rwlock`.
+//   instance of a /rwlock/ structure.
 //
 // On return rwlock_init() guarantees:
-// - /rwlk/ points to an initialized instance of a reader-writers lock.
+// - /rwlk/ points to an initialized instance of an rw-lock.
 // - No threads are considered to be holding the lock.
 //
 // Performance guarantees:
-// - The number of readers-writer locks in the system is unlimited.
-
-extern void rwlock_acquire_shared(struct rwlock * rwlk);
-
-// Acquires a readers-writer lock as a reader (shared). If the lock is currently
-// held by a writer (exclusively), the running thread is put to sleep until the
-// lock can be acquired fo reading. This function may not be called if the
-// running thread currently holds the lock as a writer (exclusively). This
-// function may not be called from an ISR. The lock must have been previously
-// initialized by rwlock_init() or its equivalent.
+// - The number of rw-locks in the system is unlimited.
+// - rwlock_init() does not allocate memory.
 //
-// A thread may acquire lock multiple times as a reader (recursive locking), in
-// which case it is said to be holding the lock as a reader _with multiplicity_.
-// In this case, rwlock_release_shared() must be called an equal number of times
-// for the running thread to be considered no longer holding the lock.
+// See also: rwlock_name(), rwlock_acquire(), rwlock_release().
+
+
+extern const char * rwlock_name(const struct rwlock * rwlk);
+
+// Returns the name of an rw-lock. The /rwlk/ argument must be a properly
+// initialized rw-lock. If rwlock_init() was called with a non-NULL /name/
+// argument, then the same pointer is returned by rwlock_name(). Otherwise, if
+// condition_init() was called with a NULL /name/, rwlock_name() returns the
+// implementation-defined name assigned to the rw-lock. In all cases, the
+// returned value is a pointer to a null-terminated string.
 //
-// Multiple threads may hold a readers-writer lock as a reader simultaneously.
-// No thread may acquire the lock as a writer (exclusively) while there is at
-// least one thread holding the lock as a reader.
+// On entry rwlock_name() assumes:
+// - /rwlk/ is a pointer to properly initialized rw-lock.
+//
+// On return rwlock_name() guarantees:
+// - The return value is a pointer to a null-terminated string.
+// - If rwlock_init() was called to initialize the rw-lock with a non-NULL
+//   /name/ argument, the value returned is /name/.
+// - If rwlock_init() was called to initialize the rw-lock with a NULL /name/
+//   argument, the value returned is a pointer to an imlementation-defined
+//   null-terminated string.
+//
+// See also rwlock_init().
+
+extern void rwlock_acquire(struct rwlock * rwlk, int exclusive);
+
+// Acquires an rw-lock. If (exclusive != 0), rwlock_acquire() attempts to
+// acquire the rw-lock exclusively. Otherwise, rwlock_acquire() attempts to
+// acquire the rw-lock as shared. Multiple threads may share an rw-lock
+// simultaneously. No thread may acquire an rw-lock exclusively while it is held
+// shared.
+//
+// A thread may hold an rw-lock either shared or exclusively. If the rw-lock is
+// currently held by another thread exclusively, the running thread is suspended
+// until the rw-lock can be acquired in the requested mode. If the rw-lock is
+// not held exclusively by another thread and (exclusive == 0), rwlock_acquire()
+// succeeds immediately and the calling thread is considered to be holding the
+// rw-lock shared.
+//
+// A thread may acquire an rw-lock multiple times (recursive locking) in the
+// same mode (shared or exclusive). If a thread attempts to acquire an rw-lock
+// exclusively that it is already holding exclusively, rwlock_acquire() succeeds
+// immediately. Similarly, if a thread attempts to acquire a shared rw-lock that
+// it is already sharing, it succeeds immediately. A thread that acquires a lock
+// multiple times is said to be holding it _with multiplicity_.
+//
+// If a thread holding an rw-lock exclusively attempts to acquire it as shared,
+// the request is promoted to an exclusive request and succeeds immediately. The
+// rw-lock lock is then considered to be held by the thread exclisively with
+// multiplity greater than one.
+//
+// A thread may _not_ request a lock exclusively if it already holding it in
+// shared mode.
 //
 // On entry rwlock_acquire_shared() assumes:
-// - /rwlock/ is a pointer to properly initialized readers-writer lock (either
-//   zero-initialized or initialized using rwlock_init()).
-// - The lock is not already held by the running thread as a writer.
+// - /rwlock/ is a pointer to properly initialized rw-lock.
+// - If a thread holds the lock in shared mode, then (exclusive == 0).
 //
 // On return rwlock_acquire_shared() guarantees:
-// - The current thread is considered to be holding the lock as a reader.
+// - The current thread is considered to be holding the rw-lock in the requested
+//   mode.
 //
 // Performance guarantees:
-// - The number of threads waiting to acquire a shared lock is unlimited.
-// - If the lock is not currently held exclusively, rwlock_acquire_shared()
-//   returns immediately without a context switch.
-// - The calling thread becomes RUNNABLE after the next call to
-//   rwlock_release_exclusive(), necessarily made in another thread, returns
-//   without the lock being held exclusively by another thread.
+// - The number of threads waiting to acquire an rw-lock is unlimited.
+// - If the calling thread is able to acquire an rw-lock in the request mode,
+//   rwlock_acquire() returns immediately without a context switch.
+// - If a thread is waiting to acquire an rw-lock, the rw-lock is released, and
+//   no other threads are waiting to acquire the same rw-lock, the waiting
+//   thread will succeed in acquiring the lock.
+// - rwlock_acquire() does not allocate memory.
 //
-// This function may switch to another thread context.
+// * This function may switch to another thread context.
+// * This function may _not_ be called from an ISR.
 //
-// See also: rwlock_init(), rwlock_release_shared().
+// See also: rwlock_init(), rwlock_release().
 
-extern void rwlock_release_shared(struct rwlock * rwlk);
+extern void rwlock_release(struct rwlock * rwlk);
 
-// Releases a lock previously acquired as a reader (shared). The running thread
-// _must_ be holding the lock as a reader. That is, the number of times the
-// running thread has called rwlock_acquire_shared() minus the number of times
-// it has called rwlock_relase_shared() on the lock must be greater than zero.
-// If the running thread is holding the lock with multiplcity, the number of
-// times it is said to be holding the lock is decreased by one.
+// Releases a previously acquired rw-lock. The rw-lock may be either shared or
+// exclusive, however, running thread _must_ be holding the rw-lock. That is,
+// the number of times the running thread has called rwlock_acquire() minus the
+// number of times it has called rwlock_release() on the rw-lock must be
+// non-zero when calling rwlock_release(). If the running thread is holding the
+// rw-lock with multiplicity, the number of times it is said to be holding the
+// rw-lock is decreased by one.
 //
-// On entry rwlock_acquire_shared() assumes:
-// - The lock is currently held as a reader by the running thread. That is, the
-//   the number of times the running thread has called rwlock_acquire_shared()
-//   minus the number of times it has called rwlock_relase_shared() on the lock
-//   is greater than zero.
+// On entry rwlock_release() assumes:
+// - The rw-lock is currently held by the running thread.
 //
-// On return rwlock_acquire_shared() guarantees:
-// - If the running thread is holding the lock with multiplicity greater than
-//   one, the multiplity is reduced by one.
-// - If the running thread is holding the lock with multiplity one, the thread
-//   is no longer considered to be holding the lock.
-// - If any threads are waiting to acquire /rwlk/ as a writer (exclusively),
-//   exactly one such thread will be allowed to acquire the lock as a writer.
+// On return rwlock_release() guarantees:
+// - If the running thread was holding the rw-lock with multiplicity greater
+//   than one, the multiplity is decreased by one.
+// - If the running thread was holding the rw-lock with multiplicity one, then
+//   on return it is no longer considered to be holding the rw-lock.
 //
-// See also: rwlock_acquire_shared().
-
-extern void rwlock_acquire_exclusive(struct rwlock * rwlk);
-
-// TODO
-
-extern void rwlock_release_exclusive(struct rwlock * rwlk);
-
-// TODO
-
+// Performance guarantees:
+// - If on return from rwlock_release() a thread is no longer considered to be
+//   holding the rw-lock and there are threads waiting to acquire that lock,
+//   then either (a) exactly one of the threads waiting to acquire the rw-lock
+//   exclusively will succeeds, or (b) all threads waiting to acquire a rw-lock
+//   shared will succeed.
 //
-// INLINE FUNCTION DEFINITIONS
+// * This function may _not_ be called from an ISR.
 //
-
-static inline const char * condition_name(const struct condition * cond) {
-    return cond->name;
-}
+// See also: rwlock_acquire().
 
 #endif // _THREAD_H_

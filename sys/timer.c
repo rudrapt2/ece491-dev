@@ -30,6 +30,15 @@
 #define BOLT_FREQ 50 // Hz
 #endif
 
+// INTERNAL TYPE DEFINITIONS
+//
+
+struct timer_alarm {
+    struct timer_alarm * next;
+    struct condition woken;
+    unsigned long long twake;
+};
+
 // EXPORTED GLOBAL VARIABLES
 //
 
@@ -40,7 +49,7 @@ unsigned int timer_frequency = 0;
 // INTERNAL GLOBAL VARIABLES
 //
 
-static struct alarm * sleep_list; // list of pending alarms
+static struct timer_alarm * sleep_list; // list of pending alarms
 
 static unsigned long long tbolt; // next system periodic interrupt time
 static unsigned int bolt_period; // ticks between system periodic interrupts
@@ -49,7 +58,7 @@ static unsigned int bolt_period; // ticks between system periodic interrupts
 // INTERNAL FUNCTION DECLARATIONS
 //
 
-static void add_alarm(struct alarm * al);
+static void add_alarm(struct timer_alarm * al);
 
 // Adds an alarm to the sleep_list and adjusts the next timer interrupt time if
 // necessary. Must be called with timer interrupts DISABLED.
@@ -72,27 +81,20 @@ void timer_init(unsigned int freq) {
     enable_timer_interrupts();
 }
 
-void alarm_init(struct alarm * al, const char * name) {
-    if (name == NULL)
-        name = "unnamed";
-    
-    memset(al, 0, sizeof(*al));
-    condition_init(&al->cond, name);
-    al->name = name;
-}
-
-void alarm_sleep_until(struct alarm * al, unsigned long long twake) {
+void alarm_sleep_until(unsigned long long twake) {
+    struct timer_alarm alarm;
     unsigned long long tnow;
     int pie;
 
     tnow = rdtime();
 
-    trace("[%llu] %s(<%s>, %llu)", tnow, __func__, al->name, twake);
+    trace("[%llu] %s(%llu)", tnow, __func__, twake);
 
     if (twake < tnow)
         return;
 
-    al->twake = twake;
+    memset(&alarm, 0, sizeof(alarm));
+    alarm.twake = twake;
 
     // We need to have timer interrupts disabled while modifying the sleep list
     // and changing the S mode timer compare register. We could disable all
@@ -101,7 +103,7 @@ void alarm_sleep_until(struct alarm * al, unsigned long long twake) {
     // disabled at that time.
 
     disable_timer_interrupts();
-    add_alarm(al);
+    add_alarm(&alarm);
 
     // condition_wait() must be inside an interrupt-disabled region to avoid a
     // race where the alarm is signalled before we begin waiting. Now we need to
@@ -111,60 +113,27 @@ void alarm_sleep_until(struct alarm * al, unsigned long long twake) {
     enable_timer_interrupts();
 
     while (rdtime() < twake)
-        condition_wait(&al->cond);
+        condition_wait(&alarm.woken);
     restore_interrupts(pie);
-
-    trace("[%llu] alarm_sleep_until(): twake = %llu", rdtime(), twake);
-    trace("[%llu] alarm_sleep_until() returning", rdtime());
-}
-
-void alarm_sleep_sec(struct alarm * al, unsigned int sec) {
-    unsigned long long duration_ticks;
-
-    duration_ticks = (unsigned long long)sec * timer_frequency;
-    alarm_sleep_until(al, rdtime() + duration_ticks);
-}
-
-void alarm_sleep_ms(struct alarm * al, unsigned int ms) {
-    unsigned long long duration_ticks;
-
-    duration_ticks = (unsigned long long)ms * timer_frequency / 1000;
-    alarm_sleep_until(al, rdtime() + duration_ticks);
-}
-
-void alarm_sleep_us(struct alarm * al, unsigned int us) {
-    unsigned long long duration_ticks;
-
-    duration_ticks = (unsigned long long)us * timer_frequency / 1000 / 1000;
-    alarm_sleep_until(al, rdtime() + duration_ticks);
 }
 
 void sleep_sec(unsigned int sec) {
-    struct alarm al;
-
-    alarm_init(&al, __func__);
-    alarm_sleep_sec(&al, sec);
+    alarm_sleep_until(1ULL * sec * timer_frequency);
 }
 
 void sleep_ms(unsigned int ms) {
-    struct alarm al;
-
-    alarm_init(&al, __func__);
-    alarm_sleep_ms(&al, ms);
+    alarm_sleep_until(1ULL * ms * timer_frequency / 1000);
 }
 
 void sleep_us(unsigned int us) {
-    struct alarm al;
-
-    alarm_init(&al, __func__);
-    alarm_sleep_us(&al, us);
+    alarm_sleep_until(1ULL * us * timer_frequency / 1000 / 1000);
 }
 
 void handle_timer_interrupt(void) {
     unsigned long long talarm;   // next alarm interrupt time
     unsigned long long tnow;
-    struct alarm * head;
-    struct alarm * next;
+    struct timer_alarm * head;
+    struct timer_alarm * next;
 
     // This function is guaranteed by assumption not to be called while we are
     // executing any other function in timer.c, either by assumption or by
@@ -177,8 +146,8 @@ void handle_timer_interrupt(void) {
     trace("[%lu] %s()", tnow, __func__);
 
     while (head != NULL && head->twake <= tnow) {
-        debug("[%lu] Waking threads sleeping on <%s>", tnow, head->name);
-        condition_broadcast(&head->cond);
+        debug("[%lu] Waking threads sleeping on <%p>", tnow, head);
+        condition_broadcast(&head->woken);
 
         next = head->next;
         head->next = NULL;
@@ -192,19 +161,19 @@ void handle_timer_interrupt(void) {
 
     tbolt = ROUND_UP(tnow+1, bolt_period);
     talarm = (head != NULL) ? head->twake : ULLONG_MAX;
-    debug("[%llu] %s(): tbolt = %llu", rdtime(), __func__, tbolt);
-    debug("[%llu] %s(): talarm = %llu", rdtime(), __func__, talarm);
-    debug("[%llu] %s(): Calling sbi_set_timer(%llu)", rdtime(), __func__, MIN(tbolt, talarm));
+    debug("[%llu] %s(): tbolt = %llu", tnow, __func__, tbolt);
+    debug("[%llu] %s(): talarm = %llu", tnow, __func__, talarm);
+    debug("[%llu] %s(): Calling sbi_set_timer(%llu)", tnow, __func__, MIN(tbolt, talarm));
     sbi_set_timer(MIN(tbolt, talarm));
 }
 
 // INTERNAL FUNCTION DEFINITIONS
 //
 
-static void add_alarm(struct alarm * al) {
-    struct alarm * prev;
+static void add_alarm(struct timer_alarm * al) {
+    struct timer_alarm * prev;
 
-    trace("[%llu] %s({\"%s\",%llu})", rdtime(), __func__, al->name, al->twake);
+    trace("[%llu] %s({%llu})", rdtime(), __func__, al->twake);
     debug("[%llu] tbolt = %llu", rdtime(), tbolt);
 
     // Timer interrupts MUST be disabled by caller while we are manipulating the

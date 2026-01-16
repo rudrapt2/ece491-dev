@@ -24,7 +24,6 @@
 #include "conf.h"
 #include "misc.h"
 #include "error.h"
-#include "uio.h" // FCNTL
 #include "console.h"
 
 #include <limits.h>
@@ -327,7 +326,7 @@ void vioblk_attach(volatile struct virtio_mmio_regs * regs, int irqno) {
     vbd->vq.desc[3].next = -1;
 
     condition_init(&vbd->vq.used_updated, "vioblk.vq.used_updated");
-    rwlock_init(&vbd->vq.lock);
+    rwlock_init(&vbd->vq.lock, "vioblk.vq.lock");
 
     // Attach queues
 
@@ -413,7 +412,7 @@ long vioblk_storage_fetch (
 
     // Submit virtq request
 
-    rwlock_acquire_exclusive(&vbd->vq.lock);
+    rwlock_acquire(&vbd->vq.lock, /* excl*/ 1);
 
     vbd->vq.req_header.sector = pos / vbd->blksz;
     vbd->vq.req_header.type = VIRTIO_BLK_T_IN;
@@ -436,7 +435,7 @@ long vioblk_storage_fetch (
         condition_wait(&vbd->vq.used_updated);
     restore_interrupts(pie);
 
-    rwlock_release_exclusive(&vbd->vq.lock);
+    rwlock_release(&vbd->vq.lock);
 
     switch (vbd->vq.req_status) {
     case VIRTIO_BLK_S_OK:

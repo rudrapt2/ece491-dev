@@ -91,7 +91,7 @@ void handle_umode_interrupt(unsigned int cause) {
 
     enable_interrupts();
 
-    running_thread_submit();
+    submit_running_thread();
 }
 
 // INTERNAL FUNCTION DEFINITIONS

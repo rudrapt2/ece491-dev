@@ -28,7 +28,7 @@ static void thread_func(void) {
     tid_from_child = running_thread();
 
     for (;;)
-        running_thread_yield();
+        yield_running_thread();
 }
 
 void main(void) {
@@ -48,7 +48,7 @@ void main(void) {
     int ctid = spawn_thread("dummy", thread_func);
 
     for (int i = 0; i < 16 && tid_from_child == 0; i++)
-        running_thread_yield();
+        yield_running_thread();
     
     if (ctid != 0 && ctid == tid_from_child)
         kprintf("PASS %s\n", test_name);

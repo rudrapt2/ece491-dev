@@ -26,7 +26,7 @@ static void thread_func(void) {
     int i;
 
     for (i = 0; i < 16; i++)
-        running_thread_yield();
+        yield_running_thread();
     
     kprintf("FAIL %s\n", test_name);
     halt();
@@ -41,7 +41,7 @@ void main(void) {
     
     // The test itself
     spawn_thread("dummy", thread_func);
-    running_thread_yield();
+    yield_running_thread();
 
     kprintf("PASS %s\n", test_name);
     halt();

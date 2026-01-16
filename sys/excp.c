@@ -123,7 +123,7 @@ void handle_umode_exception(unsigned int cause, struct trap_frame * tfr) {
         break;
     }
 
-    running_thread_submit();
+    submit_running_thread();
     
     if (handled)
         return;

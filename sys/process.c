@@ -244,7 +244,7 @@ void process_exit(void) {
 
     kfree(self);
 
-    running_thread_exit();
+    exit_running_thread();
 }
 
 // INTERNAL FUNCTION DEFINITIONS

@@ -1,4 +1,4 @@
-// test/thread/create-yield-once.c
+// test/thread/yield-once.c
 //
 // Copyright (c) 2025 University of Illinois
 // SPDX-License-identifier: NCSA
@@ -30,13 +30,13 @@ static void thread_func(void) {
 void main(void) {
     test_name_init();
     console_init();
-    timer_init(/* qemu virt timer frequency*/ 24000000);
+    timer_init(/* qemu virt timer frequency */ 24000000);
     memory_init();
     thrmgr_init();
     
     // The test itself
     spawn_thread("dummy", thread_func);
-    running_thread_yield();
+    yield_running_thread();
 
     kprintf("FAIL %s\n", test_name);
     halt();

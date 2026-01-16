@@ -70,7 +70,7 @@ static int sysuiodup(int oldfd, int newfd);
 void handle_syscall(struct trap_frame *tfr) {
     tfr->sepc += 4;
     tfr->a0 = syscall(tfr);
-    running_thread_submit();
+    submit_running_thread();
 }
 
 // INTERNAL FUNCTION DEFINITIONS
@@ -182,9 +182,9 @@ int sysfork(const struct trap_frame *tfr)
 
 /**
  * @brief Sleeps till a specified child process completes
- * @details Calls thread_join with the thread id the process wishes to wait for
+ * @details Calls join_thread with the thread id the process wishes to wait for
  * @param tid thread_id
- * @return result of thread_join else invalid on invalid thread id
+ * @return result of join_thread else invalid on invalid thread id
  */
 
 int syswait(int tid)
@@ -192,7 +192,7 @@ int syswait(int tid)
     trace("%s(%d)", __func__, tid);
 
     if (0 <= tid)
-        return thread_join(tid);
+        return join_thread(tid);
     else
         return -EINVAL;
 }
@@ -232,10 +232,7 @@ int sysprint(const char *msg)
 
 int sysusleep(unsigned long us)
 {
-    struct alarm alarm;
-
-    alarm_init(&alarm, "usleep");
-    alarm_sleep_us(&alarm, us);
+    sleep_us(us);
     return 0;
 }
 

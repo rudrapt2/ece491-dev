@@ -172,8 +172,7 @@ static struct thread main_thread = {
     .name = "main",
     .state = THREAD_RUNNING,
     .stack_anchor = (void*)_main_stack_anchor,
-    .stack_lowest = _main_stack_lowest,
-    .child_exit.name = "main.child_exit"
+    .stack_lowest = _main_stack_lowest
 };
 
 extern char _idle_stack_lowest[]; // from thrasm.s
@@ -251,7 +250,7 @@ int spawn_thread (
 
     child->ctx.s[10] = (uintptr_t)NULL;
     child->ctx.s[8] = (uintptr_t)entry;
-    child->ctx.s[11] = (uintptr_t)&running_thread_exit;
+    child->ctx.s[11] = (uintptr_t)&exit_running_thread;
     child->ctx.ra = &start_thread;
     child->ctx.sp = child->stack_anchor;
 
@@ -269,7 +268,7 @@ int spawn_thread (
     return child->id;
 }
 
-void running_thread_exit(void) {
+void exit_running_thread(void) {
     int ctid; // child TID
 
     if (TP == &main_thread)
@@ -293,11 +292,11 @@ void running_thread_exit(void) {
     // we can't free it just yet, because we're still using it. So we free it
     // in the context of the next scheduled thread.
 
-    running_thread_yield(); // should not return
+    yield_running_thread(); // should not return
     panic(NULL);
 }
 
-void running_thread_submit(void) {
+void submit_running_thread(void) {
     unsigned long long time_must_suspend; // time thread must suspend
     unsigned long long time_now;
 
@@ -305,10 +304,10 @@ void running_thread_submit(void) {
     time_must_suspend = TP->time_resumed + TP->ticks_balance;
 
     if (time_must_suspend <= time_now)
-        running_thread_yield();
+        yield_running_thread();
 }
 
-void running_thread_yield(void) {
+void yield_running_thread(void) {
     extern void switch_running_thread(struct thread *); // thrasm.s
     struct thread * susp_thread; // suspending thread
     struct thread * next_thread; // resuming thread
@@ -325,7 +324,7 @@ void running_thread_yield(void) {
     susp_thread = TP;
 
     // Add current thtread to the ready list if it is still considered RUNNING.
-    // (Its stgate may be set to EXITED or WAITING before running_thread_yield()
+    // (Its stgate may be set to EXITED or WAITING before yield_running_thread()
     // is called). Interrupts must be disabled while we manipulate the ready
     // list. 
 
@@ -423,7 +422,6 @@ void finish_thread_switch(struct thread * susp_thread) {
     // from current balance.
 
     ticks_used = time_now - susp_thread->time_resumed;
-    debug("Thread <%s:%d> used %u of %d ticks", susp_thread->name, susp_thread->id, ticks_used, susp_thread->ticks_balance);
     susp_thread->running_ticks += ticks_used;
     susp_thread->ticks_balance -= ticks_used;
 
@@ -439,7 +437,7 @@ void finish_thread_switch(struct thread * susp_thread) {
     }
 }
 
-int thread_join(int u_tid) {
+int join_thread(int u_tid) {
     struct thread * thr;
     int ctid;
     int haschild = 0;
@@ -456,7 +454,7 @@ int thread_join(int u_tid) {
         for (ctid = 1; ctid < NTHR; ctid++) {
             if (thrtab[ctid] != NULL && thrtab[ctid]->parent == TP) {
                 if (thrtab[ctid]->state == THREAD_EXITED)
-                    return thread_join(ctid); // ctid != 0
+                    return join_thread(ctid); // ctid != 0
                 haschild = 1;
             }
         }
@@ -526,14 +524,19 @@ void * running_thread_stack_anchor(void){
 //
 
 void condition_init(struct condition * cond, const char * name) {
+    memset(cond, 0, sizeof(*cond));
     tlclear(&cond->wait_list);
-    cond->name = name;
+    cond->name = (name != NULL) ? name : "anon";
+}
+
+const char * condition_name(const struct condition * cond) {
+    return cond->name;
 }
 
 void condition_wait(struct condition * cond) {
     int pie;
 
-    trace("%s(cond=<%s>) in <%s:%d>", __func__, cond->name, TP->name, TP->id);
+    trace("%s(<%s>) in <%s:%d>", __func__, cond->name, TP->name, TP->id);
 
     assert(TP->state == THREAD_RUNNING);
 
@@ -546,13 +549,15 @@ void condition_wait(struct condition * cond) {
     tlinsert(&cond->wait_list, TP);
     restore_interrupts(pie);
 
-    running_thread_yield();
+    yield_running_thread();
 }
 
 void condition_broadcast(struct condition * cond) {
     struct thread_list list;
     struct thread * thr;
     int pie;
+
+    trace("%s(<%s>) in <%s:%d>", __func__, cond->name, TP->name, TP->id);
 
     // Fast path: if there are no threads waiting, return.
 
@@ -584,7 +589,7 @@ void condition_broadcast(struct condition * cond) {
 
     pie = disable_interrupts();
 
-    #if 0
+#if 0
     tlappend(&ready_list, &list);
 #else
     tlprepend(&ready_list, &list);
@@ -609,58 +614,52 @@ void condition_broadcast(struct condition * cond) {
 // - LOCKED-SHARED when (owner == NULL && cnt > 0), and
 // - LOCKED-EXCLUISIVE when (owner != NULL && cnt > 0).
 //
-// The configuration (owner == NULL && cnt > 0) is not valid.
+// The configuration (owner != NULL && cnt == 0) is not valid.
 //
 
-void rwlock_init(struct rwlock * rwlk) {
+void rwlock_init(struct rwlock * rwlk, const char * name) {
     memset(rwlk, 0, sizeof(*rwlk));
     condition_init(&rwlk->released, "rwlock.released");
+    rwlk->name = (name != NULL) ? name : "anon";
 }
 
-void rwlock_acquire_shared(struct rwlock * rwlk) {
-    assert (rwlk->owner != TP);
-
-    while (rwlk->owner != NULL)
-        condition_wait(&rwlk->released);
-
-    rwlk->cnt += 1;
-
-    if (rwlk->cnt == 0)
-        panic("rwlock.cnt overflow");
+const char * rwlock_name(const struct rwlock * rwlk) {
+    return rwlk->name;
 }
 
-void rwlock_release_shared(struct rwlock * rwlk) {
-    assert (rwlk->owner == NULL);
-    assert (rwlk->cnt > 0);
+void rwlock_acquire(struct rwlock * rwlk, int exclusive) {
+    trace("%s(<%s>,%d)", __func__, rwlk->ame, exclusive);
 
-    rwlk->cnt -= 1;
-
-    if (rwlk->cnt == 0)
-        condition_broadcast(&rwlk->released);
-}
-
-void rwlock_acquire_exclusive(struct rwlock * rwlk) {
-    if (rwlk->owner != TP) {
+    if (exclusive) {
+        if (rwlk->owner != TP) {
+            while (rwlk->cnt > 0)
+                condition_wait(&rwlk->released);
+            rwlk->owner = TP;
+        }
+    } else {
         while (rwlk->owner != NULL)
             condition_wait(&rwlk->released);
-        rwlk->owner = TP;
     }
-    
+
     rwlk->cnt += 1;
 
     if (rwlk->cnt == 0)
         panic("rwlock.cnt overflow");
 }
 
-void rwlock_release_exclusive(struct rwlock * rwlk) {
-    assert (rwlk->owner == TP);
-    assert (rwlk->cnt != 0);
+void rwlock_release(struct rwlock * rwlk) {
+    trace("%s(<%s>)", __func__, rwlk->name);
 
+    assert (rwlk->cnt > 0);
     rwlk->cnt -= 1;
 
-    if (rwlk->cnt == 0)
+    if (rwlk->cnt == 0) {
+        assert (rwlk->owner == NULL || rwlk->owner == TP);
         condition_broadcast(&rwlk->released);
+        rwlk->owner = NULL;
+    }
 }
+
 
 // INTERNAL FUNCTION DEFINITIONS
 //
@@ -711,7 +710,7 @@ struct thread * create_thread(const char * name) {
     struct thread_stack_anchor * anchor;
     int tid;
 
-    trace("%s(name=\"%s\") in <%s:%d>", __func__, name, TP->name, TP->id);
+    trace("%s(\"%s\") in <%s:%d>", __func__, name, TP->name, TP->id);
 
     // Find a free thread slot.
 
@@ -737,8 +736,9 @@ struct thread * create_thread(const char * name) {
 
     thrtab[tid] = thr;
 
+    thr->name = (name != NULL) ? name : "anon";
     thr->id = tid;
-    thr->name = name;
+
     return thr;
 }
 
@@ -841,7 +841,7 @@ void idle_thread_func(void) {
         // If there are runnable threads, yield to them.
 
         while (!tlempty(&ready_list))
-            running_thread_yield();
+            yield_running_thread();
         
         // No runnable threads. Sleep using the wfi instruction. Note that we
         // need to disable interrupts and check the runnable thread list one
