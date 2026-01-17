@@ -7,13 +7,21 @@
 #ifndef _CACHE_H_
 #define _CACHE_H_
 
+#include "io.h"
+
 struct cache; // opaque decl.
 
-extern struct cache * create_cache(struct io * bkgio, unsigned int capacity);
+#define CACHE_BLKSZ 512
+
+// extern struct cache * create_cache(struct io * bkgio, unsigned int capacity);
+
+extern struct cache * create_cache(struct io * bkgio);
 
 extern unsigned int cache_blksz(const struct cache * ca);
 
-extern int cache_fetch(struct cache * ca, unsigned long long pos, void ** pptr, int exclusive);
+// extern int cache_fetch(struct cache * ca, unsigned long long pos, void ** pptr, int exclusive);
+
+extern int cache_fetch(struct cache * ca, unsigned long long pos, void ** pptr);
 
 extern void cache_release(struct cache * ca, void * ptr, int dirty);
 

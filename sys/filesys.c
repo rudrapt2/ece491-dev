@@ -14,6 +14,7 @@
 #include "misc.h"
 #include "string.h"
 #include "uioimpl.h"
+#include "ioimpl.h"
 
 // INTERNAL TYPE DEFINITIONS
 //
@@ -47,13 +48,14 @@ static void nullfs_flush(struct filesystem * fs);
 // INTERNAL GLOBAL VARIABLES
 //
 
-struct fs_listing_uio {
-    struct uio base;
+struct root_lsio {
+    struct io io;
     const struct mountpoint * fs;
 };
 
-static const struct uio_intf fs_listing_uio_intf = {
-    .close = &fs_listing_close,
+static const struct iointf root_lsio_intf = {
+    .implname = "root_ls"
+    .reclaim = &fs_listing_close,
     .read = &fs_listing_read
 };
 

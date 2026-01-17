@@ -19,8 +19,9 @@ OBJS = \
 	dev/rtc.o \
 	dev/virtio.o \
 	dev/viorng.o \
-	dev/ramdisk.o \
+	dev/vioblk.o \
 	device.o \
+	io.o \
 	filesys.o \
 	elf.o \
 	error.o \
@@ -40,10 +41,10 @@ OBJS = \
 	dev/viorng.o \
 	dev/vioblk.o \
 	cache.o \
-	games/trek_mp2.o \
-	games/rule30.o
+   tarfs.o 
+#	games/trek_mp2.o \
+#	games/rule30.o
 #	ktfs.o
-#   tarfs.o 
 
 CFLAGS = -Wall -Werror=implicit-function-declaration -Wno-unused-function
 CFLAGS += -fno-omit-frame-pointer -ggdb3 -gdwarf-2
@@ -74,7 +75,6 @@ ASFLAGS = -march=rv64imazicsr
 LDFLAGS = -melf64lriscv
 
 QEMUOPTS = -global virtio-mmio.force-legacy=false
-# QEMUOPTS += -machine virt,dumpdtb=qemu_dtb.dtb -nographic
 QEMUOPTS += -machine virt -nographic
 
 # the first rng-random is for reading "true" randomness from /dev/urandom

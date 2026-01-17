@@ -17,14 +17,14 @@ struct iointf {
     void (*reclaim)(struct io * io);
     long (*read)(struct io * io, void * buf, long blkcap);
     long (*write)(struct io * io, const void * buf, long blkcnt);
-    long (*store)(struct io * io, unsigned long long blkpos, void * buf, long blkcnt);
+    long (*store)(struct io * io, unsigned long long blkpos, const void * buf, long blkcnt);
     long (*fetch)(struct io * io, unsigned long long blkpos, void * buf, long blkcnt);
     int (*ioctl)(struct io * io, int op, void * arg);
-    int (*ioctl_u)(struct io * io, int u_op, void * u_arg);
+    int (*ioctl_u)(struct io * io, int u_op, uintptr_t u_arg);
 };
 
 struct io {
-    struct iointf * intf;
+    const struct iointf * intf;
     unsigned int blksz;
     unsigned int refcnt;
 };
@@ -50,8 +50,8 @@ struct seekio {
 
 extern struct io * seekio_init (
     struct seekio * sio,
-    struct iointf * intf,
-    unsigned long long end,
+    const struct iointf * intf,
+    unsigned long long endpos,
     unsigned int blksz,
     unsigned int refcnt
 );

@@ -15,10 +15,11 @@
 #include "rtc.h"
 #include "conf.h"
 #include "misc.h"
-#include "devimpl.h"
+#include "device.h"
 #include "console.h"
 #include "string.h"
 #include "heap.h"
+#include "ioimpl.h"
 
 #include "error.h"
 
@@ -33,27 +34,25 @@ struct rtc_regs {
 };
 
 struct rtc_device {
-    struct serial base; // must be first
     volatile struct rtc_regs * regs;
+    struct io io;
 };
 
 // INTERNAL FUNCTION DEFINITIONS
 //
 
-static int rtc_open(struct serial * ser);
-static void rtc_close(struct serial * ser);
-static int rtc_recv(struct serial * ser, void * buf, unsigned int bufsz);
+static int rtc_open(int instno, struct io ** ioptr, void * aux);
+static void rtc_reclaim(struct io * io);
+static long rtc_read(struct io * io, void * buf, long bufsz);
 
 static uint64_t read_real_time(volatile struct rtc_regs * regs);
 
 // INTERNAL GLOBAL VARIABLES AND CONSTANTS
 //
 
-static const struct serial_intf rtc_serial_intf = {
-    .blksz = 8,
-    .open = &rtc_open,
-    .close = &rtc_close,
-    .recv = &rtc_recv
+static const struct iointf rtc_intf = {
+    .implname = "rtc",
+    .read = &rtc_read
 };
 
 // EXPORTED FUNCTION DEFINITIONS
@@ -69,30 +68,26 @@ void rtc_attach(void * mmio_base) {
 
     rtc->regs = mmio_base;
 
-    serial_init(&rtc->base, &rtc_serial_intf);
-    register_device("rtc", DEV_SERIAL, rtc);
+    register_device("rtc", 1, &rtc_open, rtc);
+    ioinit(&rtc->io, &rtc_intf, 8, 0);
 }
 
-int rtc_open(struct serial * ser) {
+int rtc_open(int instno, struct io ** ioptr, void * aux) {
+    struct rtc_device * const rtc = aux;
     trace("%s()", __func__);
+    *ioptr = ioaddref(&rtc->io);
     return 0;
 }
 
-void rtc_close(struct serial * ser) {
-    trace("%s()", __func__);
-}
-
-int rtc_recv(struct serial * ser, void * buf, unsigned int bufsz) {
-    struct rtc_device * const rtc = (struct rtc_device*)ser;
+long rtc_read(struct io * io, void * buf, long bufsz) {
+    struct rtc_device * const rtc =
+        (void*)io - offsetof(struct rtc_device, io);
     uint64_t time_now;
 
     trace("%s(bufsz=%ld)", __func__, bufsz);
     
     if (bufsz == 0)
         return 0;
-    
-    if (bufsz < sizeof(uint64_t))
-        return -EINVAL;
     
     time_now = read_real_time(rtc->regs);
 

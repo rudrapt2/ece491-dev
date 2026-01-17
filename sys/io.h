@@ -7,7 +7,8 @@
 #ifndef _IO_H_
 #define _IO_H_
 
-#include <stdint.h>
+#include <stddef.h> // size_t
+#include <stdint.h> // uintptr_t
 
 struct io; // opaque
 
@@ -16,13 +17,13 @@ struct io; // opaque
 
 extern unsigned int ioblksz(const struct io * io);
 extern unsigned int iorefcnt(const struct io * io);
-extern unsigned int ioaddref(struct io * io);
+extern struct io * ioaddref(struct io * io);
 extern void iodropref(struct io * io);
 
-extern long read(struct io * io, void * buf, long bufsz);
-extern long write(struct io * io, const void * buf, long len);
-extern long fetch(struct io * io, unsigned long long pos, void * buf, long len);
-extern long store(struct io * io, unsigned long long pos, const void * buf, long len);
+extern long ioread(struct io * io, void * buf, long bufsz);
+extern long iowrite(struct io * io, const void * buf, long len);
+extern long iofetch(struct io * io, unsigned long long pos, void * buf, long len);
+extern long iostore(struct io * io, unsigned long long pos, const void * buf, long len);
 
 #define IOC_GETEND 1
 #define IOC_SETEND 2
@@ -39,9 +40,12 @@ int ioctl_u(struct io * io, int u_op, uintptr_t u_arg);
 extern struct io * create_nullio(void);
 
 extern struct io * create_memio (
-    void * buf,
-    unsigned int size,
-    unsigned int blksz,
-    int rdonly);
+    void * buf, size_t size,
+    void(*reclfn)(void*,size_t));
 
 #endif // _IO_H_
+
+struct ioret {
+    struct io * io;
+    int err;
+};

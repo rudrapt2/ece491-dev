@@ -4,8 +4,6 @@
 // SPDX-License-identifier: NCSA
 //
 
-#include "devimpl.h"
-
 #ifdef VIOBLK_TRACE
 #define TRACE
 #endif
@@ -25,6 +23,7 @@
 #include "misc.h"
 #include "error.h"
 #include "console.h"
+#include "ioimpl.h"
 
 #include <limits.h>
 
@@ -85,41 +84,31 @@ struct vioblk_request_header {
  * @brief VirtIO Block Device with virtqueues and condition variables
  */ 
 
-struct vioblk_storage {
-    struct storage base;
+struct vioblk_device {
     volatile struct virtio_mmio_regs * regs;
     int irqno;
-    char opened;
 
-    unsigned int blksz;
+    struct io io;
 
-    unsigned long long size;
+    unsigned long long bytecap;
     unsigned long long blkcnt;
 
     struct {
         struct condition used_updated;
         struct rwlock lock;
 
-        /**
-         * @brief The avail virtqueue for interacting with the VirtIO device
-         */
-
         union {
             struct virtq_avail avail;
             char _avail_filler[VIRTQ_AVAIL_SIZE(1)];
         };
-
-        /**
-         * @brief The used virtqueue for interacting with the VirtIO device
-         */
 
         union {
             volatile struct virtq_used used;
             char _used_filler[VIRTQ_USED_SIZE(1)];
         };
 
-        struct virtq_desc desc[4]; ///< The first descriptor is an indirect descriptor and is the one used in the avail and used rings. The second descriptor points to the header, the third points to the data, and the fourth to the status byte.
-        struct vioblk_request_header req_header; ///< The request header to pass to the VirtIO device
+        struct virtq_desc desc[4];
+        struct vioblk_request_header req_header;
         uint8_t req_status;
     } vq;
 };
@@ -127,99 +116,41 @@ struct vioblk_storage {
 // INTERNAL FUNCTION DECLARATIONS
 //
 
-/**
- * @brief Sets the virtq avail and virtq used queues such that they are available for use. (Hint,
- * read virtio.h) Enables the interupt line for the virtio device and sets necessary flags in vioblk
- * device.
- * @param sto Storage IO struct for the storage device
- * @return Return 0 on success or negative error code if error. If the given sto is already opened,
- * then return -EBUSY.
- */
-static int vioblk_storage_open (struct storage * sto);
+static int vioblk_open(int instno, struct io ** ioptr, void * aux);
 
-/**
- * @brief Resets the virtq avail and virtq used queues and sets necessary flags in vioblk device. If
- * the given sto is not opened, this function does nothing.
- * @param sto Storage IO struct for the storage device
- * @return None
- */
-static void vioblk_storage_close (struct storage * sto);
+static void vioblk_reclaim(struct io * io);
 
-/**
- * @brief Reads bytecnt number of bytes from the disk and writes them to buf, rounded down to 
- * nearest blksz. Achieves this by repeatedly setting the appropriate registers to request a 
- * block from the disk, waiting until the data has been populated in block buffer cache, and
- * then writes that data out to buf. The request is truncated if attempted to read past the 
- * end. Thread sleeps while waiting for the disk to service the request.
- * @param sto Storage IO struct for the storage device
- * @param pos The starting position for the read within the VirtIO device
- * @param buf A pointer to the buffer to fill with the read data
- * @param bytecnt The number of bytes to read from the VirtIO device into the buffer
- * @return The number of bytes read from the device, or negative error code if error
- */
-static long vioblk_storage_fetch (
-    struct storage * sto,
-    unsigned long long pos,
-    void * buf,
-    unsigned long bytecnt);
-    
-/**
- * @brief Writes bytecnt number of bytes from the parameter buf to the disk, rounded down to 
- * the nearest blksz. The size of the virtio device should not change. You should only 
- * overwrite existing data. Write should also not create any new files. Achieves this by 
- * filling up the block buffer cache and then setting the appropriate registers to request 
- * the disk write the contents of the cache to the specified block location, truncating to 
- * avoid writing past end. Thread sleeps while waiting for the disk to service the request.
- * @param sto Storage IO struct for the storage device
- * @param pos The starting position for the write within the VirtIO device
- * @param buf A pointer to the buffer with the data to write
- * @param bytecnt The number of bytes to write to the VirtIO device from the buffer
- * @return The number of bytes written to the device, or negative error code if error
- */
-static long vioblk_storage_store (
-    struct storage * sto,
-    unsigned long long pos,
-    const void * buf,
-    unsigned long bytecnt);
+static long vioblk_fetch (
+    struct io * io, unsigned long long pos, void * buf, long len);
 
-/**
- * @brief Given a file io object, a specific command, and possibly some arguments, execute the
- * corresponding functions on the VirtIO block device.
- * @details Any commands such as FCNTL_GETEND should pass back through the arg variable. Do not
- * directly return the value.
- * @details FCNTL_GETEND should return the capacity of the VirtIO block device in bytes.
- * @param sto Storage IO struct for the storage device
- * @param op Operation to execute. vioblk should support FCNTL_GETEND.
- * @param arg Argument specific to the operation being performed
- * @return Status code on the operation performed
- */
-static int vioblk_storage_cntl (struct storage * sto, int op, void * arg);
+static long vioblk_store (
+    struct io * io, unsigned long long pos, const void * buf, long len);
 
-/**
- * @brief The interrupt handler for the VirtIO device. When an interrupt occurs, the system will
- * call this function.
- * @param irqno The interrupt request number for the VirtIO device
- * @param aux A generic pointer for auxiliary data.
- * @return None
- */
+static int vioblk_ioctl(struct io * io, int op, void * arg);
+
 static void vioblk_isr(int srcno, void * aux);
         
         
+// INTERNAL GLOBAL VARIABLES
+//
+
+static const struct iointf vioblk_intf = {
+    .implname = "vioblk",
+    .reclaim = &vioblk_reclaim,
+    .fetch = &vioblk_fetch,
+    .store = &vioblk_store,
+    .ioctl = &vioblk_ioctl
+};
 
 // EXPORTED FUNCTION DEFINITIONS
 //
 
-// Attaches a VirtIO block device. Declared and called directly from virtio.c.
-/**
- * @brief Initializes virtio block device with the necessary IO operation functions and sets the
- * required feature bits.
- * @param regs Memory mapped register of Virtio
- * @param irqno Interrupt request number of the device
- * @return None
- */
+// The vioblk_attach function is declared and called from virtio_attach() in
+// virtio.c when a VirtIO block device is found.
+
 void vioblk_attach(volatile struct virtio_mmio_regs * regs, int irqno) {
     virtio_featset_t enabled_features, wanted_features, needed_features;
-    struct vioblk_storage * vbd;
+    struct vioblk_device * vb;
     unsigned int blksz;
     int result;
     
@@ -263,82 +194,63 @@ void vioblk_attach(volatile struct virtio_mmio_regs * regs, int irqno) {
     // blksz must be a power of two
     assert (((blksz - 1) & blksz) == 0);
 
-    // Initialize interface after getting blksz
-    static struct storage_intf vioblk_intf = {
-        .blksz = 512,
-        .open = vioblk_storage_open,
-        .close = vioblk_storage_close,
-        .fetch = vioblk_storage_fetch,
-        .store= vioblk_storage_store,
-        .cntl = vioblk_storage_cntl
-    };
-
     // Allocate initialize device struct
 
-    vbd = kcalloc(1, sizeof(struct vioblk_storage));
+    vb = kcalloc(1, sizeof(*vb));
 
-    vbd->blksz = blksz;
+    vb->regs = regs;
+    vb->irqno = irqno;
+    vb->blkcnt = vb->regs->config.blk.capacity;
 
-
-    vbd->regs = regs;
-    vbd->blksz = blksz;
-
-    // vbd->instno filled later
-    vbd->irqno = irqno;
-
-    // capacity in bytes should fit in an unsigned long long
-    assert (vbd->regs->config.blk.capacity < ULLONG_MAX / 512);
-    vbd->size = vbd->regs->config.blk.capacity * 512ULL;
-    debug("%p: virtio block device capacity is %lu", regs, vbd->size);
-
-    vbd->blkcnt = vbd->size / blksz;
-    vbd->size = vbd->blkcnt * blksz; // in case size not multiple of blksz
+    assert (vb->blkcnt < ULLONG_MAX / 512);
+    vb->bytecap = vb->blkcnt * 512ULL;
     
     // Pre-initialize as much of the request virtq as possible. We use a very
     // simple scheme of one transaction at a time. A higher-performance scheme
     // may allow multiple concurrent requests.
-    // Note: entire vbd struct is zero-initialized, so we only need to set the
+    // Note: entire vb struct is zero-initialized, so we only need to set the
     // non-zero members of the virtq.
 
     // The first descriptor (index 0 in descriptor array) is the one used in the
     // avail and used rings. It is an indirect descriptor that points to three
-    // chained descriptors, vbd->vq.desc[1..3].
+    // chained descriptors, vb->vq.desc[1..3].
 
-    vbd->vq.desc[0].addr = (uintptr_t)(vbd->vq.desc + 1);
-    vbd->vq.desc[0].len = 3 * sizeof(struct virtq_desc);
-    vbd->vq.desc[0].flags = VIRTQ_DESC_F_INDIRECT;
-    vbd->vq.desc[0].next = -1;
+    vb->vq.desc[0].addr = (uintptr_t)(vb->vq.desc + 1);
+    vb->vq.desc[0].len = 3 * sizeof(struct virtq_desc);
+    vb->vq.desc[0].flags = VIRTQ_DESC_F_INDIRECT;
+    vb->vq.desc[0].next = -1;
 
     // First descriptor in indirect descriptor chain points to request header.
-    vbd->vq.desc[1].addr = (uintptr_t)&vbd->vq.req_header;
-    vbd->vq.desc[1].len = sizeof(struct vioblk_request_header);
-    vbd->vq.desc[1].flags = VIRTQ_DESC_F_NEXT;
-    vbd->vq.desc[1].next = 1; // relative chain
+    vb->vq.desc[1].addr = (uintptr_t)&vb->vq.req_header;
+    vb->vq.desc[1].len = sizeof(struct vioblk_request_header);
+    vb->vq.desc[1].flags = VIRTQ_DESC_F_NEXT;
+    vb->vq.desc[1].next = 1; // relative chain
 
     // Second descriptor in indirect descriptor chain points to data.
-    vbd->vq.desc[2].flags = VIRTQ_DESC_F_NEXT;
-    vbd->vq.desc[2].next = 2;
+    vb->vq.desc[2].flags = VIRTQ_DESC_F_NEXT;
+    vb->vq.desc[2].next = 2;
 
     // Third descriptor in indirect descriptor chain points to request status.
-    vbd->vq.desc[3].addr = (uintptr_t)&vbd->vq.req_status;
-    vbd->vq.desc[3].len = 1;
-    vbd->vq.desc[3].flags = VIRTQ_DESC_F_WRITE;
-    vbd->vq.desc[3].next = -1;
+    vb->vq.desc[3].addr = (uintptr_t)&vb->vq.req_status;
+    vb->vq.desc[3].len = 1;
+    vb->vq.desc[3].flags = VIRTQ_DESC_F_WRITE;
+    vb->vq.desc[3].next = -1;
 
-    condition_init(&vbd->vq.used_updated, "vioblk.vq.used_updated");
-    rwlock_init(&vbd->vq.lock, "vioblk.vq.lock");
+    condition_init(&vb->vq.used_updated, "vioblk.vq.used_updated");
+    rwlock_init(&vb->vq.lock, "vioblk.vq.lock");
 
     // Attach queues
 
     virtio_attach_virtq (
         regs, 0, 1,
-        (uintptr_t)&vbd->vq.desc,
-        (uintptr_t)&vbd->vq.used,
-        (uintptr_t)&vbd->vq.avail);
+        (uintptr_t)&vb->vq.desc,
+        (uintptr_t)&vb->vq.used,
+        (uintptr_t)&vb->vq.avail);
 
     // Register device
-    storage_init(&vbd->base, &vioblk_intf, vbd->size);
-    register_device(VIOBLK_NAME, DEV_STORAGE, vbd);
+
+    register_device(VIOBLK_NAME, 0, &vioblk_open, vb);
+    ioinit(&vb->io, &vioblk_intf, blksz, 0);
     
     // Signal initialization complete
 
@@ -346,98 +258,84 @@ void vioblk_attach(volatile struct virtio_mmio_regs * regs, int irqno) {
     __sync_synchronize(); // fence o,oi
 }
 
-int vioblk_storage_open (struct storage * sto){
-    struct vioblk_storage * const vbd = 
-        (void*)sto - offsetof(struct vioblk_storage, base);
+int vioblk_open(int instno, struct io ** ioptr, void * aux) {
+    struct vioblk_device * const vb = aux;
 
-	trace("%s(vbd={regs=%p})", __func__, vbd->regs);
-
-    if (vbd->opened)
-        return -EBUSY;
+	trace("%s(%d,{regs=%p})", __func__, instno, vb->regs);
     
-    vbd->vq.avail.idx = 0;
-    vbd->vq.used.idx = 0;
+    vb->vq.avail.idx = 0;
+    vb->vq.used.idx = 0;
 
-    virtio_enable_virtq(vbd->regs, 0);
-    enable_intr_source(vbd->irqno, VIOBLK_INTR_PRIO, vioblk_isr, vbd);
+    virtio_enable_virtq(vb->regs, 0);
+    enable_intr_source(vb->irqno, VIOBLK_INTR_PRIO, vioblk_isr, vb);
 
-    vbd->opened = 1;
+    *ioptr = ioaddref(&vb->io);
+
     return 0;
 }
 
-// Must be called with interrupts enabled to ensure there are no pending
-// interrupts (ISR will not execute after closing).
-void vioblk_storage_close (struct storage * sto) {
-    struct vioblk_storage * const vbd = 
-        (void*)sto - offsetof(struct vioblk_storage, base);
+void vioblk_reclaim(struct io * io) {
+    struct vioblk_device * const vb = 
+        (void*)io - offsetof(struct vioblk_device, io);
     
 	trace("%s()", __func__);
 
-    assert(vbd->opened);
-
-    virtio_reset_virtq(vbd->regs, 0);
-    disable_intr_source(vbd->irqno);
-
-    vbd->opened = 0;
+    virtio_reset_virtq(vb->regs, 0);
+    disable_intr_source(vb->irqno);
 }
 
-
-long vioblk_storage_fetch (
-    struct storage * sto,
-    unsigned long long pos,
+long vioblk_fetch (
+    struct io * io,
+    unsigned long long bytepos,
     void * buf,
-    unsigned long bytecnt)
+    long bytecnt)
 {
-    struct vioblk_storage * const vbd = 
-        (void*)sto - offsetof(struct vioblk_storage, base);
+    struct vioblk_device * const vb = 
+        (void*)io - offsetof(struct vioblk_device, io);
+    unsigned long long blkpos;
     int pie;
 
-    trace("%s(pos=%ld,buf=%p,bytecnt=%ld)", __func__, pos, buf, bytecnt);
+    trace("%s(%lld,%ld)", __func__, pos, bytecnt);
 
-    // check that buf is not in user memory space
-    // assert(buf < (void *)UMEM_START_VMA);
-
-    if (vbd->size < pos)
+    if (vb->bytecap < bytepos || vb->bytecap - bytepos < bytecnt)
         return -EINVAL;
-
-    // Truncate read to end of device
-
-    if (vbd->size - pos < bytecnt)
-        bytecnt = vbd->size - pos;
 
     // Zero-length reads are allowed but do nothing
 
     if (bytecnt == 0)
         return 0;
+    
+    blkpos = bytepos / io->blksz;
 
     // Submit virtq request
 
-    rwlock_acquire(&vbd->vq.lock, /* excl*/ 1);
+    rwlock_acquire(&vb->vq.lock, /* excl*/ 1);
 
-    vbd->vq.req_header.sector = pos / vbd->blksz;
-    vbd->vq.req_header.type = VIRTIO_BLK_T_IN;
-    vbd->vq.desc[2].flags = VIRTQ_DESC_F_NEXT | VIRTQ_DESC_F_WRITE;
-    vbd->vq.desc[2].addr = (uintptr_t)buf;
-    vbd->vq.desc[2].len = bytecnt;
-
-    __sync_synchronize(); // fence w,w
-
-    vbd->vq.avail.idx += 1;
+    vb->vq.req_header.sector = blkpos;
+    vb->vq.req_header.type = VIRTIO_BLK_T_IN;
+    vb->vq.desc[2].flags = VIRTQ_DESC_F_NEXT | VIRTQ_DESC_F_WRITE;
+    // Note: /buf/ must be a valid pma, so must not be in user space.
+    vb->vq.desc[2].addr = (uintptr_t)buf;
+    vb->vq.desc[2].len = bytecnt;
 
     __sync_synchronize(); // fence w,w
 
-    virtio_notify_avail(vbd->regs, 0);
+    vb->vq.avail.idx += 1;
+
+    __sync_synchronize(); // fence w,w
+
+    virtio_notify_avail(vb->regs, 0);
 
     // Wait for descriptor to return via used ring
 
     pie = disable_interrupts();
-    while (vbd->vq.used.idx != vbd->vq.avail.idx)
-        condition_wait(&vbd->vq.used_updated);
+    while (vb->vq.used.idx != vb->vq.avail.idx)
+        condition_wait(&vb->vq.used_updated);
     restore_interrupts(pie);
 
-    rwlock_release(&vbd->vq.lock);
+    rwlock_release(&vb->vq.lock);
 
-    switch (vbd->vq.req_status) {
+    switch (vb->vq.req_status) {
     case VIRTIO_BLK_S_OK:
         return bytecnt;
     case VIRTIO_BLK_S_IOERR:
@@ -450,58 +348,58 @@ long vioblk_storage_fetch (
 }
 
 
-static long vioblk_storage_store (
-    struct storage * sto,
-    unsigned long long pos,
+static long vioblk_store (
+    struct io * io,
+    unsigned long long bytepos,
     const void * buf,
-    unsigned long bytecnt)
+    long bytecnt)
 {
-    struct vioblk_storage * const vbd = 
-        (void*)sto - offsetof(struct vioblk_storage, base);
+    struct vioblk_device * const vb = 
+        (void*)io - offsetof(struct vioblk_device, io);
+    unsigned long long blkpos;
     int pie;
 
-    trace("%s(buf=%p,bytecnt=%ld)", __func__, buf, bytecnt);
+    trace("%s(%lld,%ld)", __func__, bytepos, bytecnt);
 
-    // check that buf is not in user memory space
-    // assert(buf < (void *)UMEM_START_VMA);
-    
-    if (vbd->size < pos)
+    if (vb->bytecap < bytepos || vb->bytecap - bytepos < bytecnt)
         return -EINVAL;
 
-    // Truncate read to end of device
-
-    if (vbd->size - pos < bytecnt)
-        bytecnt = vbd->size - pos;
-
-    // Zero-length writes are allowed but do nothing
+    // Zero-length reads are allowed but do nothing
 
     if (bytecnt == 0)
         return 0;
+    
+    blkpos = bytepos / io->blksz;
 
     // Submit virtq request
 
-    rwlock_acquire_exclusive(&vbd->vq.lock);
+    rwlock_acquire(&vb->vq.lock, /* exclusive */ 1);
 
-    vbd->vq.req_header.sector = pos / vbd->blksz;
-    vbd->vq.req_header.type = VIRTIO_BLK_T_OUT;
-    vbd->vq.desc[2].flags = VIRTQ_DESC_F_NEXT;
-    vbd->vq.desc[2].addr = (uintptr_t)buf;
-    vbd->vq.desc[2].len = bytecnt;
+    vb->vq.req_header.sector = blkpos;
+    vb->vq.req_header.type = VIRTIO_BLK_T_OUT;
+    vb->vq.desc[2].flags = VIRTQ_DESC_F_NEXT;
+    // Note: /buf/ must be a valid pma, so must not be in user space.
+    vb->vq.desc[2].addr = (uintptr_t)buf;
+    vb->vq.desc[2].len = bytecnt;
     __sync_synchronize(); // fence w,w
-    vbd->vq.avail.idx += 1;
+    vb->vq.avail.idx += 1;
 
-    virtio_notify_avail(vbd->regs, 0);
+    virtio_notify_avail(vb->regs, 0);
 
-    // Wait for descriptor to return via used ring
+    // Wait for descriptor to return via used ring. A more efficient
+    // implementation would not need to wait here. This would require some
+    // additional bookkeeping to keep track of the fact that there is an
+    // outstanding buffer. We also need a way to ensure that all data has been
+    // written, so we would need to add a /flush/ function to /iointf/.
 
     pie = disable_interrupts();
-    while (vbd->vq.used.idx != vbd->vq.avail.idx)
-        condition_wait(&vbd->vq.used_updated);
+    while (vb->vq.used.idx != vb->vq.avail.idx)
+        condition_wait(&vb->vq.used_updated);
     restore_interrupts(pie);
 
-    rwlock_release_exclusive(&vbd->vq.lock);
+    rwlock_release(&vb->vq.lock);
 
-    switch (vbd->vq.req_status) {
+    switch (vb->vq.req_status) {
     case VIRTIO_BLK_S_OK:
         return bytecnt;
     case VIRTIO_BLK_S_IOERR:
@@ -513,15 +411,15 @@ static long vioblk_storage_store (
     }
 }
 
-int vioblk_storage_cntl(struct storage * sto, int op, void * arg) {
-    struct vioblk_storage * const vbd = 
-        (void*)sto - offsetof(struct vioblk_storage, base);
+int vioblk_ioctl(struct io * io, int op, void * arg) {
+    struct vioblk_device * const vb = 
+        (void*)io - offsetof(struct vioblk_device, io);
     
-    trace("%s(op=%d,arg=%p)", __func__, op, arg);
+    trace("%s(op=%d)", __func__, op);
     
     switch (op) {
-    case FCNTL_GETEND:
-        *(unsigned long long*)arg = vbd->size;
+    case IOC_GETEND:
+        *(unsigned long long*)arg = vb->bytecap;
         return 0;
     default:
         return -ENOTSUP;
@@ -529,15 +427,15 @@ int vioblk_storage_cntl(struct storage * sto, int op, void * arg) {
 }
 
 void vioblk_isr(int irqno, void * aux) {
-    struct vioblk_storage * const vbd = aux;
+    struct vioblk_device * const vb = aux;
     uint32_t intr_status;
 
-    intr_status = vbd->regs->interrupt_status;
-    vbd->regs->interrupt_ack = intr_status;
+    intr_status = vb->regs->interrupt_status;
+    vb->regs->interrupt_ack = intr_status;
     __sync_synchronize(); // fence o,r
 
     trace("%s(irqno=%d)", __func__, irqno);
 
     if (intr_status & 1)
-        condition_broadcast(&vbd->vq.used_updated);
+        condition_broadcast(&vb->vq.used_updated);
 }

@@ -7,40 +7,13 @@
 #ifndef _FSIMPL_H_
 #define _FSIMPL_H_
 
-struct uio;
+#include "io.h"
 
-/**
- * @brief The /filesystem/ struct defines the backing operations
- * of the filesystem. Use the functions /open/, /flush/, etc.
- * defined below to interact with files within the filesystem.
- */
 struct filesystem {
-    /**
-     * @brief Opens a file within a filesystem
-     * @param fs Filesystem containing the file
-     * @param name Name of file to open
-     * @param uioptr uio object to open file on
-     */
-    int (*open)(struct filesystem * fs, const char * name, struct uio ** uioptr);
-
-    /**
-     * @brief Creates a file within a filesystem
-     * @param fs Filesystem to create file at
-     * @param name Name of file to create
-     */
-    int (*create)(struct filesystem * fs, const char * name);
-
-    /**
-     * @brief Removes a file within a filesystem
-     * @param fs Filesystem in which file will be delted
-     * @param name Name of file to delete
-     */
-    int (*delete)(struct filesystem * fs, const char * name);
-
-    /**
-     * @brief Flushes the filesystem
-     * @param fs Filesystem to flush
-     */
+    int (*open_listing)(struct filesystem * fs, struct io ** ioptr);
+    int (*open_file)(struct filesystem * fs, const char * name, struct io ** ioptr);
+    int (*create_file)(struct filesystem * fs, const char * name);
+    int (*delete_file)(struct filesystem * fs, const char * name);
     void (*flush)(struct filesystem * fs);
 };
 
