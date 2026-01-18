@@ -3,6 +3,7 @@
 #include "../error.h"
 #include "../shell.h"
 #include "../heap.h"
+#include "../uio.h"
 
 void test_malloc(int argc, char * argv[]) {
     char* arr;
@@ -102,9 +103,11 @@ void test_write(int argc, char * argv[]) {
             printf("Failed to write to %s: %s\n", path, error_name(result));
             return;
         }
-        else {
-            dprintf(STDOUT, "SUCCESS: wrote to %s\n", path);
+        if (result < written) {
+            printf("WARNING: wrote %d bytes to %s instead of %d\n", 
+                result, path, written);
         }
+        dprintf(STDOUT, "SUCCESS: wrote to %s\n", path);
         _close(fd);
     }
 }
@@ -209,6 +212,10 @@ void test_write_long(int argc, char * argv[]) {
                 printf("Failed to write to %s on iteration %d: %s\n", path, j, error_name(result));
                 return;
             }
+            if (result < written) {
+                printf("WARNING: wrote %d bytes to %s instead of %d\n", 
+                    result, path, written);
+            }
         }
         dprintf(STDOUT, "SUCCESS: wrote long to %s\n", path);
         _close(fd);
@@ -257,6 +264,42 @@ void test_read_long(int argc, char * argv[]) {
     }
 }
 
+void test_set_end(int argc, char * argv[]) {
+    int num_files;
+    char path[26];
+    int result,fd;
+    unsigned long end = 0;
+    char* mp = "/c/";
+
+    if (argc < 2) {
+        printf("USAGE: %s [NUM_FILES] [MOUNTPOINT (c)]\n", argv[0]);
+        return;
+    }
+
+    num_files = strtoul(argv[1], NULL, 10);
+    if (argc >= 3)
+        mp = argv[2];
+
+    // testing set end
+    for (int i = 1; i <= num_files; i++) {
+        snprintf(path, 26, "%s%d", mp, i);
+        fd = _open(-1, path);
+        if (fd < 0) {
+            printf("Failed to open %s: %s\n", path, error_name(fd));
+            return;
+        }
+        result = _fcntl(fd, FCNTL_SETEND, &end);
+        if (result < 0) {
+            printf("Failed to set end of %s: %s\n", path, error_name(result));
+            return;
+        }
+        else {
+            dprintf(STDOUT, "SUCCESS: set end of %s\n", path);
+        }
+        _close(fd);
+    }
+}
+
 struct testcase {
     const char * name;
     void (*main)(int argc, char * argv[]);
@@ -270,6 +313,7 @@ const struct testcase testcases[] = {
     {.name="delete",    .main=test_delete},
     {.name="write_long",.main=test_write_long},
     {.name="read_long", .main=test_read_long},
+    {.name="set_end",   .main=test_set_end},
 };
 
 void main (int argc, char* argv[]) {

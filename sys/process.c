@@ -221,8 +221,6 @@ void process_exit(void) {
         halt_success();
     }
 
-    discard_active_mspace();
-
     for (i = 0; i < PROCESS_UIOMAX; i++) {
       if (self->uiotab[i] != NULL)
       {
@@ -230,6 +228,8 @@ void process_exit(void) {
         uio_close(self->uiotab[i]);
       }
     }
+    
+    discard_active_mspace();
     
     // Free process struct. First, though, remove references to it from thread
     // struct and proctab.

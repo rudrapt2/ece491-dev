@@ -16,6 +16,7 @@
 #include "timer.h"
 #include "string.h"
 #include "filesys.h"
+#include "lffs.h"
 #include "error.h"
 #include "cache.h"
 #include "memory.h"
@@ -27,7 +28,7 @@
 #define CMNTNAME "c"
 #define DEVMNTNAME "dev"
 #define CDEVNAME "vioblk"
-#define CDEVINST 0
+#define CDEVINST 1
 
 #ifndef NUART // number of UARTs
 #define NUART 2
@@ -101,7 +102,7 @@ void mount_cdrive(void) {
         halt_failure();
     }
 
-    result = create_cache(hd, &cache);
+    result = create_cache(hd, &cache, LFFS_BLKSZ);
 
     if (result != 0) {
         kprintf("create_cache(%s%d) failed: %s\n",
