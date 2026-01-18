@@ -15,11 +15,11 @@ extern void devmgr_init(void);
 
 extern struct filesystem devfs;
 
-typedef int (*device_openfn_t)(int instno, struct io ** ioptr, void * aux);
+typedef int (*device_openfn_t)(struct io ** ioptr, void * aux);
 
 extern int register_device (
     const char * name,
-    int unique,
+    int instno,
     device_openfn_t openfn,
     void * ofaux
 );

@@ -74,16 +74,10 @@
 #define NTHR 32
 #endif
 
-// Maximum number of processes
-
-#ifndef NPROC
-#define NPROC 16
-#endif
-
 // Heap allocator alignment
 
 #ifndef HEAP_ALIGN
-#define HEAP_ALIGN 16
+#define HEAP_ALIGN 8
 #endif
 
 // Interrupt priorities
@@ -94,9 +88,9 @@
 #define VIORNG_INTR_PRIO 1
 #define VIOGPU_INTR_PRIO 2
 
-// Maximum number of open uio objects
+// Maximum number of open Io objects
 
-#define PROCESS_UIOMAX 16
+#define PROC_IOMAX 16
 
 // Capacity of block cache
 

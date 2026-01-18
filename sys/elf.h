@@ -8,8 +8,8 @@
 #ifndef _ELF_H_
 #define _ELF_H_
 
-#include "uio.h"
+#include "io.h"
 
-extern int elf_load(struct uio * uio, void (**eptr)(void));
+extern int elf_load(struct io * io, void (**eptr)(void));
 
 #endif // _ELF_H_

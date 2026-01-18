@@ -25,9 +25,8 @@
 struct device_record {
     struct device_record * next;    // Next device record in linked list
     device_openfn_t openfn;         // Function for opening device
-    void * ofaux;                   // Aux. argument for openfn
-    unsigned char clen;             // length of name without instance number
-    char name[];                    // device name with instance number
+    void * ofaux;                   // Auxilliary argument for openfn
+    char name[];                    // device name
 };
 
 // devfs listing io object
@@ -51,14 +50,20 @@ static int devfs_open_file(struct filesystem * fs, const char * name, struct io 
 char devmgr_initialized = 0;
 
 struct filesystem devfs = {
-    .open_listing = devfs_open_listing,
-    .open_file = &devfs_open_file
+    .implname = "devfs",
+    .openfile = &devfs_open_file
 };
 
 // DEVMGR INTERNAL GLOBAL VARIABLES
 //
 
 static struct device_record * devlist;
+
+static const struct iointf devfs_lsio_intf = {
+    .implname = "devfs_lsio",
+    .reclaim = (void(*)(struct io*))&kfree,
+    .read = &devfs_listing_read
+};
 
 // EXPORTED FUNCTION DEFINITIONS
 //
@@ -70,65 +75,56 @@ void devmgr_init(void) {
 
 int register_device (
     const char * name,
-    int unique,
+    int instno,
     device_openfn_t openfn,
     void * ofaux)
 {
-    struct device_record ** dptr;
-    struct device_record * dev;
-    int instno = 0;
-    size_t clen;
+    struct device_record * dev = NULL;
     size_t namelen;
 
-    trace("%s("\%s", %d)", __func__, name, unique);
+    trace("%s("\%s", %d)", __func__, name, instno);
 
     assert(devmgr_initialized);
     assert(name != NULL);
     assert(openfn != NULL);
 
-    clen = strlen(name);
-    namelen = clen;
-    dptr = &devlist;
+    namelen = strlen(name);
 
-    if (255 < clen)
-        clen = 255;
+    if (999 < instno || 255 < namelen)
+        return -EINVAL;
 
-    // If the device is unique, place it at the start of the list. Otherwise,
-    // scan through list to determine device instance number and add the new
-    // device at the end.
+    dev = kmalloc(sizeof(*dev) + namelen+3+1);
+    memset(dev, 0, sizeof(*dev));
 
-    if (!unique) {
-        while ((dev = *dptr) != NULL) {
-            instno += (strncmp(name, dev->name, dev->clen) == 0);
-            dptr = &dev->next;
+    if (0 <= instno)
+        snprintf(dev->name, namelen+3+1, "%s%d", name, instno);
+    else
+        memcpy(dev->name, name, namelen+1);
+
+    // Check if the device is already registered
+    
+    for (dev = devlist; dev != NULL; dev = dev->next) {
+        if (strcmp(name, dev->name) == 0) {
+            kfree(dev); // oops!
+            return -EEXIST;
         }
     }
-    
-    dev = kmalloc(sizeof(*dev) + namelen + 1);
-    memset(dev, 0, sizeof(*dev));
 
     dev->openfn = openfn;
     dev->ofaux = ofaux;
-    dev->next = *dptr;
-    *dptr = dev;
-    
-    return instno;
+    dev->next = devlist;
+    devlist = dev;
+    return 0;
 }
 
 extern int open_device(const char * name, struct io ** ioptr) {
     struct device_record * dev;
-    int instno = 0;
 
     trace("%s(\"%s\")", __func__, name);
 
-    // Find numbered instance of device in devlist
-
     for (dev = devlist; dev != NULL; dev = dev->next) {
-        if (strncmp(name, dev->name, dev->clen) == 0) {
-            if (strcmp(name + dev->clen, dev->name + dev->clen) == 0)
-                return dev->openfn(instno, ioptr, dev->ofaux);
-            instno += 1;
-        }
+        if (strcmp(name, dev->name) == 0)
+            return dev->openfn(ioptr, dev->ofaux);
     }
 
     return -ENOENT;
@@ -137,18 +133,22 @@ extern int open_device(const char * name, struct io ** ioptr) {
 // INTERNAL FUNCTION DEFINITIONS
 //
 
-
-int devfs_open_listing(struct filesystem * fs, struct io ** ioptr) {
-    static const struct iointf devfs_lsio_intf = {
-        .implname = "devfs_ls",
-        .reclaim = (void(*)(struct io*))&kfree,
-        .read = &devfs_listing_read
-    };
-
+int devfs_open_file (
+    struct filesystem * fs,
+    const char * name,
+    struct io ** ioptr)
+{
     struct devfs_lsio * lsio;
+
+    trace("%s("\%s")", __func__, name);
 
     assert (fs == &devfs);
     assert (ioptr != NULL);
+
+    if (name != NULL)
+        return open_device(name, ioptr);
+    
+    // If /name/ is NULL, open a device listing.
 
     lsio = kcalloc(1, sizeof(*lsio));
     lsio->next = devlist;
@@ -160,24 +160,10 @@ int devfs_open_listing(struct filesystem * fs, struct io ** ioptr) {
 long devfs_listing_read(struct io * io, void * buf, long bufsz) {
     struct devfs_lsio * const lsio = (struct devfs_lsio*)io;
 
-    if (lsio->next != NULL) {
-        strncpy(buf, lsio->next->name, bufsz);
+    if (bufsz != 0 && lsio->next != NULL) {
+        strlcpy(buf, lsio->next->name, bufsz);
         lsio->next = lsio->next->next;
         return strlen(buf)+1;
-    }
+    } else
         return 0;
-}
-
-int devfs_open_file (
-    struct filesystem * fs,
-    const char * name,
-    struct io ** ioptr)
-{
-    assert (fs == &devfs);
-    assert (name != NULL);
-    assert (ioptr != NULL);
-
-    trace("%s("\%s")", __func__, name);
-
-    return open_device(name, ioptr);
 }

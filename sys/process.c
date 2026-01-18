@@ -5,16 +5,10 @@
 
 */
 
-/*!
- * @brief Enables trace messages for process.c
- */
 #ifdef PROCESS_TRACE
 #define TRACE
 #endif
 
-/*!
- * @brief Enables debug messages for process.c
- */
 #ifdef PROCESS_DEBUG
 #define DEBUG
 #endif
@@ -32,24 +26,14 @@
 #include "string.h"
 #include "thread.h"
 #include "trap.h"
-#include "uio.h"
-
-// COMPILE-TIME PARAMETERS
-//
-
-/*!
- * @brief Maximum number of processes
- */
-#ifndef NPROC
-#define NPROC 16
-#endif
+#include "io.h"
 
 // INTERNAL FUNCTION DECLARATIONS
 //
 
-static int build_stack(void* stack, int argc, char** argv);
+static int build_stack(void * stack, int argc, char ** argv);
 
-static void fork_func(struct condition* forked, struct trap_frame* tfr);
+static void fork_func(struct condition * forked, struct trap_frame * tfr);
 
 // INTERNAL GLOBAL VARIABLES
 //
@@ -58,8 +42,6 @@ static void fork_func(struct condition* forked, struct trap_frame* tfr);
  * @brief The main user process struct
  */
 static struct process main_proc;
-
-static struct process* proctab[NPROC] = {&main_proc};
 
 // EXPORTED GLOBAL VARIABLES
 //
@@ -79,14 +61,17 @@ void procmgr_init(void) {
     procmgr_initialized = 1;
 }
 
-int process_exec(struct uio * exefile, int argc, char ** argv) {
+int process_exec(struct io * exeio, int argc, char ** argv) {
+    struct process * self;
     struct trap_frame tfr;
     void (*entry)(void);
     void * stack;
     int stksz;
     int result;
 
-    trace("%s(exefile=%p)", __func__, exefile);
+    trace("%s(exeio=%p)", __func__, exeio);
+
+    self = current_process();
 
     // The exec system call is a tricky. If something goes wrong after we reset
     // the process memory space, we cannot just return an error, since there is
@@ -106,16 +91,25 @@ int process_exec(struct uio * exefile, int argc, char ** argv) {
     if (stksz < 0)
         return stksz;
 
-    // Clear user memory mapping
+    // Clear user memory mapping.
 
     reset_active_mspace();
 
-    // Load process image from ELF file. Note that at this point, we can't
-    // return an error, since we have reset the address space. So we print an
-    // error to the console and terminate our thread.
+    // Load process image from ELF file. At this point we can't return an error,
+    // since we have reset the address space. So we print an error to the
+    // console and terminate our thread. A better way to handle this would be to
+    // create an elf_validate() function that could return an error if there is
+    // something wrong with the ELF file.
 
-    result = elf_load(exefile, &entry);
-    uio_close(exefile);
+    result = elf_load(exeio, &entry);
+
+    // Save the io object of the executable in the /exeio/ member of the
+    // /process/ structure.
+
+    if (self->exeio != NULL)
+        iodropref(self->exeio);
+    
+    self->exeio = exeio;
 
     if (result != 0) {
         debug("exec: elf_load: %s\n", error_name(result));
@@ -145,37 +139,25 @@ int process_fork(const struct trap_frame * tfr) {
     struct process * child; // child process
     struct condition done; // child done using tfr
     int ctid; // child tid
-    int idx;
     int i;
 
     trace("%s(tfr=%p)", __func__, tfr);
 
     parent = current_process();
-
-    // Find an open process slot for the child
-
-    idx = 0;
-    while (idx < NPROC) {
-        if (proctab[idx] == NULL)
-            break;
-        idx += 1;
-    }
-
-    if (idx == NPROC)
-        return -EMPROC;
     
     // Allocate process struct for child and initialize.
 
     child = kcalloc(1, sizeof(struct process));
-    proctab[idx] = child;
     child->mtag = clone_active_mspace();
 
     // Copy io object pointers and increment ref count
 
+    child->exeio = ioaddref(parent->exeio);
+
     for (i = 0; i < PROCESS_IOMAX; i++) {
-        child->uiotab[i] = parent->uiotab[i];
-        if (child->uiotab[i] != NULL)
-            uio_addref(child->uiotab[i]);
+        child->iotab[i] = parent->iotab[i];
+        if (child->iotab[i] != NULL)
+            ioaddref(child->iotab[i]);
     }
 
     // Spawn a new thread for the child. The child thread will use the parent's
@@ -215,33 +197,21 @@ void process_exit(void) {
 
     trace("%s() in %s", __func__, thread_name(running_thread()));
 
-    if (running_thread() == 0) {
-        fsmgr_flushall();
-        panic("Main process exited");
-    }
+    if (running_thread() == 0)
+        shutdown();
 
     discard_active_mspace();
 
-    for (i = 0; i < PROCESS_UIOMAX; i++) {
-      if (self->uiotab[i] != NULL)
-      {
-        debug("process_exit: closing fd=%d, refcnt=%lu", i, uio_refcnt(self->uiotab[i]));
-        uio_close(self->uiotab[i]);
-      }
+    iodropref(self->exeio);
+    
+    for (i = 0; i < PROCESS_IOMAX; i++) {
+        if (self->iotab[i] != NULL)
+            iodropref(self->iotab[i]);
     }
     
-    // Free process struct. First, though, remove references to it from thread
-    // struct and proctab.
+    // Detach process from running thread and free the process structure.
 
     thread_attach_process(running_thread(), NULL);
-    
-    for (i = 0; i < NPROC; i++) {
-        if (proctab[i] == self) {
-            proctab[i] = NULL;
-            break;
-        }
-    }
-
     kfree(self);
 
     exit_running_thread();
@@ -250,23 +220,6 @@ void process_exit(void) {
 // INTERNAL FUNCTION DEFINITIONS
 //
 
-/**
- * \brief Builds the initial user stack for a new process.
- *
- * Builds the stack for a new process, including the argument vector (\p argv)
- * and the strings it points to. Note that \p argv must contain \p argc + 1
- * elements (the last one is a NULL pointer).
- *
- * Remember to round the final stack size up to a multiple of 16 bytes
- * (RISC-V ABI requirement).
- *
- * \param[in,out] stack  Pointer to the stack page (destination buffer).
- * \param[in]     argc   Number of arguments in \p argv.
- * \param[in]     argv   Array of argument pointers; length is \p argc+1 and
- *                       \p argv[argc] must be NULL.
- *
- * \return Size of the stack page on success; negative error code on failure.
- */
 int build_stack(void * stack, int argc, char ** argv) {
     size_t stksz, argsz;
     uintptr_t * newargv;
@@ -318,19 +271,12 @@ int build_stack(void * stack, int argc, char ** argv) {
     return stksz;
 }
 
-/**
- * \brief Function to be executed by the child process after fork.
- * This is a very beautiful function. 
- * Tell the parent process that it is done with the trap frame, then jumps to user space (hint: which function should we use?)
- * 
- * \param[in] done  Pointer to a condition variable to signal parent
- * \param[in] tfr   Pointer to a trap frame
- *
- * \return NONE (very important, this is a hint)
- */
 void fork_func(struct condition * done, struct trap_frame * tfr) {
+    void * sscratch;
+
     condition_broadcast(done); // signal parent we're done using trap frame
 
     tfr->a0 = 0;
-    trap_frame_jump(tfr, running_thread_stack_anchor() - sizeof(struct trap_frame));
+    sscratch = running_thread_stack_anchor() - sizeof(struct trap_frame);
+    trap_frame_jump(tfr, sscratch);
 }

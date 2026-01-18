@@ -116,7 +116,7 @@ struct vioblk_device {
 // INTERNAL FUNCTION DECLARATIONS
 //
 
-static int vioblk_open(int instno, struct io ** ioptr, void * aux);
+static int vioblk_open(struct io ** ioptr, void * aux);
 
 static void vioblk_reclaim(struct io * io);
 
@@ -149,6 +149,7 @@ static const struct iointf vioblk_intf = {
 // virtio.c when a VirtIO block device is found.
 
 void vioblk_attach(volatile struct virtio_mmio_regs * regs, int irqno) {
+    static unsigned short instcnt = 0; // number of vioblk devices
     virtio_featset_t enabled_features, wanted_features, needed_features;
     struct vioblk_device * vb;
     unsigned int blksz;
@@ -249,7 +250,7 @@ void vioblk_attach(volatile struct virtio_mmio_regs * regs, int irqno) {
 
     // Register device
 
-    register_device(VIOBLK_NAME, 0, &vioblk_open, vb);
+    register_device(VIOBLK_NAME, instcnt++, &vioblk_open, vb);
     ioinit(&vb->io, &vioblk_intf, blksz, 0);
     
     // Signal initialization complete
@@ -258,7 +259,7 @@ void vioblk_attach(volatile struct virtio_mmio_regs * regs, int irqno) {
     __sync_synchronize(); // fence o,oi
 }
 
-int vioblk_open(int instno, struct io ** ioptr, void * aux) {
+int vioblk_open(struct io ** ioptr, void * aux) {
     struct vioblk_device * const vb = aux;
 
 	trace("%s(%d,{regs=%p})", __func__, instno, vb->regs);

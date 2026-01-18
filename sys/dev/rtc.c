@@ -41,7 +41,7 @@ struct rtc_device {
 // INTERNAL FUNCTION DEFINITIONS
 //
 
-static int rtc_open(int instno, struct io ** ioptr, void * aux);
+static int rtc_open(struct io ** ioptr, void * aux);
 static void rtc_reclaim(struct io * io);
 static long rtc_read(struct io * io, void * buf, long bufsz);
 
@@ -59,6 +59,7 @@ static const struct iointf rtc_intf = {
 // 
 
 void rtc_attach(void * mmio_base) {
+    static unsigned short instcnt = 0; // number of RTCs
     struct rtc_device * rtc;
 
     // Because there is usually only one RTC device, we could also allocate the
@@ -68,11 +69,11 @@ void rtc_attach(void * mmio_base) {
 
     rtc->regs = mmio_base;
 
-    register_device("rtc", 1, &rtc_open, rtc);
+    register_device("rtc", instcnt++, &rtc_open, rtc);
     ioinit(&rtc->io, &rtc_intf, 8, 0);
 }
 
-int rtc_open(int instno, struct io ** ioptr, void * aux) {
+int rtc_open(struct io ** ioptr, void * aux) {
     struct rtc_device * const rtc = aux;
     trace("%s()", __func__);
     *ioptr = ioaddref(&rtc->io);

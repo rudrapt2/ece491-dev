@@ -10,6 +10,7 @@
 #include "heap.h"
 #include "misc.h"
 #include "string.h"
+#include "thread.h"
 
 // IO EXPORTED FUNCTION DEFINITIONS
 //
@@ -414,4 +415,141 @@ int memio_ioctl(struct io * io, int op, void * arg) {
     default:
         return -ENOTSUP;
     }
+}
+
+// IOPIPE INTERNAL TYPE DEFINITIONS
+//
+
+struct iopipe {
+    struct io wio, rio;
+    volatile unsigned short wpos, rpos;
+    volatile char wbusy;
+    struct condition updated;
+    void * buf;
+};
+
+// IOPIPE INTERNAL FUNCTION DECLARATIONS
+//
+
+static void iopipe_wio_reclaim(struct io * io);
+static void iopipe_rio_reclaim(struct io * io);
+static long iopipe_write(struct io * io, const void * buf, long len);
+static long iopipe_read(struct io * io, void * buf, long bufsz);
+
+static void iopipe_reclaim(struct iopipe * p);
+
+
+// IOPIPE INTERNAL CONSTANT DEFINITIONS
+//
+
+static const struct iointf iopipe_writer_intf = {
+    .implname = "iopipe_wio",
+    .reclaim = &iopipe_wio_reclaim,
+    .write = &iopipe_write
+};
+
+static const struct iointf iopipe_reader_intf = {
+    .implname = "iopipe_rio",
+    .reclaim = &iopipe_rio_reclaim,
+    .read = &iopipe_read
+};
+
+// IOPIPE EXTERNAL FUNCTION DEFINITIONS
+//
+
+void create_iopipe(struct io ** wioptr, struct io ** rioptr) {
+    struct iopipe * p;
+
+    p = kcalloc(1, sizeof(*p));
+    p->buf = alloc_phys_page();
+    *wioptr = ioinit(&p->wio, &iopipe_writer_intf, 1, 1);
+    *rioptr = ioinit(&p->rio, &iopipe_reader_intf, 1, 1);
+    condition_init(&p->updated, "iopipe.updated");
+}
+
+// IOPIPE INTERNAL FUNCTION DEFINITIONS
+//
+
+void iopipe_wio_reclaim(struct io * io) {
+    struct iopipe * const p = (void*)io - offsetof(struct iopipe, wio);
+    if (iorefcnt(&p->rio) == 0)
+        iopipe_reclaim(p);
+}
+
+void iopipe_rio_reclaim(struct io * io) {
+    struct iopipe * const p = (void*)io - offsetof(struct iopipe, rio);
+    if (iorefcnt(&p->wio) == 0)
+        iopipe_reclaim(p);
+}
+
+long iopipe_write(struct io * io, const void * buf, long buflen) {
+    struct iopipe * const p = (void*)io - offsetof(struct iopipe, wio);
+    long bufoff = 0;
+
+    // If there are no readers left return broken pipe error
+
+    if (iorefcnt(&p->rio) == 0)
+        return -EPIPE;
+    
+    // When there is more than one writer, we want all writes to the pipe to be
+    // contiguous. To ensure that happens, we only allow one writer at a time to
+    // write to the pipe. Access is controlled by the /wbusy/ variable, which
+    // acts like a lock.
+
+    while (p->wbusy != 0)
+        condition_wait(&p->updated);
+    
+    p->wbusy = 1;
+
+    while (bufoff < buflen) {
+        // If the buffer is full, we need to wait for a reader to drain it. The
+        // /updated/ variable is used to signal that the buffer has been
+        // updated. We also need to check that there are still readers left each
+        // time we wake up.
+
+        while (iorefcnt(&p->rio) > 0 && p->wpos - p->rpos == PAGE_SIZE)
+            condition_wait(&p->updated);
+        
+        // If there are no readers left, stop. If we've written some data to the
+        // pipe already, return how much was written. Otherwise, return -EPIPE
+        // (broken pipe). This is Unix behavior. Perhaps a more elegant option
+        // would be for pipes to return 0 when they will no longer be able to
+        // accept data. This has a nice symmetry to reads returning 0 to signal
+        // EOF. Maybe change it to do that instead?
+
+        if (iorefcnt(&p->rio) == 0) {
+            p->wbusy = 0; // unlock!
+            return (bufoff != 0) ? bufoff : -EPIPE;
+        }
+        
+        // Copy into page-sized ring buffer using memcpy
+
+        int const woff = p->wpos % PAGE_SIZE;
+        int const roff = p->wpos % PAGE_SIZE;
+        int copylen; // how much we can copy
+        int wend;
+
+        if (roff < woff)
+            wend = PAGE_SIZE;
+        else
+            wend = roff;
+        
+        copylen = MIN(wend - woff, buflen - bufoff);
+        memcpy(p->buf + woff, buf + bufoff, copylen);
+        p->wpos += copylen;
+        bufoff += copylen;
+    }
+
+    p->wbusy = 0;
+    return bufoff;
+}
+
+long iopipe_read(struct io * io, void * buf, long bufsz) {
+    struct iopipe * const p = (void*)io - offsetof(struct iopipe, rio);
+
+    // ...
+
+void iopipe_reclaim(struct iopipe * p) {
+    free_phys_page(p->buf);
+    kfree(p);
 }

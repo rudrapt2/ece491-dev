@@ -43,9 +43,6 @@ extern struct io * create_memio (
     void * buf, size_t size,
     void(*reclfn)(void*,size_t));
 
-#endif // _IO_H_
+extern void create_iopipe(struct io ** wioptr, struct io ** rioptr);
 
-struct ioret {
-    struct io * io;
-    int err;
-};
+#endif // _IO_H_

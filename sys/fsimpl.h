@@ -10,13 +10,11 @@
 #include "io.h"
 
 struct filesystem {
-    int (*open_listing)(struct filesystem * fs, struct io ** ioptr);
-    int (*open_file)(struct filesystem * fs, const char * name, struct io ** ioptr);
-    int (*create_file)(struct filesystem * fs, const char * name);
-    int (*delete_file)(struct filesystem * fs, const char * name);
+    const char * implname;
+    int (*openfile)(struct filesystem * fs, const char * flname, struct io ** ioptr);
+    int (*createfile)(struct filesystem * fs, const char * flname);
+    int (*deletefile)(struct filesystem * fs, const char * flname);
     void (*flush)(struct filesystem * fs);
 };
-
-extern int attach_filesystem(const char * mpname, struct filesystem * fs);
 
 #endif  // _FSIMPL_H_

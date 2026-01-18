@@ -104,7 +104,7 @@ struct uart_device {
 // INTERNAL FUNCTION DEFINITIONS
 //
 
-static int uart_open(int instno, struct io ** ioptr, void * aux);
+static int uart_open(struct io ** ioptr, void * aux);
 static long uart_read(struct io * io, void * buf, long bufsz);
 static long uart_write(struct io * io, const void * buf, long len);
 
@@ -131,6 +131,7 @@ static const struct iointf uart_intf = {
 // 
 
 void attach_uart(void * mmio_base, int irqno) {
+    static unsigned short instcnt = 0; // number of UARTs
     struct uart_device * uart;
 
     uart = kcalloc(1, sizeof(*uart));
@@ -152,11 +153,11 @@ void attach_uart(void * mmio_base, int irqno) {
     // fence o,o ?
     uart->regs->lcr = 0; // DLAB=0
 
-    register_device(UART_DEVNAME, 0, &uart_open, uart);
+    register_device(UART_DEVNAME, instcnt++, &uart_open, uart);
     ioinit(&uart->io, &uart_intf, 1, 0);
 }
 
-int uart_open(int instno, struct io ** ioptr, void * aux) {
+int uart_open(struct io ** ioptr, void * aux) {
     struct uart_device * const uart = aux;
 
     trace("%s(%d)", __func__, instno);

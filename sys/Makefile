@@ -41,7 +41,7 @@ OBJS = \
 	dev/viorng.o \
 	dev/vioblk.o \
 	cache.o \
-   tarfs.o 
+    tarfs.o 
 #	games/trek_mp2.o \
 #	games/rule30.o
 #	ktfs.o

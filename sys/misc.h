@@ -68,4 +68,6 @@ void trace_actual(const char* filename, int lineno, const char* fmt, ...);
 
 extern __attribute__ ((noreturn)) void halt(void);
 
+extern __attribute__ ((noreturn)) void shutdown(void);
+
 #endif // _MISC_H_

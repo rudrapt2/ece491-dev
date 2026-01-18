@@ -71,7 +71,7 @@ struct viorng_device {
 // INTERNAL FUNCTION DECLARATIONS
 //
 
-static int viorng_open(int instno, struct io ** ioptr, void * aux);
+static int viorng_open(struct io ** ioptr, void * aux);
 
 static void viorng_reclaim(struct io * io);
 
@@ -95,6 +95,7 @@ static const struct iointf viorng_intf = {
 // virtio.c when a VirtIO RNG device is found.
 
 void viorng_attach(volatile struct virtio_mmio_regs * regs, int irqno) {
+    static unsigned short instcnt = 0; // number of viorng devices
     virtio_featset_t enabled_features, wanted_features, needed_features;
     struct viorng_device * vrng;
     int result;
@@ -147,11 +148,11 @@ void viorng_attach(volatile struct virtio_mmio_regs * regs, int irqno) {
     // fence o,oi
     __sync_synchronize();
 
-    register_device(VIORNG_NAME, 0, &viorng_open, vrng);
+    register_device(VIORNG_NAME, instcnt++, &viorng_open, vrng);
     ioinit(&vrng->io, &viorng_intf, 1, 0);
 }
 
-int viorng_open(int instno, struct io ** ioptr, void * aux) {
+int viorng_open(struct io ** ioptr, void * aux) {
     struct viorng_device * vrng = aux;
 
     vrng->regs->status |= VIRTIO_STAT_ACKNOWLEDGE;

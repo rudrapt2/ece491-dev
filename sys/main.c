@@ -69,6 +69,13 @@ void main(void) {
     kprintf("Hello world!\n");
 }
 
+// The following definition of shutdown overrides the default definition in
+// misc.c, which is just an alias for halt().
+
+void shutdown(void) {
+    flush_all_filesys();
+    halt();
+}
 
 void attach_devices(void) {
     int i;

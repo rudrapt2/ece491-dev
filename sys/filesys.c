@@ -4,45 +4,44 @@
 
 */
 
-#include "filesys.h"
+#ifdef FILESYS_TRACE
+#define TRACE
+#endif
+
+#ifdef FILESYS_DEBUG
+#define DEBUG
+#endif
+
+#include "fsimpl.h"
 
 #include <stddef.h>
 
 #include "error.h"
-#include "fsimpl.h"
 #include "heap.h"
 #include "misc.h"
 #include "string.h"
-#include "uioimpl.h"
 #include "ioimpl.h"
 
 // INTERNAL TYPE DEFINITIONS
 //
 
-/**
- * @brief Defines the mountpoints within the root file system.
- */
 struct mountpoint {
-    struct mountpoint * next;  ///< Next mountpoint in linked list
-    struct filesystem * fs;    ///< Filesystem function interface
-    char name[];              ///< Path alias for mountpoint
+    struct mountpoint * next;  // Next mountpoint in linked list
+    const char * name;         // mountpoint name
+    struct filesystem * fs;    // Filesystem at this mountpoint
 };
+
 
 // INTERNAL FUNCTION PROTOTYPES
 //
 
-static struct filesystem * getfs(const char * mpname);
-static int fsopen(struct filesystem * fs, const char * flname, struct uio ** uioptr);
-static int fscreate(struct filesystem * fs, const char * flname);
-static int fsdelete(struct filesystem * fs, const char * flname);
-static void fsflush(struct filesystem * fs);
+static struct mountpoint * findmp(const char * mpname);
 
-static int fs_open_listing(struct uio ** uioptr);
-static void fs_listing_close(struct uio * uio);
-static long fs_listing_read(struct uio * uio, void * buf, unsigned long bufsz);
+static int open_root_listing(struct io ** ioptr);
+static void root_listing_reclaim(struct io * io);
+static long root_listing_read(struct io * io, void * buf, long bufsz);
 
-static int nullfs_open(struct filesystem * fs, const char * flname, struct uio ** uioptr);
-static void nullfs_flush(struct filesystem * fs);
+static int nullfs_openfile(struct filesystem * fs, const char * flname, struct io ** ioptr);
 
 
 // INTERNAL GLOBAL VARIABLES
@@ -50,28 +49,30 @@ static void nullfs_flush(struct filesystem * fs);
 
 struct root_lsio {
     struct io io;
-    const struct mountpoint * fs;
+    const struct mountpoint * next;
 };
 
 static const struct iointf root_lsio_intf = {
-    .implname = "root_ls"
-    .reclaim = &fs_listing_close,
-    .read = &fs_listing_read
-};
-
-static const struct filesystem nullfs = {
-    .open = &nullfs_open,
-    .flush = &nullfs_flush
+    .implname = "root_lsio",
+    .reclaim = (void(*)(struct io*))&kfree,
+    .read = &root_listing_read
 };
 
 // Linked list of mounted filesystems
 
 static struct mountpoint * mplist;
 
+
 // EXPORTED GLOBAL VARIABLES
 //
 
 char fsmgr_initialized = 0;
+
+struct filesystem nullfs = {
+    .implname = "nullfs",
+    .openfile = &nullfs_openfile
+};
+
 
 // EXTERNAL FUNCTION DEFINITIONS
 //
@@ -81,169 +82,168 @@ int fsmgr_init(void) {
     return 0;
 }
 
-/**
- * @brief Flushes all mounted filesystems
- */
-void fsmgr_flushall(void) {
+int mount_filesys(const char * mpname, struct filesystem * fs) {
     struct mountpoint * mp;
 
-    for (mp = mplist; mp != NULL; mp = mp->next)
-        fsflush(mp->fs);
+    trace("%s(\"%s\")", __func__, mpname);
+    assert (mpname != NULL);
+    assert (fs != NULL);
+
+    // Check if mountpoint already exists
+
+    for (mp = mplist; mp != NULL; mp = mp->next) {
+        if (strcmp(mp->name, mpname) == 0)
+            return -EEXIST;
+    }
+
+    // Create mountpoint and add it to the list.
+
+    mp = kcalloc(1, sizeof(*mp));
+    mp->next = mplist;
+    mp->name = mpname;
+    mp->fs = fs;
+    return 0;
 }
 
-int open_file(const char * mpname, const char * flname, struct uio ** uioptr) {
-    struct filesystem * fs;
+void flush_all_filesys(void) {
+    struct mountpoint * mp;
 
-    trace("%s(%s/%s)", __func__, mpname, flname);
+    for (mp = mplist; mp != NULL; mp = mp->next) {
+        if (mp->fs->flush != NULL)
+            mp->fs->flush(mp->fs);
+    }
+}
 
-    assert(mpname != NULL || flname == NULL);
+int open_file(const char * mpname, const char * flname, struct io ** ioptr) {
+    struct mountpoint * mp;
 
-    if (mpname == NULL || *mpname == '\0')
-        return fs_open_listing(uioptr);
+    trace("%s(\"%s\",\"%s\")", __func__, mpname, flname);
+    assert (ioptr != NULL);
 
-    fs = getfs(mpname);
+    if (mpname == NULL) {
+        assert (flname == NULL);
+        return open_root_listing(ioptr);
+    }
 
-    return (fs != NULL) ? fsopen(fs, flname, uioptr) : -ENOENT;
+    mp = findmp(mpname);
+    
+    if (mp == NULL)
+        return -ENOENT;
+    
+    if (mp->fs->openfile == NULL)
+        return -ENOTSUP;
+    
+    return mp->fs->openfile(mp->fs, flname, ioptr);
 }
 
 int create_file(const char * mpname, const char * flname) {
-    struct filesystem * fs;
+    struct mountpoint * mp;
 
-    if (mpname == NULL || flname == NULL) return -EINVAL;
+    trace("%s(\"%s\",\"%s\")", __func__, mpname, flname);
+    assert (mpname != NULL);
 
-    fs = getfs(mpname);
+    if (flname == NULL)
+        return -ENOTSUP;
 
-    return (fs != NULL) ? fscreate(fs, flname) : -ENOENT;
+    mp = findmp(mpname);
+
+    if (mp == NULL)
+        return -ENOENT;
+    
+    if (mp->fs->createfile == NULL)
+        return -ENOTSUP;
+    
+    return mp->fs->createfile(mp->fs, flname);
 }
 
 int delete_file(const char * mpname, const char * flname) {
-    struct filesystem * fs;
-
-    if (mpname == NULL || flname == NULL) return -EINVAL;
-
-    fs = getfs(mpname);
-
-    return (fs != NULL) ? fsdelete(fs, flname) : -ENOENT;
-}
-
-int fs_open_listing(struct uio ** uioptr) {
-    struct fs_listing_uio * ls;
-
-    ls = kcalloc(1, sizeof(*ls));
-    ls->fs = mplist;
-
-    // Note: The listing uio_intf is at index DEV_UNDEF in /devfs_uio_intfs/.
-    *uioptr = uio_init1(&ls->base, &fs_listing_uio_intf);
-
-    return 0;
-}
-
-void fs_listing_close(struct uio * uio) {
-    struct fs_listing_uio * const ls = (struct fs_listing_uio *)uio;
-    kfree(ls);
-}
-
-long fs_listing_read(struct uio * uio, void * buf, unsigned long bufsz) {
-    struct fs_listing_uio * const ls = (struct fs_listing_uio *)uio;
-    size_t len;
-
-    if (ls->fs != NULL) {
-        len = strlen(ls->fs->name);
-        strncpy(buf, ls->fs->name, bufsz);
-        ls->fs = ls->fs->next;
-        return (len < bufsz) ? len : bufsz;
-    } else
-        return 0;
-}
-
-int mount_nullfs(const char * name) {
-    return attach_filesystem(name, (struct filesystem *)&nullfs);
-}
-
-int attach_filesystem(const char * mpname, struct filesystem * fs) {
-    struct mountpoint ** mpptr;
     struct mountpoint * mp;
-    size_t namelen;
 
-    mpptr = &mplist;
-    while ((mp = *mpptr) != NULL) {
-        if (strcmp(mp->name, mpname) == 0) return -EEXIST;
-        mpptr = &mp->next;
-    }
+    trace("%s(\"%s\",\"%s\")", __func__, mpname, flname);
+    assert (mpname != NULL);
 
-    namelen = strlen(mpname);
-    mp = kmalloc(sizeof(*mp) + namelen + 1);
-    memset(mp, 0, sizeof(*mp));
+    if (flname == NULL)
+        return -ENOTSUP;
+    
+    mp = findmp(mpname);
 
-    strncpy(mp->name, mpname, namelen + 1);
-    mp->fs = fs;
-    *mpptr = mp;
+    if (mp == NULL)
+        return -ENOENT;
+    
+    if (mp->fs->deletefile == NULL)
+        return -ENOTSUP;
+    
+    return mp->fs->deletefile(mp->fs, flname);
+}
 
-    return 0;
+void parse_path(char * path, char ** mpnameptr, char ** flnameptr) {
+    assert (path == NULL);
+    assert (mpnameptr == NULL);
+    assert (flnameptr == NULL);
+    char * ss; // slash in path
+
+    // ignore leading slash
+    if (*path == '/')
+        path += 1;
+
+    ss = strchr(path, '/');
+
+    if (ss != NULL) {
+        *flnameptr = ss + 1;
+        *ss = '\0';
+    } else // no slashes indicates mp only
+        *flnameptr = NULL;
+
+    *mpnameptr = path;
 }
 
 // INTERNAL FUNCTION DEFINITIONS
 //
 
-struct filesystem * getfs(const char * mpname) {
+static struct mountpoint * findmp(const char * mpname) {
     struct mountpoint * mp;
 
     for (mp = mplist; mp != NULL; mp = mp->next) {
-        if (strcmp(mp->name, mpname) == 0) return mp->fs;
+        if (strcmp(mpname, mp->name) == 0)
+            return mp;
     }
 
     return NULL;
 }
 
-int fsopen(struct filesystem * fs, const char * flname, struct uio ** uioptr) {
-    if (fs->open != NULL)
-        return fs->open(fs, flname, uioptr);
-    else
-        return -ENOTSUP;
+int open_root_listing(struct io ** ioptr) {
+    struct root_lsio * lsio;
+
+    assert (ioptr != NULL);
+
+    lsio = kcalloc(1, sizeof(*lsio));
+    lsio->next = mplist;
+
+    *ioptr = ioinit(&lsio->io, &root_lsio_intf, 1, 1);
+    return 0;
 }
 
-int fscreate(struct filesystem * fs, const char * flname) {
-    if (fs->create != NULL)
-        return fs->create(fs, flname);
-    else
-        return -ENOTSUP;
+long root_listing_read(struct io * io, void * buf, long bufsz) {
+    struct root_lsio * lsio = (struct root_lsio*)io;
+
+    if (bufsz != 0 && lsio->next != NULL) {
+        strlcpy(buf, lsio->next->name, bufsz);
+        lsio->next = lsio->next->next;
+        return strlen(buf)+1;
+    } else
+        return 0;
 }
 
-int fsdelete(struct filesystem * fs, const char * flname) {
-    if (fs->delete != NULL)
-        return fs->delete(fs, flname);
-    else
-        return -ENOTSUP;
-}
 
-void fsflush(struct filesystem * fs) {
-    if (fs->flush != NULL) fs->flush(fs);
-}
+int nullfs_openfile (
+    struct filesystem * fs, const char * flname, struct io ** ioptr)
+{
+    assert (fs == &nullfs);
+    assert (ioptr != NULL);
 
-int nullfs_open(struct filesystem * fs __attribute__((unused)), const char * flname,
-                struct uio ** uioptr) {
-    return -ENOENT;
-}
-
-void nullfs_flush(struct filesystem * fs __attribute__((unused))) {
-    // nothing
-}
-
-int parse_path(char * path, char ** mpnameptr, char ** flnameptr){
-    if (path == NULL || mpnameptr == NULL || flnameptr == NULL) {
-        return -EINVAL; // invalid args
-    }
-
-    while (*path == '/') path++; // ignore all leading slashes
-
-    char *slash = strchr(path, '/');
-    if (slash != NULL) {
-        *flnameptr = slash + 1;
-        *slash = '\0';
-    } else // no slashes indicates mp only
-        *flnameptr = NULL;
-
-    *mpnameptr = path;
-
-    return 0; // success
+    if (flname == NULL) {
+        *ioptr = create_nullio();
+        return 0;
+    } else
+        return -ENOENT;
 }

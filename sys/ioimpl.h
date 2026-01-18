@@ -29,8 +29,6 @@ struct io {
     unsigned int refcnt;
 };
 
-#define IO(p) ((struct io*)(p));
-
 extern struct io * ioinit (
     struct io * io,
     const struct iointf * intf,
