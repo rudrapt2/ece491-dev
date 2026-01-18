@@ -160,7 +160,7 @@ void attach_uart(void * mmio_base, int irqno) {
 int uart_open(struct io ** ioptr, void * aux) {
     struct uart_device * const uart = aux;
 
-    trace("%s(%d)", __func__, instno);
+    trace("%s(%d)", __func__);
 
     if (iorefcnt(&uart->io) != 0)
         return -EBUSY;

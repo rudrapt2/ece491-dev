@@ -20,7 +20,7 @@ struct iointf {
     long (*store)(struct io * io, unsigned long long blkpos, const void * buf, long blkcnt);
     long (*fetch)(struct io * io, unsigned long long blkpos, void * buf, long blkcnt);
     int (*ioctl)(struct io * io, int op, void * arg);
-    int (*ioctl_u)(struct io * io, int u_op, uintptr_t u_arg);
+    int (*ioctl_u)(struct io * io, int op, uintptr_t arg_uma);
 };
 
 struct io {

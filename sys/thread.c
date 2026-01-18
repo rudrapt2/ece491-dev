@@ -33,7 +33,7 @@
 //
 
 #ifndef NTHR // maximum number of threads
-#define NTHR 16
+#define NTHR 32
 #endif
 
 #ifndef SCHED_SLICE_MS // scheduler time slice
@@ -311,7 +311,6 @@ void yield_running_thread(void) {
     extern void switch_running_thread(struct thread *); // thrasm.s
     struct thread * susp_thread; // suspending thread
     struct thread * next_thread; // resuming thread
-    mtag_t next_mtag;
     int pie;
 
     trace("%s() in <%s:%d>", __func__, TP->name, TP->id);
@@ -377,12 +376,15 @@ void yield_running_thread(void) {
     
     set_thread_state(next_thread, THREAD_RUNNING);
 
+#ifdef HAVE_MEMORY
     // If the thread to be resumed has an associated process, switch to its
     // memory space. Otherwise, switch to the main thread's memory space. If
     // there is no process associated with the main thread, then virtual address
     // translation is not active, and we don't need to switch memory spaces.
 
     if (main_thread.proc != NULL) {
+        mtag_t next_mtag;
+
         if (next_thread->proc != NULL)
             next_mtag = next_thread->proc->mtag;
         else
@@ -393,6 +395,7 @@ void yield_running_thread(void) {
             switch_mspace(next_mtag);
         }
     }
+#endif
 
     trace("Thread <%s:%d> calling switch_running_thread(<%s:%d>)",
         TP->name, TP->id, next_thread->name, next_thread->id);
@@ -430,7 +433,11 @@ void finish_thread_switch(struct thread * susp_thread) {
     // switch_threads().
 
     if (susp_thread->state == THREAD_EXITED) {
+#ifdef HAVE_MEMORY
         free_phys_page(susp_thread->stack_lowest);
+#else
+        kfree(susp_thread->stack_lowest);
+#endif
         susp_thread->stack_lowest = NULL;
         susp_thread->stack_anchor = NULL;
         susp_thread->time_exited = time_now;
@@ -628,7 +635,7 @@ const char * rwlock_name(const struct rwlock * rwlk) {
 }
 
 void rwlock_acquire(struct rwlock * rwlk, int exclusive) {
-    trace("%s(<%s>,%d)", __func__, rwlk->ame, exclusive);
+    trace("%s(<%s>,%d)", __func__, rwlk->name, exclusive);
 
     if (exclusive) {
         if (rwlk->owner != TP) {
@@ -725,9 +732,14 @@ struct thread * create_thread(const char * name) {
     // Allocate a struct thread and a stack
 
     thr = kcalloc(1, sizeof(struct thread));
-    
+
+#ifdef HAVE_MEMORY
     stack_page = alloc_phys_page();
     anchor = stack_page + PAGE_SIZE;
+#else
+    stack_page = kmalloc(HEAP_ALLOC_MAX);
+    anchor = stack_page + HEAP_ALLOC_MAX;
+#endif
     anchor -= 1; // anchor is at base of stack
     thr->stack_lowest = stack_page;
     thr->stack_anchor = anchor;

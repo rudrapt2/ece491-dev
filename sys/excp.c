@@ -8,13 +8,15 @@
 
 #include "console.h"
 #include "intr.h"
-#include "memory.h"
-#include "process.h"
 #include "misc.h"
 #include "riscv.h"
 #include "string.h"
 #include "thread.h"
 #include "trap.h"
+
+// MP3
+#include "memory.h"
+#include "process.h"
 
 // EXPORTED FUNCTION DECLARATIONS
 //
@@ -96,15 +98,6 @@ void handle_smode_exception(unsigned int cause, struct trap_frame* tfr) {
     panic(msgbuf);
 }
 
-/**
- * @brief Handles exceptions from user mode to ensure proper system functionality. The handler
- * redirects certain exceptions to support lazy allocation and system calls from user mode.
- * Otherwise, the handler exits the current process after providing information on where the
- * exception occurred.
- * @param cause Exception code
- * @param tfr Trap frame pointer
- * @return None
- */
 void handle_umode_exception(unsigned int cause, struct trap_frame * tfr) {
     const char * name = NULL;
     int handled = 0;
@@ -156,3 +149,24 @@ void handle_umode_exception(unsigned int cause, struct trap_frame * tfr) {
 
     process_exit();
 }
+
+#ifndef STUDENT
+
+// The following functions are weak definitions for functions that are not
+// implemented in MP2.
+
+int __attribute__ ((weak)) handle_umode_page_fault (
+    struct trap_frame* tfr, uintptr_t vma)
+{
+    return 0; // not handled
+}
+
+void __attribute__ ((weak)) process_exit(void) {
+    exit_running_thread();
+}
+
+void __attribute__ ((weak)) handle_syscall(struct trap_frame * tfr) {
+    // nothing
+}
+
+#endif // STUDENT

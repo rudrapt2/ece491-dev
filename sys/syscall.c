@@ -58,7 +58,7 @@ static int sysopen(int fd, const char * path);
 static int sysclose(int fd);
 static long sysread(int fd, void * buf, size_t bufsz);
 static long syswrite(int fd, const void * buf, size_t len);
-static int sysioctl(int fd, int cmd, void * arg);
+static int sysioctl(int fd, int cmd, uintptr_t arg_uma);
 static int syspipe(int * wfd, int * rfd);
 static int sysiodup(int oldfd, int newfd);
 
@@ -115,7 +115,7 @@ long syscall(const struct trap_frame * tfr) {
     case SYSCALL_WRITE:
         return syswrite(tfr->a0, (void *)tfr->a1, tfr->a2);
     case SYSCALL_IOCTL:
-        return sysfcntl(tfr->a0, tfr->a1, (void *)tfr->a2);
+        return sysioctl(tfr->a0, tfr->a1, tfr->a2);
     case SYSCALL_PIPE:
         return syspipe((int *)tfr->a0, (int *)tfr->a0);
     case SYSCALL_CREATE:
@@ -134,19 +134,19 @@ int sysexit(void) {
     process_exit();
 }
 
-int sysexec(int fd, int argc, char **argv) {
-    struct process *self;
-    struct uio *exeio;
+int sysexec(int fd, int argc, char ** argv) {
+    struct process * self;
+    struct io * exeio;
 
     trace("%s(%d)", __func__, fd);
 
     if (fd < 0 || PROC_IOMAX <= fd)
-        return -EBADFD;
+        return -EBADF;
 
     self = current_process();
 
     if (self->iotab[fd] == NULL)
-        return -EBADFD;
+        return -EBADF;
 
     // We need to close the file descriptor being exec'd. We'll do that in
     // process_exec, but we need to clear iotab[fd] here.
@@ -332,12 +332,12 @@ int sysclose(int fd) {
     trace("%s(%d)", __func__, fd);
 
     if (fd < 0 || PROC_IOMAX <= fd)
-        return -EBADFD;
+        return -EBADF;
 
     self = current_process();
 
     if (self->iotab[fd] == NULL)
-        return -EBADFD;
+        return -EBADF;
 
     iodropref(self->iotab[fd]);
     self->iotab[fd] = NULL;
@@ -351,12 +351,12 @@ long sysread(int fd, void * buf, size_t bufsz) {
     trace("%s(%d,%p,%zu)", __func__, fd, buf, bufsz);
 
     if (fd < 0 || PROC_IOMAX <= fd)
-        return -EBADFD;
+        return -EBADF;
 
     self = current_process();
 
     if (self->iotab[fd] == NULL)
-        return -EBADFD;
+        return -EBADF;
 
     // Ensure memory region is user-writable
 
@@ -375,12 +375,12 @@ long syswrite(int fd, const void *buf, size_t len) {
     trace("%s(%d,%p,%zu)", __func__, fd, buf, len);
 
     if (fd < 0 || PROC_IOMAX <= fd)
-        return -EBADFD;
+        return -EBADF;
 
     self = current_process();
 
     if (self->iotab[fd] == NULL)
-        return -EBADFD;
+        return -EBADF;
 
     // Ensure memory region is user-readable
 
@@ -392,21 +392,20 @@ long syswrite(int fd, const void *buf, size_t len) {
     return iowrite(self->iotab[fd], buf, len);
 }
 
-int sysioctl(int fd, int op, void * arg) {
+int sysioctl(int fd, int op, uintptr_t arg_uma) {
     struct process * self;
-    int result;
 
     trace("%s(%d,%d,%p)", __func__, fd, op, arg);
 
     if (fd < 0 || PROC_IOMAX <= fd)
-        return -EBADFD;
+        return -EBADF;
 
     self = current_process();
 
     if (self->iotab[fd] == NULL)
-        return -EBADFD;
+        return -EBADF;
 
-    return iocntl_u(self->iotab[fd], op, arg);
+    return ioctl_u(self->iotab[fd], op, arg_uma);
 }
 
 int syspipe(int * wfdptr, int * rfdptr) {
@@ -454,15 +453,15 @@ int sysiodup(int oldfd, int newfd) {
     trace("%s(oldfd=%d,newfd=%d)", __func__, oldfd, newfd);
 
     if (oldfd < 0 || PROC_IOMAX <= oldfd)
-        return -EBADFD;
+        return -EBADF;
 
     if (PROC_IOMAX <= newfd)
-        return -EBADFD;
+        return -EBADF;
 
     self = current_process();
 
     if (self->iotab[oldfd] == NULL)
-        return -EBADFD;
+        return -EBADF;
 
     newfd = allocfd(self, newfd, oldfd);
 
@@ -479,7 +478,7 @@ int allocfd(struct process * proc, int reqfd, int notfd) {
         if (reqfd != notfd && proc->iotab[reqfd] == NULL)
             return reqfd;
         else
-            return -EBADFD;
+            return -EBADF;
     }
 
     for (fd = 0; fd < PROC_IOMAX; fd++) {

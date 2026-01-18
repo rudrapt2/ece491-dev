@@ -89,6 +89,7 @@ static struct heap_free_chunk * unsorted_free_chunks;
 static uint32_t heap_managed_bytes;
 static uint32_t heap_alloc_objects;
 static uint32_t heap_alloc_bytes;
+static uint32_t heap_alloc_maxsz;
 static uint64_t heap_cumul_objects;
 static uint64_t heap_cumul_bytes;
 
@@ -147,7 +148,7 @@ heap_init_success:
     heap_initialized = 1;
 }
 
-void heap_copy_stats(struct heap_stats * stats) {
+void copy_heap_stats(struct heap_stats * stats) {
     uint32_t avail_bytes = 0;
     uint32_t avail_maxsz = 0;
     struct heap_free_chunk * chunk;
@@ -169,6 +170,7 @@ void heap_copy_stats(struct heap_stats * stats) {
     stats->managed_bytes = heap_managed_bytes;
     stats->alloc_objects = heap_alloc_objects;
     stats->alloc_bytes = heap_alloc_bytes;
+    stats->alloc_maxsz = heap_alloc_maxsz;
     stats->avail_bytes = avail_bytes;
     stats->avail_maxsz = avail_maxsz;
 }
@@ -231,6 +233,19 @@ void kfree(void * ptr) {
 void * __attribute__ ((weak)) alloc_phys_page(void) {
     // If the system does not have a memory manager (memory.c), the heap_alloc()
     // function below will call this weak definition instead.
+
+    struct heap_stats stats;
+    copy_heap_stats(&stats);
+
+    debug("cumul_objects = %lu", stats.cumul_objects);
+    debug("cumul_bytes = %lu", stats.cumul_bytes);
+    debug("managed_bytes = %u", stats.managed_bytes);
+    debug("alloc_objects = %u", stats.alloc_objects);
+    debug("alloc_bytes = %u", stats.alloc_bytes);
+    debug("alloc_maxsz = %u", stats.alloc_maxsz);
+    debug("avail_bytes = %u", stats.avail_bytes);
+    debug("avail_maxsz = %u", stats.avail_maxsz);
+
     panic("Out of memory");
 }
 
@@ -291,11 +306,16 @@ void * heap_alloc(size_t size, void * call_ra) {
 
     ptr = ahdr + 1; // next address after chunk header
     ahdr->chkval = calc_alloc_chkval(ahdr);
+    
     debug("Allocated %zu bytes at %p", ahdr->size, ptr);
+
     heap_cumul_bytes += ahdr->size;
     heap_alloc_bytes += ahdr->size;
     heap_cumul_objects += 1;
     heap_alloc_objects += 1;
+
+    if (heap_alloc_maxsz < ahdr->size)
+        heap_alloc_maxsz = ahdr->size;
 
     return ptr;
 }

@@ -8,21 +8,68 @@
 
 #include <stddef.h>  // for NULL
 
-extern const char* error_name(int code) {
-    static const char* const error_names[] = {
-        [0] = "(success)",   [EINVAL] = "EINVAL",   [EBUSY] = "EBUSY",   [ENOTSUP] = "ENOTSUP",
-        [EIO] = "EIO",       [EBADFMT] = "EBADFMT", [ENOENT] = "ENOENT", [EACCESS] = "EACCESS",
-        [EBADFD] = "EBADFD", [EMFILE] = "EMFILE",   [EMPROC] = "EMPROC", [EMTHR] = "EMTHR",
-        [ECHILD] = "ECHILD", [ENOMEM] = "ENOMEM",   [EEXIST] = "EEXIST"};
+static const char * const errdescrs[] = {
+    [0] = "(success)",
+    [EINVAL] = "EINVAL",
+    [EBUSY] = "EBUSY",
+    [ENOTSUP] = "ENOTSUP",
+    [EIO] = "EIO",
+    [EBADFMT] = "EBADFMT",
+    [ENOENT] = "ENOENT",
+    [EACCESS] = "EACCESS",
+    [EBADF] = "EBADF",
+    [EMFILE] = "EMFILE",
+    [EMPROC] = "EMPROC",
+    [EMTHR] = "EMTHR",
+    [ECHILD] = "ECHILD",
+    [ENOMEM] = "ENOMEM",
+    [EEXIST] = "EEXIST",
+    [EFAULT] = "EFAULT"
+};
 
-    const char* name;
+static const char * const errmsgs[] = {
+    [0] = "Success",
+    [EINVAL] = "Invalid argument",
+    [EBUSY] = "Resource busy",
+    [ENOTSUP] = "Not supported",
+    [EIO] = "Input/output error",
+    [EBADFMT] = "Invalid format",
+    [ENOENT] = "No such file or device",
+    [EACCESS] = "Permission denied",
+    [EBADF] = "Bad file descriptor",
+    [EMFILE] = "Too many open files",
+    [EMPROC] = "Too many processes",
+    [EMTHR] = "Too many threads",
+    [ECHILD] = "No child thread",
+    [ENOMEM] = "Out of memory",
+    [EEXIST] = "File exists",
+    [EFAULT] = "Bad address"
+};
 
-    if (code < 0) code = -code;
+const char * error_name(int err) {
+    const char * str;
 
-    if (code < sizeof(error_names) / sizeof(error_names[0]))
-        name = error_names[code];
+    if (err < 0)
+        err = -err;
+
+    if (err < sizeof(errdescrs) / sizeof(errdescrs[0]))
+        str = errdescrs[err];
     else
-        name = NULL;
+        str = NULL;
 
-    return name ? name : "(unknown)";
+    return str ? str : "(unknown)";
+}
+
+const char * error_desc(int err) {
+    const char * str;
+
+    if (err < 0)
+        err = -err;
+
+    if (err < sizeof(errmsgs) / sizeof(errmsgs[0]))
+        str = errmsgs[err];
+    else
+        str = NULL;
+
+    return str ? str : "Unknown error";
 }

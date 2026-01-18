@@ -44,6 +44,8 @@ static long devfs_listing_read(struct io * io, void * buf, long bufsz);
 
 static int devfs_open_file(struct filesystem * fs, const char * name, struct io ** ioptr);
 
+struct device_record * find_device(const char * name);
+
 // EXPORTED GLOBAL VARIABLES
 //
 
@@ -82,7 +84,7 @@ int register_device (
     struct device_record * dev = NULL;
     size_t namelen;
 
-    trace("%s("\%s", %d)", __func__, name, instno);
+    trace("%s(\"%s\", %d)", __func__, name, instno);
 
     assert(devmgr_initialized);
     assert(name != NULL);
@@ -103,11 +105,9 @@ int register_device (
 
     // Check if the device is already registered
     
-    for (dev = devlist; dev != NULL; dev = dev->next) {
-        if (strcmp(name, dev->name) == 0) {
-            kfree(dev); // oops!
-            return -EEXIST;
-        }
+    if (find_device(dev->name) != NULL) {
+        kfree(dev);
+        return -EEXIST;
     }
 
     dev->openfn = openfn;
@@ -122,12 +122,9 @@ extern int open_device(const char * name, struct io ** ioptr) {
 
     trace("%s(\"%s\")", __func__, name);
 
-    for (dev = devlist; dev != NULL; dev = dev->next) {
-        if (strcmp(name, dev->name) == 0)
-            return dev->openfn(ioptr, dev->ofaux);
-    }
+    dev = find_device(name);
 
-    return -ENOENT;
+    return (dev != NULL) ? dev->openfn(ioptr, dev->ofaux) : -ENOENT;
 }
 
 // INTERNAL FUNCTION DEFINITIONS
@@ -140,7 +137,7 @@ int devfs_open_file (
 {
     struct devfs_lsio * lsio;
 
-    trace("%s("\%s")", __func__, name);
+    trace("%s(\"%s\")", __func__, name);
 
     assert (fs == &devfs);
     assert (ioptr != NULL);
@@ -166,4 +163,17 @@ long devfs_listing_read(struct io * io, void * buf, long bufsz) {
         return strlen(buf)+1;
     } else
         return 0;
+}
+
+struct device_record * find_device(const char * name) {
+    struct device_record * dev;
+
+    trace("%s(\"%s\")", __func__, name);
+
+    for (dev = devlist; dev != NULL; dev = dev->next) {
+        if (strcmp(name, dev->name) == 0)
+            return dev;
+    }
+
+    return NULL;
 }

@@ -1,9 +1,8 @@
-/*! @file plic.c
-    @brief RISC-V PLIC    
-    @copyright Copyright (c) 2024-2025 University of Illinois
-    @license SPDX-License-identifier: NCSA
-
-*/
+// plic.c - Interface to RISC-V PLIC
+//
+// Copyright (c) 2024-2025 University of Illinois
+// SPDX-License-identifier: NCSA
+//
 
 #ifdef PLIC_TRACE
 #define TRACE
@@ -30,9 +29,6 @@
 // INTERNAL TYPE DEFINITIONS
 // 
 
-/*! @struct plic_regs
-    @brief PLIC registers
-*/
 struct plic_regs {
 	union {
 		uint32_t priority[PLIC_SRC_CNT]; /**< Interrupt Priorities registers */
@@ -65,80 +61,34 @@ struct plic_regs {
 
 // INTERNAL FUNCTION DECLARATIONS
 //
-/*!
- * @brief Set the priority level of an interrupt source. 
- * @details This function changes the priority level of an interrupt source. 
- * Each array entry matches an interrupt source.
- * @param srcno Source number.
- * @param level Priority level.
- */
+
 static void plic_set_source_priority (
 	uint_fast32_t srcno, uint_fast32_t level);
-/*!
- * @brief Check if an interrupt source is pending. 
- * @details This function returns 1 for a pending interrupt, 0 otherwise. This is decided
- * by checking the bit in the pending array that corresponds to scrno.
- * @param srcno Source number.
- * @return 1 for a pending interrupt, 0 otherwise.
- */
+
 static int plic_source_pending(uint_fast32_t srcno);
-/*!
- * @brief Enables an interrupt source for a context
- * @details This function sets the appropriate bit in the enable array. It calculates the index based on srcno and ctxno, 
- * and sets the corresponding bit.
- * @param ctxno Context number.
- * @param srcno Source number.
- */
+
 static void plic_enable_source_for_context (
 	uint_fast32_t ctxno, uint_fast32_t srcno);
-/*!
- * @brief Disables an interrupt source for a context.
- * @details This function clears the appropriate bit in the enable array. Like plic_enable_source_for_context, it must clear
- * the correct bit for the given context and source.
- * @param ctxno Context number.
- * @param srcid Source number.
- */
+
 static void plic_disable_source_for_context (
 	uint_fast32_t ctxno, uint_fast32_t srcno);
-/*!
- * @brief Set the interrupt priority threshold for a context.
- * @details This function sets a threshold. Afterwards, the context should ignore intererupts below this priority.
- * @param ctxno Context number.
- * @param level Priority level.
- */
+
 static void plic_set_context_threshold (
 	uint_fast32_t ctxno, uint_fast32_t level);
-/*!
- * @brief Claim an interrupt for a given context.
- * @details function reads from the claim register and returns the interrupt ID of the highest-priority pending 
- * interrupt. It returns 0 if no interrupts are pending.
- * @param ctxno Context number.
- * @return interrupt ID of the highest-priority pending interrupt. 0 if no interrupts are pending.
- */
+
 static uint_fast32_t plic_claim_context_interrupt (
 	uint_fast32_t ctxno);
-/*!
- * @brief Complete the handling of an interrupt for a given context.
- * @details This function writes the interrupt source number back to the claim register, notifying the PLIC that 
- * the interrupt has been services.
- * @param ctxno Context number.
- * @param srcno Source number.
- */
+
 static void plic_complete_context_interrupt (
 	uint_fast32_t ctxno, uint_fast32_t srcno);
 
-/*!
- * @brief Enable all interrupt sources for a given context.
- * @details This function sets all bits in the corresponding entry of enable array for the specified context.
- * @param ctxno Context number.
- */
 static void plic_enable_all_sources_for_context(uint_fast32_t ctxno);
-/*!
- * @brief Disable all interrupt sources for a given context.
- * @details his function clears all bits in the corresponding entry of enable array for the specified context.
- * @param ctxno Context number.
- */
 static void plic_disable_all_sources_for_context(uint_fast32_t ctxno);
+
+// EXPORTED GLOBAL VARIABLES
+//
+
+char plic_initialized = 0;
 
 // We currently only support single-hart operation, sending interrupts to S mode
 // on hart 0 (context 0). The low-level PLIC functions already understand
@@ -153,16 +103,17 @@ void plic_init(void) {
 
 	// Disable all sources by setting priority to 0
 
-	for (i = 0; i < PLIC_SRC_CNT; i++)
+	for (i = 1; i < PLIC_SRC_CNT; i++)
 		plic_set_source_priority(i, 0);
 	
 	// Route all sources to S mode on hart 0 only
 
-	for (int i = 0; i < PLIC_CTX_CNT; i++)
+	for (int i = 1; i < PLIC_CTX_CNT; i++)
 		plic_disable_all_sources_for_context(i);
 	
 	plic_enable_all_sources_for_context(CTX(0,1));
 	plic_set_context_threshold(1, 0);
+	plic_initialized = 1;
 }
 
 extern void plic_enable_source(int srcno, int prio) {
@@ -176,8 +127,6 @@ extern void plic_enable_source(int srcno, int prio) {
 extern void plic_disable_source(int irqno) {
 	if (0 < irqno)
 		plic_set_source_priority(irqno, 0);
-	else
-		debug("plic_disable_irq called with irqno = %d", irqno);
 }
 
 extern int plic_claim_interrupt(void) {

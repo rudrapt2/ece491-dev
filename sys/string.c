@@ -234,7 +234,6 @@ size_t vsnprintf(char * buf, size_t bufsz, const char * fmt, va_list ap) {
     if (bufsz != 0) {
         state.pos = buf;
         state.rem = bufsz-1;
-        buf[bufsz-1] = '\0';
     } else {
         state.pos = NULL;
         state.rem = 0;
@@ -242,6 +241,9 @@ size_t vsnprintf(char * buf, size_t bufsz, const char * fmt, va_list ap) {
 
     n = vgprintf(vsnprintf_putc, &state, fmt, ap);
 
+    if (bufsz != 0)
+        *state.pos = '\0';
+    
     return n;
 }
 

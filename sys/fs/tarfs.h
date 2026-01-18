@@ -7,8 +7,8 @@
 #ifndef _TARFS_H_
 #define _TARFS_H_
 
-#include "io.h"
+struct io; // extern decl.
 
-extern int mount_tarfs(const char * mpname, struct io * io);
+extern int mount_tarfs(const char * mpname, struct io * bkgio);
 
 #endif // _TARFS_H_
