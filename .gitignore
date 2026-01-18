@@ -29,3 +29,6 @@ usr/bin
 */.clangd
 */*.log
 */usr/bin
+
+!sys/games
+!sys/games/*.o

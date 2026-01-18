@@ -1,9 +1,8 @@
-/*! @file timer.c
-    @brief A timer system
-    @copyright Copyright (c) 2024-2025 University of Illinois
-    @license SPDX-License-identifier: NCSA
-
-*/
+// timer.c - Timer and Alarms
+//
+// Copyright (c) 2024-2025 University of Illinois
+// SPDX-License-identifier: NCSA
+//
 
 #ifdef TIMER_TRACE
 #define TRACE
@@ -16,213 +15,171 @@
 #include "timer.h"
 #include "thread.h"
 #include "riscv.h"
+#include "sbi.h" // for sbi_set_timer
 #include "intr.h"
-#include "conf.h"
-#include "see.h" // for set_stcmp
 #include "misc.h"
-
+#include "string.h"
 
 #include <stddef.h>
+#include <limits.h> // for ULLONG_MAX
 
-// EXPORTED GLOBAL VARIABLE DEFINITIONS
-// 
-
-char timer_initialized = 0;
-
-// INTERNVAL GLOBAL VARIABLE DEFINITIONS
+// COMPILE-TIME OPTIONS
 //
 
-static struct alarm * sleep_list;
+#ifndef BOLT_FREQ
+#define BOLT_FREQ 50 // Hz
+#endif
+
+// EXPORTED GLOBAL VARIABLES
+//
+
+char timer_initialized = 0;
+unsigned int timer_frequency = 0;
+
+
+// INTERNAL GLOBAL VARIABLES
+//
+
+static struct alarm * sleep_list; // list of pending alarms
+
+static unsigned long long tbolt; // next system periodic interrupt time
+static unsigned int bolt_period; // ticks between system periodic interrupts
+
 
 // INTERNAL FUNCTION DECLARATIONS
 //
 
+static void add_alarm(struct alarm * al);
+
+// Adds an alarm to the sleep_list and adjusts the next timer interrupt time if
+// necessary. Must be called with timer interrupts DISABLED.
+
+static void enable_timer_interrupts(void);
+static void disable_timer_interrupts(void);
+
+// Enabled and disables timer interrupts (sie.STIE). Does not touch sstatus.SIE.
+
 // EXPORTED FUNCTION DEFINITIONS
 //
-/**
- * @brief Initializes the timer
- * @param None
- * @return None
- */
 
-void timer_init(void) {
-    set_stcmp(UINT64_MAX);
+void timer_init(unsigned int freq) {
+    assert (freq > 0);
+    timer_frequency = freq;
+    bolt_period = freq / BOLT_FREQ;
     timer_initialized = 1;
+
+    sbi_set_timer(0); // interrupt immediately
+    enable_timer_interrupts();
 }
 
-/**
- * @brief Initialize alarm fields
- * @param al The alarm object pointer
- * @param name The condition variable
- * @return None
- */
 void alarm_init(struct alarm * al, const char * name) {
-    condition_init(&al->cond, name ? name : "alarm");
-    al->twake = rdtime();
-    al->next = NULL;
+    if (name == NULL)
+        name = "unnamed";
+    
+    memset(al, 0, sizeof(*al));
+    condition_init(&al->cond, name);
+    al->name = name;
 }
 
-/**
- * @brief Allows the current thread to sleep
- * @param al The alarm object pointer
- * @param tcnt The number of ticks to put the thread to sleep for relative to the most recent initialization, reset, or wake-up event for the alarm object
- * @return None
- */
-void alarm_sleep(struct alarm * al, unsigned long long tcnt) {
-    unsigned long long now;
-    struct alarm * prev;
+void alarm_sleep_until(struct alarm * al, unsigned long long twake) {
+    unsigned long long tnow;
     int pie;
 
-    now = rdtime();
+    tnow = rdtime();
 
-    // If the tcnt is so large it wraps around, set it to UINT64_MAX
+    trace("[%llu] %s(<%s>, %llu)", tnow, __func__, al->name, twake);
 
-    if (UINT64_MAX - al->twake < tcnt)
-        al->twake = UINT64_MAX;
-    else
-        al->twake += tcnt;
-    
-    // If the wake-up time has already passed, return
-
-    if (al->twake < now)
+    if (twake < tnow)
         return;
+
+    al->twake = twake;
+
+    // We need to have timer interrupts disabled while modifying the sleep list
+    // and changing the S mode timer compare register. We could disable all
+    // interrupts, but that is not necessary. Since add_alarm() may traverse the
+    // list of current alarms, it is desirable to not keep all interrupts
+    // disabled at that time.
+
+    disable_timer_interrupts();
+    add_alarm(al);
+
+    // condition_wait() must be inside an interrupt-disabled region to avoid a
+    // race where the alarm is signalled before we begin waiting. Now we need to
+    // disable all interrupts, but need to re-enable timer interrupts now.
     
     pie = disable_interrupts();
+    enable_timer_interrupts();
 
-    if (sleep_list == NULL || al->twake <= sleep_list->twake) {
-        // Insert alarm at head of alarm list (will require updating stcmp)
-        debug("[%lu] Inserting alarm %s at head of list", now, al->cond.name);
-        al->next = sleep_list;
-        sleep_list = al;
-        set_stcmp(al->twake);
-        csrs_sie(RISCV_SIE_STIE);
-    } else {
-        // Insert current alarm in list in order of wake-up time. Ideally, we
-        // should not keep interrupts disabled while we iterate through the
-        // list. The right way would be to restore interrupt state, find the
-        // place on the list where we want to insert, the disable interrupts and
-        // re-check the insert point.
-
-        for (prev = sleep_list; prev->next != NULL; prev = prev->next) {
-            if (al->twake <= prev->next->twake) {
-                debug("[%lu] Inserting alarm %s after %s",
-                    now, al->cond.name, prev->cond.name);
-                al->next = prev->next;
-                prev->next = al;
-                break;
-            }
-        }
-
-        // End of list, insert at tail
-        if (prev->next == NULL) {
-            debug("%[lu] Inserting alarm %s at tail", al->cond.name);
-            al->next = NULL;
-            prev->next = al;
-        }
-    }
-
-    debug("[%lu] Next timer interrupt set for %llu ticks", now, sleep_list->twake);
-
-    // Note: condition_wait must be *inside* intr_disable/restore_interrupts block to
-    // prevent a race condition where an alarm is signalled before we call
-    // condition_wait.
-
-    condition_wait(&al->cond);
-
+    while (rdtime() < twake)
+        condition_wait(&al->cond);
     restore_interrupts(pie);
+
+    trace("[%llu] alarm_sleep_until(): twake = %llu", rdtime(), twake);
+    trace("[%llu] alarm_sleep_until() returning", rdtime());
 }
 
-// Resets the alarm so that the next sleep increment is relative to the time
-// alarm_reset is called.
-
-/**
- * @brief Resets the alarm against each epoch (now)
- * @param al The alarm object pointer
- * @return None
- */
-void alarm_reset(struct alarm * al) {
-    al->twake = rdtime();
-}
-
-/**
- * @brief Allows an alarm to trigger after a specified number of seconds
- * @param al The alarm object pointer
- * @param sec The number of seconds to sleep
- * @return None
- */
 void alarm_sleep_sec(struct alarm * al, unsigned int sec) {
-    alarm_sleep(al, sec * TIMER_FREQ);
+    unsigned long long duration_ticks;
+
+    duration_ticks = (unsigned long long)sec * timer_frequency;
+    alarm_sleep_until(al, rdtime() + duration_ticks);
 }
 
-/**
- * @brief Allows an alarm to trigger after a specified number of milliseconds 
- * @param al The alarm object pointer
- * @param ms The number of milliseconds to sleep
- * @return None
- */
-void alarm_sleep_ms(struct alarm * al, unsigned long ms) {
-    alarm_sleep(al, ms * (TIMER_FREQ / 1000));
+void alarm_sleep_ms(struct alarm * al, unsigned int ms) {
+    unsigned long long duration_ticks;
+
+    duration_ticks = (unsigned long long)ms * timer_frequency / 1000;
+    alarm_sleep_until(al, rdtime() + duration_ticks);
 }
 
-/**
- * @brief Allows an alarm to trigger after a specified number of microseconds
- * @param al The alarm object pointer
- * @param us The number of microseconds to sleep
- * @return None
- */
-void alarm_sleep_us(struct alarm * al, unsigned long us) {
-    alarm_sleep(al, us * (TIMER_FREQ / 1000 / 1000));
+void alarm_sleep_us(struct alarm * al, unsigned int us) {
+    unsigned long long duration_ticks;
+
+    duration_ticks = (unsigned long long)us * timer_frequency / 1000 / 1000;
+    alarm_sleep_until(al, rdtime() + duration_ticks);
 }
 
-/**
- * @brief Pauses program execution for a specified number of seconds
- * @param sec An unsigned integer which is the number of seconds to sleep
- * @return None
- */
 void sleep_sec(unsigned int sec) {
-    sleep_ms(1000UL * sec);
-}
-
-/**
- * @brief Pauses program execution for a specified number of milliseconds
- * @param ms A unsigned integer which is the number of milliseconds to sleep
- * @return None
- */
-void sleep_ms(unsigned long ms) {
-    sleep_us(1000UL * ms);
-}
-
-/**
- * @brief Pauses program execution for a specified number of microseconds
- * @param us A unsigned integer which is the number of microseconds to sleep
- * @return None
- */
-void sleep_us(unsigned long us) {
     struct alarm al;
 
-    alarm_init(&al, "sleep");
+    alarm_init(&al, __func__);
+    alarm_sleep_sec(&al, sec);
+}
+
+void sleep_ms(unsigned int ms) {
+    struct alarm al;
+
+    alarm_init(&al, __func__);
+    alarm_sleep_ms(&al, ms);
+}
+
+void sleep_us(unsigned int us) {
+    struct alarm al;
+
+    alarm_init(&al, __func__);
     alarm_sleep_us(&al, us);
 }
 
-/**
- * @brief Service timer interrupts
- * @param None
- * @return None
- */
-
 void handle_timer_interrupt(void) {
-    struct alarm * head = sleep_list;
+    unsigned long long talarm;   // next alarm interrupt time
+    unsigned long long tnow;
+    struct alarm * head;
     struct alarm * next;
-    uint64_t now;
 
-    now = rdtime();
+    // This function is guaranteed by assumption not to be called while we are
+    // executing any other function in timer.c, either by assumption or by
+    // disabling timer interrupts in critical sections elsewhere.
 
-    trace("[%lu] %s()", now, __func__);
-    debug("[%lu] mtcmp = %lu", now, rdtime());
+    head = sleep_list;
 
-    while (head != NULL && head->twake <= now) {
-        debug("[%lu] Broadcasting alarm for %s", now, head->cond.name);
+    tnow = rdtime();
+
+    trace("[%lu] %s()", tnow, __func__);
+
+    while (head != NULL && head->twake <= tnow) {
+        debug("[%lu] Waking threads sleeping on <%s>", tnow, head->name);
         condition_broadcast(&head->cond);
+
         next = head->next;
         head->next = NULL;
         head = next;
@@ -230,11 +187,69 @@ void handle_timer_interrupt(void) {
 
     sleep_list = head;
 
-    if (head == NULL) {
-        debug("[%lu] No alarms pending: timer interrupt disabled ", now);
-        csrc_sie(RISCV_SIE_STIE);
-    } else {
-        debug("[%lu] Setting next alarm for %lu ", now, head->twake);
-        set_stcmp(head->twake);
+    // Calculate next system periodic interrupt time and next alarm wake time
+    // and set timer interrupt for the earlier of the two
+
+    tbolt = ROUND_UP(tnow+1, bolt_period);
+    talarm = (head != NULL) ? head->twake : ULLONG_MAX;
+    debug("[%llu] %s(): tbolt = %llu", rdtime(), __func__, tbolt);
+    debug("[%llu] %s(): talarm = %llu", rdtime(), __func__, talarm);
+    debug("[%llu] %s(): Calling sbi_set_timer(%llu)", rdtime(), __func__, MIN(tbolt, talarm));
+    sbi_set_timer(MIN(tbolt, talarm));
+}
+
+// INTERNAL FUNCTION DEFINITIONS
+//
+
+static void add_alarm(struct alarm * al) {
+    struct alarm * prev;
+
+    trace("[%llu] %s({\"%s\",%llu})", rdtime(), __func__, al->name, al->twake);
+    debug("[%llu] tbolt = %llu", rdtime(), tbolt);
+
+    // Timer interrupts MUST be disabled by caller while we are manipulating the
+    // alarm list.
+
+    al->next = NULL;
+
+    if (sleep_list == NULL || al->twake <= sleep_list->twake) {
+        // Insert at head of list. If alarm time is before next system periodic
+        // interrupt, update the S mode timer compare register.
+
+        al->next = sleep_list;
+        sleep_list = al;
+
+        debug("[%llu] %s(): tbolt = %llu", rdtime(), __func__, tbolt);
+        debug("[%llu] %s(): al->twake = %llu", rdtime(), __func__, al->twake);
+
+        if (al->twake < tbolt) {
+            debug("[%llu] %s(): Calling sbi_set_timer(%llu)", rdtime(), __func__, al->twake);
+            sbi_set_timer(al->twake);
+        }
+        
+        return;
     }
+
+    // Insert into list after the first element. We don't need to update the
+    // timer compare register.
+
+    for (prev = sleep_list; prev->next != NULL; prev = prev->next) {
+        if (al->twake <= prev->next->twake) {
+            al->next = prev->next;
+            prev->next = al;
+            return;
+        }
+    }
+
+    // End of list reached, insert at tail.
+
+    prev->next = al;
+}
+
+void enable_timer_interrupts(void) {
+    csrs_sie(RISCV_SIE_STIE);
+}
+
+void disable_timer_interrupts(void) {
+    csrc_sie(RISCV_SIE_STIE);
 }

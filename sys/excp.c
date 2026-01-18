@@ -69,7 +69,8 @@ void handle_smode_exception(unsigned int cause, struct trap_frame* tfr) {
     const char* name = NULL;
     char msgbuf[80];
 
-    if (0 <= cause && cause < sizeof(excp_names) / sizeof(excp_names[0])) name = excp_names[cause];
+    if (0 <= cause && cause < sizeof(excp_names) / sizeof(excp_names[0]))
+        name = excp_names[cause];
 
     if (name != NULL) {
         switch (cause) {
@@ -122,6 +123,8 @@ void handle_umode_exception(unsigned int cause, struct trap_frame * tfr) {
         break;
     }
 
+    running_thread_submit();
+    
     if (handled)
         return;
 

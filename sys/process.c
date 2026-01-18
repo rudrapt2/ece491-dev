@@ -76,7 +76,7 @@ void procmgr_init(void) {
 
     main_proc.tid = running_thread();
     main_proc.mtag = active_mspace();
-    thread_set_process(main_proc.tid, &main_proc);
+    thread_attach_process(main_proc.tid, &main_proc);
     procmgr_initialized = 1;
 }
 
@@ -138,7 +138,7 @@ int process_exec(struct uio * exefile, int argc, char ** argv) {
     tfr.sstatus |= RISCV_SSTATUS_SPIE;
     tfr.sstatus &= ~RISCV_SSTATUS_SPP;
     
-    trap_frame_jump(&tfr, running_thread_stack_base() - sizeof(tfr));
+    trap_frame_jump(&tfr, running_thread_stack_anchor() - sizeof(tfr));
 }
 
 int process_fork(const struct trap_frame * tfr) {
@@ -191,7 +191,7 @@ int process_fork(const struct trap_frame * tfr) {
 
     condition_init(&done, "fork_child_done");
     ctid = spawn_thread("fork_child", (void*)&fork_func, &done, tfr);
-    thread_set_process(ctid, child);
+    thread_attach_process(ctid, child);
 
     if (ctid < 0)
         return ctid;
@@ -234,7 +234,7 @@ void process_exit(void) {
     // Free process struct. First, though, remove references to it from thread
     // struct and proctab.
 
-    thread_set_process(running_thread(), NULL);
+    thread_attach_process(running_thread(), NULL);
     
     for (i = 0; i < NPROC; i++) {
         if (proctab[i] == self) {
@@ -333,5 +333,5 @@ void fork_func(struct condition * done, struct trap_frame * tfr) {
     condition_broadcast(done); // signal parent we're done using trap frame
 
     tfr->a0 = 0;
-    trap_frame_jump(tfr, running_thread_stack_base() - sizeof(struct trap_frame));
+    trap_frame_jump(tfr, running_thread_stack_anchor() - sizeof(struct trap_frame));
 }

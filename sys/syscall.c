@@ -67,10 +67,10 @@ static int sysuiodup(int oldfd, int newfd);
  * @return void
  */
 
-void handle_syscall(struct trap_frame *tfr)
-{
+void handle_syscall(struct trap_frame *tfr) {
     tfr->sepc += 4;
     tfr->a0 = syscall(tfr);
+    running_thread_submit();
 }
 
 // INTERNAL FUNCTION DEFINITIONS

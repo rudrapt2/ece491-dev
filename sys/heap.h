@@ -13,35 +13,26 @@
 
 // Maximum allocation request size
 
-#ifndef HEAP_ALLOC_MAX
-#define HEAP_ALLOC_MAX 4000
-#endif
+#define HEAP_ALLOC_MAX 4032
 
-extern char heap_initialized;  // 1 if heap_init called, 0 otherwise
+struct heap_stats {
+    uint64_t cumul_objects;
+    uint64_t cumul_bytes;
+    uint32_t managed_bytes;
+    uint32_t alloc_objects;
+    uint32_t alloc_bytes;
+    uint32_t alloc_maxsz;
+    uint32_t avail_bytes;
+    uint32_t avail_maxsz;
+};
 
-extern void heap_init(void* start, void* end);
+extern char heap_initialized;
+void heap_init(void * start, size_t size);
 
-/**
- * @brief Allocates a region of memory on the heap of size number of bytes.
- * @param size Number of bytes that is desired to be allocated.
- * @return A void pointer to the allocated space, NULL if insufficient memory avalible.
- */
-extern void* kmalloc(size_t size);
+extern void heap_copy_stats(struct heap_stats * stat);
 
-/**
- * @brief Allocates memory on the heap of nelts * eltsz number of bytes. Initializes all of the
- * allocated memory to zero's.
- * @param nelts Number of elements that are desired to be allocated.
- * @param eltsz Size of each element in bytes.
- * @return A void pointer to the allocated space, NULL if insufficient memory avalible.
- */
-extern void* kcalloc(size_t nelts, size_t eltsz);
-
-/**
- * @brief Deallocate memory on the heap that was previously allocated.
- * @param ptr A pointer to the begining of the previously allocated block of memory on the heap.
- * @return None
- */
-extern void kfree(void* ptr);
+void * kmalloc(size_t size);
+void * kcalloc(size_t nelts, size_t eltsz);
+void kfree(void * ptr);
 
 #endif  // _HEAP_H_

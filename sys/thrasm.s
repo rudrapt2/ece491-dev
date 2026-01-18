@@ -1,44 +1,34 @@
 # thrasm.s - Special functions called from thread.c
 #
-# Copyright (c) 2024-2025 University of Illinois
+# Copyright (c) 2024-2026 University of Illinois
 # SPDX-License-identifier: NCSA
 #
 
-# struct thread * _thread_swtch(struct thread * resuming_thread)
-
-# Switches from the currently running thread to another thread and returns when
-# the current thread is scheduled to run again. Argument /resuming_thread/ is
-# the thread to be resumed. Returns a pointer to the previously-scheduled
-# thread. This function is called in thread.c. The spelling of swtch is
-# historic.
-
         .text
-        .global _thread_swtch
-        .type   _thread_swtch, @function
+        .global switch_running_thread
+        .type   switch_running_thread, @function
 
-_thread_swtch:
+switch_running_thread:
 
-        # We only need to save the ra and s0 - s12 registers. Save them on
-        # the stack and then save the stack pointer. Our declaration is:
-        # 
-        #   struct thread * _thread_swtch(struct thread * resuming_thread);
-        #
-        # The currently running thread is suspended and resuming_thread is
-        # restored to execution. swtch returns when execution is switched back
-        # to the calling thread. The return value is the previously executing
-        # thread. Interrupts are enabled when swtch returns.
-        #
-        # tp = pointer to struct thread of current thread (to be suspended)
-        # a0 = pointer to struct thread of thread to be resumed
-        # 
-        # The first element of struct thread is:
-        #
-        #     struct thread_context {
-        #         uint64_t s[12];
-        #         void (*ra)(uint64_t);
-        #         void * sp;
-        #     };
-        #
+# void switch_running_thread(struct thread * next_thread);
+# 
+# Switches from the currently running thread to another thread and returns when
+# the current thread is scheduled to run again. This function is called by
+# running_thread_yield() defined in thread.c. Argument /next_thread/ is the
+# thread to be resumed. Instead of returning, jumps to finish_switch(), which is
+# also defined in thread.c, which returns via /ra/ to running_thread_yield().
+# 
+# tp = pointer to struct thread of current thread (to be suspended)
+# a0 = pointer to struct thread of thread to be resumed
+# 
+# The first element of struct thread is:
+#
+#     struct thread_context {
+#         uint64_t s[12];
+#         void (*ra)(uint64_t);
+#         void * sp;
+#     };
+#
 
         sd      s0, 0*8(tp)
         sd      s1, 1*8(tp)
@@ -74,12 +64,21 @@ _thread_swtch:
         ld      s1, 1*8(tp)
         ld      s0, 0*8(tp)
                 
-        ret
+        j       finish_thread_switch
 
-        .global _thread_startup
-        .type   _thread_startup, @function
 
-_thread_startup:
+        .global start_thread
+        .type   start_thread, @function
+
+start_thread:
+
+# Code fragment used to start a new thread. When a thread is spawned, it is
+# placed on the ready list and the s-registers in its saved context are
+# populated with the arguments to the thread function where execution of the new
+# thread should start. This fragment populated the a0-a7 argument registers with
+# the contents of s0-s7, and initializes the /fp/ and /ra/ registers from s10
+# and s11. The address of the thread function is in s8.
+
         mv      a0, s0
         mv      a1, s1
         mv      a2, s2
