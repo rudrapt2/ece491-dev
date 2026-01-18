@@ -105,7 +105,7 @@ void mount_cdrive(void) {
 
     if (hd == NULL) {
         kprintf("Storage device %s%d not found\n", CDEVNAME, CDEVINST);
-        halt_failure();
+        halt();
     }
 
     result = storage_open(hd);
@@ -113,7 +113,7 @@ void mount_cdrive(void) {
     if (result != 0) {
         kprintf("storage_open failed on %s%d: %s\n",
             CDEVNAME, CDEVINST, error_name(result));
-        halt_failure();
+        halt();
     }
 
     result = create_cache(hd, &cache, LFFS_BLKSZ);
@@ -121,7 +121,7 @@ void mount_cdrive(void) {
     if (result != 0) {
         kprintf("create_cache(%s%d) failed: %s\n",
             CDEVNAME, CDEVINST, error_name(result));
-        halt_failure();
+        halt();
     }
 
     result = mount_lffs(CMNTNAME, cache, storage_capacity(hd));
@@ -129,7 +129,7 @@ void mount_cdrive(void) {
     if (result != 0) {
         kprintf("mount_lffs(%s, cache(%s%d)) failed: %s\n",
             CMNTNAME, CDEVNAME, CDEVINST, error_name(result));
-        halt_failure();
+        halt();
     }
 }
 
@@ -142,7 +142,7 @@ void mount_ddrive(void) {
 
     if (hd == NULL) {
         kprintf("Storage device %s%d not found\n", DDEVNAME, DDEVINST);
-        halt_failure();
+        halt();
     }
 
     result = storage_open(hd);
@@ -150,7 +150,7 @@ void mount_ddrive(void) {
     if (result != 0) {
         kprintf("storage_open failed on %s%d: %s\n",
             DDEVNAME, DDEVINST, error_name(result));
-        halt_failure();
+        halt();
     }
 
     result = create_cache(hd, &cache, KTFS_BLKSZ);
@@ -158,7 +158,7 @@ void mount_ddrive(void) {
     if (result != 0) {
         kprintf("create_cache(%s%d) failed: %s\n",
             DDEVNAME, DDEVINST, error_name(result));
-        halt_failure();
+        halt();
     }
 
     result = mount_ktfs(DMNTNAME, cache);
@@ -166,7 +166,7 @@ void mount_ddrive(void) {
     if (result != 0) {
         kprintf("mount_ktfs(%s, cache(%s%d)) failed: %s\n",
             DMNTNAME, DDEVNAME, DDEVINST, error_name(result));
-        halt_failure();
+        halt();
     }
 }
 

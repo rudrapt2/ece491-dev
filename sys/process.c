@@ -34,6 +34,7 @@
 #include "thread.h"
 #include "trap.h"
 #include "uio.h"
+#include "console.h"
 
 // COMPILE-TIME PARAMETERS
 //
@@ -218,7 +219,8 @@ void process_exit(void) {
 
     if (running_thread() == 0) {
         fsmgr_flushall();
-        halt_success();
+        kprintf("Main process exited\n");
+        halt();
     }
 
     for (i = 0; i < PROCESS_UIOMAX; i++) {

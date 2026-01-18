@@ -24,8 +24,6 @@
 #include "devimpl.h"
 #include "console.h"
 
-#define CACHE_CAPACITY 64 // must be power of two
-
 // INTERNAL TYPE DEFINITIONS
 //
 

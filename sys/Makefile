@@ -20,6 +20,8 @@ OBJS = \
 	dev/rtc.o \
 	dev/virtio.o \
 	dev/viorng.o \
+	dev/viogpu.o \
+	dev/viohi.o \
 	dev/ramdisk.o \
 	device.o \
 	filesys.o \
@@ -66,6 +68,7 @@ CFLAGS += -DAEE2
 # CFLAGS += -DELF_DEBUG -DELF_TRACE
 
 # CFLAGS += -DUIO_DEBUG -DUIO_TRACE
+# CFLAGS += -DVIRTIO_DEBUG -DVIRTIO_TRACE
 # CFLAGS += -DTIMER_DEBUG -DTIMER_TRACE
 # CFLAGS += -DVIOGPU_DEBUG -DVIOGPU_TRACE
 # CFLAGS += -DVIOBLK_DEBUG -DVIOBLK_TRACE
@@ -94,10 +97,6 @@ QEMUOPTS += -serial mon:stdio
 QEMUOPTS += -serial pty
 QEMUOPTS += -monitor pty
 # Add more UARTs
-
-QEMUOPTS += -object rng-random,filename=/dev/urandom,id=rng0
-QEMUOPTS += -device virtio-rng-device,rng=rng0
-# Add more RNG devices
 
 QEMUOPTS += -drive file=lffs.raw,id=blk1,if=none,format=raw,readonly=false
 QEMUOPTS += -device virtio-blk-device,drive=blk1

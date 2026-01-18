@@ -38,7 +38,7 @@
 #define FAT_ENTRYSZ             (sizeof(uint32_t))
 #define DENTRIES_PER_BLOCK      (LFFS_BLKSZ / DENTRYSZ)
 
-#define RM_FILE(file)                                  \
+#define RM_FILE(file)                                   \
     do {                                                \
         if (file->next) file->next->prev = file->prev;  \
         if (file->prev) file->prev->next = file->next;  \
@@ -510,15 +510,16 @@ void lffs_flush(struct filesystem * fs) {
 
         for(int i = 0; i < min(remaining_files, DENTRIES_PER_BLOCK); i++) {
             for (struct lffs_file * f = files_list; f != NULL; f = f->next) {
-                if(strncmp(f->dentry.name, root_entries[i].name,
-                    LFFS_MAX_FILENAME_LEN) == 0 &&
-                    root_entries[i].size != f->dentry.size) {
+                if (strncmp(f->dentry.name, root_entries[i].name,
+                    LFFS_MAX_FILENAME_LEN) != 0)
+                    continue;
 
+                if (root_entries[i].size != f->dentry.size) {
                     memcpy(&root_entries[i], &f->dentry, sizeof(f->dentry));
-                    RM_FILE(f);
                     dirty = CACHE_DIRTY;
-                    break;
                 }
+                RM_FILE(f);
+                break;
             }
         }
 

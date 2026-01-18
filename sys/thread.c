@@ -504,7 +504,7 @@ struct process * running_thread_process(void) {
 void thread_attach_process(int tid, struct process * proc) {
     assert (0 <= tid && tid < NTHR);
     assert (thrtab[tid] != NULL);
-    assert (proc != NULL);
+    // assert (proc != NULL);
     thrtab[tid]->proc = proc;
 }
 
@@ -641,7 +641,7 @@ void rwlock_release_shared(struct rwlock * rwlk) {
 
 void rwlock_acquire_exclusive(struct rwlock * rwlk) {
     if (rwlk->owner != TP) {
-        while (rwlk->owner != NULL)
+        while (rwlk->cnt > 0) //
             condition_wait(&rwlk->released);
         rwlk->owner = TP;
     }
@@ -657,6 +657,7 @@ void rwlock_release_exclusive(struct rwlock * rwlk) {
     assert (rwlk->cnt != 0);
 
     rwlk->cnt -= 1;
+    rwlk->owner = NULL; //
 
     if (rwlk->cnt == 0)
         condition_broadcast(&rwlk->released);

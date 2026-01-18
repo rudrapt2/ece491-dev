@@ -3,23 +3,23 @@
 #include "../shell.h"
 #include "../error.h"
 
-#define BUFSIZE 1024
+#define BUFSIZE 256
 #define MAXARGS 64
 
 #define SKIP_SPACES(buf) while(*buf == ' ') buf++
 
 void exec(int argc, char* argv[]) {
-	char path[BUFSIZE];
+	char full_path[BUFSIZE];
 	int fd, result;
+    char * path = argv[0];
 
-	// If path doesn't start with '/', prepend '/c/' for relative paths
-	if (strncmp(argv[0], "/", 1) != 0 && strncmp(argv[0], "c/", 2) != 0) {
-		snprintf(path, sizeof(path), "/c/%s", argv[0]);
-        fd = _open(-1, path);
+	// If path doesn't contain '/', prepend '/c/' for relative paths
+	if (strchr(argv[0], '/') == NULL) {
+		snprintf(full_path, sizeof(full_path), "/c/%s", argv[0]);
+        path = full_path;
 	}
-	else {
-	    fd = _open(-1, argv[0]);
-	}
+
+    fd = _open(-1, path);
 
 	if (fd < 0) {
 		printf("Unable to access %s (%s)\n", path, error_name(fd));
@@ -27,7 +27,7 @@ void exec(int argc, char* argv[]) {
 	}
 
 	result = _exec(fd, argc, argv);
-	printf("Failed to exec file (%s)", error_name(result));
+	printf("Failed to exec %s (%s)", path, error_name(result));
 }
 
 static int handle_file_input(char* file) {

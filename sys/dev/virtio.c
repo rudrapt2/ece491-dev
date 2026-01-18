@@ -2,6 +2,14 @@
     @brief MMIO-based VirtIO
 */
 
+#ifdef VIRTIO_TRACE
+#define TRACE
+#endif
+
+#ifdef VIRTIO_DEBUG
+#define DEBUG
+#endif
+
 #include "virtio.h"
 #include "error.h"
 #include "misc.h"
