@@ -12,7 +12,6 @@
 #define DEBUG
 #endif
 
-#include "uart.h"
 #include "conf.h"
 #include "intr.h"
 #include "heap.h"
@@ -105,6 +104,7 @@ struct uart_device {
 //
 
 static int uart_open(struct io ** ioptr, void * aux);
+static void uart_reclaim(struct io * io);
 static long uart_read(struct io * io, void * buf, long bufsz);
 static long uart_write(struct io * io, const void * buf, long len);
 
@@ -124,7 +124,8 @@ static char rbuf_getc(struct ringbuf * rbuf);
 static const struct iointf uart_intf = {
     .implname = "uart",
     .read = &uart_read,
-    .write = &uart_write
+    .write = &uart_write,
+    .reclaim = &uart_reclaim
 };
 
 // EXPORTED FUNCTION DEFINITIONS
@@ -160,7 +161,7 @@ void attach_uart(void * mmio_base, int irqno) {
 int uart_open(struct io ** ioptr, void * aux) {
     struct uart_device * const uart = aux;
 
-    trace("%s(%d)", __func__);
+    trace("%s()", __func__);
 
     if (iorefcnt(&uart->io) != 0)
         return -EBUSY;

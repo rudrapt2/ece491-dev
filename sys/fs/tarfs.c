@@ -97,6 +97,8 @@ static long tarfs_lsio_read(struct io * io, void * buf, long bufsz);
 static const struct iointf tarfs_file_intf = {
     .implname = "tarfs_fileio",
     .reclaim = (void(*)(struct io*))&kfree,
+    .read = &seekio_read,
+    .write = &seekio_write,
     .fetch = &tarfs_fileio_fetch,
     .store = &tarfs_fileio_store,
     .ioctl = &tarfs_fileio_ioctl

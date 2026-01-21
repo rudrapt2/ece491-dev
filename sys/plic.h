@@ -12,7 +12,7 @@
 #define PLIC_SRC_CNT 96 // QEMU-specific
 
 extern char plic_initialized;
-extern void plic_init(void);
+extern void plic_init(void * mmio_base);
 
 extern void plic_enable_source(int srcno, int prio);
 

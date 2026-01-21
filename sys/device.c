@@ -11,7 +11,9 @@
 
 #include "conf.h"
 #include "error.h"
+#ifndef MP2
 #include "fsimpl.h"
+#endif
 #include "heap.h"
 #include "misc.h"
 #include "string.h"
@@ -29,20 +31,22 @@ struct device_record {
     char name[];                    // device name
 };
 
+#ifndef MP2
 // devfs listing io object
 
 struct devfs_lsio {
     struct io base;
     const struct device_record * next;
 };
+#endif
 
 // INTERNAL FUNCTION DECLARATIONS
 //
 
-static int devfs_open_listing(struct filesystem * fs, struct io ** ioptr);
-static long devfs_listing_read(struct io * io, void * buf, long bufsz);
-
+#ifndef MP2
 static int devfs_open_file(struct filesystem * fs, const char * name, struct io ** ioptr);
+static long devfs_listing_read(struct io * io, void * buf, long bufsz);
+#endif
 
 struct device_record * find_device(const char * name);
 
@@ -51,21 +55,25 @@ struct device_record * find_device(const char * name);
 
 char devmgr_initialized = 0;
 
+#ifndef MP2
 struct filesystem devfs = {
     .implname = "devfs",
     .openfile = &devfs_open_file
 };
+#endif
 
 // DEVMGR INTERNAL GLOBAL VARIABLES
 //
 
 static struct device_record * devlist;
 
+#ifndef MP2
 static const struct iointf devfs_lsio_intf = {
     .implname = "devfs_lsio",
     .reclaim = (void(*)(struct io*))&kfree,
     .read = &devfs_listing_read
 };
+#endif
 
 // EXPORTED FUNCTION DEFINITIONS
 //
@@ -130,6 +138,7 @@ extern int open_device(const char * name, struct io ** ioptr) {
 // INTERNAL FUNCTION DEFINITIONS
 //
 
+#ifndef MP2
 int devfs_open_file (
     struct filesystem * fs,
     const char * name,
@@ -164,6 +173,7 @@ long devfs_listing_read(struct io * io, void * buf, long bufsz) {
     } else
         return 0;
 }
+#endif // MP2
 
 struct device_record * find_device(const char * name) {
     struct device_record * dev;

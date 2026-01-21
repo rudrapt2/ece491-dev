@@ -30,7 +30,8 @@ BASE_OBJS = \
 	timer.o \
 	intr.o \
 	excp.o \
-	trap.o
+	trap.o \
+	board/qemu-virt.o
 
 MP2_OBJS = \
 	$(BASE_OBJS) \
@@ -55,6 +56,8 @@ CFLAGS += -mcmodel=medany -fno-pie -no-pie -march=rv64imazicsr -mabi=lp64
 CFLAGS += -fno-common -nostdlib -mno-relax -ffreestanding 
 CFLAGS += -fno-asynchronous-unwind-tables -mno-riscv-attribute
 CFLAGS += -I.
+
+CFLAGS += -DMP2
 
 # CFLAGS += -DDEBUG -DTRACE # Everything!
 # CFLAGS += -DMEMORY_DEBUG -DMEMORY_TRACE

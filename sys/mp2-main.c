@@ -10,9 +10,6 @@
 #include "plic.h"
 #include "device.h"
 #include "thread.h"
-#include "dev/rtc.h"
-#include "dev/uart.h"
-#include "dev/virtio.h"
 #include "timer.h"
 #include "string.h"
 #include "error.h"
@@ -20,25 +17,13 @@
 #include "heap.h"
 #include "io.h"
 
-#ifndef NUART // number of UARTs
-#define NUART 3
-#endif
-
-#ifndef NVIODEV // number of VirtIO devices
-#define NVIODEV 8
-#endif
-
-static void attach_devices(void);
 static void run_mp2(void);
 
+extern void board_init(void); // from board/xxx.c
+extern void attach_devices(void); // from board/xxx.c
+
 void main(void) {
-    console_init();
-    timer_init(TIMER_FREQ);
-    plic_init();
-
-    extern char _kimg_end[];
-    heap_init(_kimg_end, RAM_END - (void*)_kimg_end);
-
+    board_init();
     intmgr_init();
     devmgr_init();
     thrmgr_init();
@@ -48,18 +33,6 @@ void main(void) {
     enable_interrupts();
 
     run_mp2();
-}
-
-void attach_devices(void) {
-    int i;
-
-    rtc_attach((void*)RTC_MMIO_BASE);
-
-    for (i = 0; i < NUART; i++)
-        attach_uart((void*)UART_MMIO_BASE(i), UART0_INTR_SRCNO+i);
-    
-    for (i = 0; i < NVIODEV; i++)
-        attach_virtio((void*)VIRTIO_MMIO_BASE(i), VIRTIO0_INTR_SRCNO+i);
 }
 
 #define TREK_TERM_NAME "uart1"
@@ -114,12 +87,12 @@ void run_mp2(void) {
 }
 
 void __attribute__ ((weak)) trek_start(struct io * tio, unsigned long rngseed) {
-    char msgbuf[256];
+    char msgbuf[120];
     int n;
     
     for (;;) {
         n = snprintf(msgbuf, sizeof(msgbuf),
-            "[%llu] This is trek placeholder (rngseed = %lu)\r\n", rdtime(), rngseed);
+            "[%llu] This is trek (rngseed = %lu)\r\n", rdtime(), rngseed);
         
         iowrite(tio, msgbuf, n);
         sleep_ms(500);
@@ -127,7 +100,7 @@ void __attribute__ ((weak)) trek_start(struct io * tio, unsigned long rngseed) {
 }
 
 void __attribute__ ((weak)) rule30_start(struct io * tio) {
-    char msgbuf[256];
+    char msgbuf[120];
     int n;
     
     for (;;) {

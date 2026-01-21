@@ -49,8 +49,8 @@ extern int spawn_thread (
 // thread is given an implementation-defined name. The new thread will start
 // execution in /entry/, which must be a pointer to executable code, when it is
 // scheduled to run. Up to 8 optional arguments may be passed to spawn_thread().
-// These arguments will be passed to /entry/ as function arguments when it is
-// started. That is, if spawn_thread() is invoked as,
+// These arguments will be passed to /entry/ as function arguments in the same
+// order when it is started. That is, if spawn_thread() is invoked as,
 //
 //     spawn_thread("myname", (void(*)()) &myfunc, "one", 2);
 //
@@ -190,6 +190,7 @@ extern int join_thread(int u_tid);
 // See also: thread_exit().
 
 
+#ifndef MP2
 extern struct process * thread_process(int tid);
 
 // Returns a pointer to the process structure (`struct process *`) of the
@@ -240,6 +241,7 @@ extern void thread_attach_process(int tid, struct process * proc);
 // - If /proc/ is not NULL, it becomes the process associated thread /tid/.
 //
 // See also: thread_process().
+#endif // !defined(MP2)
 
 
 extern const char * thread_name(int tid);
@@ -272,6 +274,7 @@ extern const char * running_thread_name(void);
 //
 // See also: thread_name(), running_thread().
 
+#ifndef NO_PROC
 extern void * running_thread_stack_anchor(void);
 
 // Returns a pointer to the thread stack anchor structure that is placed at the
@@ -296,7 +299,7 @@ extern void * running_thread_stack_anchor(void);
 //
 // See also: _smode_trap_entry in trap.s, spawn_thread(), process_exec(),
 // process_fork().
-
+#endif // NO_PROC
 
 // CONDITION VARIABLES
 //

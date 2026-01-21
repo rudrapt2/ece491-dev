@@ -1,8 +1,8 @@
-/*! @file heap.h
-    @brief Heap memory manager
-    @copyright Copyright (c) 2024-2025 University of Illinois
-
-*/
+// heap.c - Heap memory manager
+//
+// Copyright (c) 2026 University of Illinois
+// SPDX-License-identifier: NCSA
+//
 
 #ifndef _HEAP_H_
 #define _HEAP_H_

@@ -12,7 +12,6 @@
 #define DEBUG
 #endif
 
-#include "rtc.h"
 #include "conf.h"
 #include "misc.h"
 #include "device.h"
@@ -58,7 +57,7 @@ static const struct iointf rtc_intf = {
 // EXPORTED FUNCTION DEFINITIONS
 // 
 
-void rtc_attach(void * mmio_base) {
+void attach_rtc(void * mmio_base) {
     static unsigned short instcnt = 0; // number of RTCs
     struct rtc_device * rtc;
 

@@ -1,8 +1,8 @@
-/*! @file excp.c
-    @brief Exception handlers
-    @copyright Copyright (c) 2024-2025 University of Illinois
-    @license SPDX-License-identifier: NCSA
-*/
+// excp.c - Exception handing
+//
+// Copyright (c) 2024-2026 University of Illinois
+// SPDX-License-identifier: NCSA
+//
 
 #include <stddef.h>
 
@@ -14,9 +14,10 @@
 #include "thread.h"
 #include "trap.h"
 
-// MP3
+#ifndef MP2
 #include "memory.h"
 #include "process.h"
+#endif
 
 // EXPORTED FUNCTION DECLARATIONS
 //
@@ -24,17 +25,15 @@
 // The following two functions, defined below, are called to handle an exception
 // from trap.s.
 
-extern void handle_smode_exception(unsigned int cause, struct trap_frame* tfr);
-extern void handle_umode_exception(unsigned int cause, struct trap_frame* tfr);
+extern void handle_smode_exception(unsigned int cause, struct trap_frame * tfr);
+extern void handle_umode_exception(unsigned int cause, struct trap_frame * tfr);
 
+#ifndef MP2
 // IMPORTED FUNCTION DECLARATIONS
 //
-/**
- * @brief Imported function definition from syscall.c that handles system calls from user mode.
- * @param tfr Pointer to the trapframe
- * @return None
- */
+
 extern void handle_syscall(struct trap_frame* tfr);  // syscall.c
+#endif
 
 // INTERNAL GLOBAL VARIABLES
 //
@@ -60,13 +59,6 @@ static const char* const excp_names[] = {
 // EXPORTED FUNCTION DEFINITIONS
 //
 
-/**
- * @brief Handles exceptions from supervisor mode. Ensures that each
- * specfic cause is handled appropriately. Creates a panic.
- * @param cause Exception code
- * @param tfr Pointer to the trap frame
- * @return None
- */
 void handle_smode_exception(unsigned int cause, struct trap_frame* tfr) {
     const char* name = NULL;
     char msgbuf[80];
@@ -85,20 +77,27 @@ void handle_smode_exception(unsigned int cause, struct trap_frame* tfr) {
             case RISCV_SCAUSE_LOAD_ACCESS_FAULT:
             case RISCV_SCAUSE_STORE_ACCESS_FAULT:
             case RISCV_SCAUSE_INSTR_ACCESS_FAULT:
-                snprintf(msgbuf, sizeof(msgbuf), "%s at %p for %p in S mode", name,
-                         (void*)tfr->sepc, (void*)csrr_stval());
+                snprintf(msgbuf, sizeof(msgbuf),
+                    "%s at %p for %p in S mode", name,
+                    (void*)tfr->sepc, (void*)csrr_stval());
                 break;
             default:
-                snprintf(msgbuf, sizeof(msgbuf), "%s at %p in S mode", name, (void*)tfr->sepc);
+                snprintf(msgbuf, sizeof(msgbuf),
+                    "%s at %p in S mode", name, (void*)tfr->sepc);
         }
     } else {
-        snprintf(msgbuf, sizeof(msgbuf), "Exception %d at %p in S mode", cause, (void*)tfr->sepc);
+        snprintf(msgbuf, sizeof(msgbuf),
+            "Exception %d at %p in S mode", cause, (void*)tfr->sepc);
     }
 
     panic(msgbuf);
 }
 
 void handle_umode_exception(unsigned int cause, struct trap_frame * tfr) {
+#ifdef STUDENT
+    // (your MP3cp2 code here)
+#else
+#ifndef MP2
     const char * name = NULL;
     int handled = 0;
     trace("%s(cause=%d, tfr=%p)", __func__, cause, tfr);
@@ -148,25 +147,9 @@ void handle_umode_exception(unsigned int cause, struct trap_frame * tfr) {
     }
 
     process_exit();
-}
-
-#ifndef STUDENT
-
-// The following functions are weak definitions for functions that are not
-// implemented in MP2.
-
-int __attribute__ ((weak)) handle_umode_page_fault (
-    struct trap_frame* tfr, uintptr_t vma)
-{
-    return 0; // not handled
-}
-
-void __attribute__ ((weak)) process_exit(void) {
-    exit_running_thread();
-}
-
-void __attribute__ ((weak)) handle_syscall(struct trap_frame * tfr) {
-    // nothing
-}
-
+#else
+    (void)cause;
+    (void)tfr;
+#endif // !defined(MP2)
 #endif // STUDENT
+}

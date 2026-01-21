@@ -18,6 +18,12 @@
 
 #include <stdint.h>
 
+// COMPILE-TIME CONFIGURATION
+//
+
+#define PLIC_SRC_CNT 96  // QEMU VIRT_IRQCHIP_NUM_SOURCES
+#define PLIC_CTX_CNT 2
+
 // INTERNAL MACRO DEFINITIONS
 //
 
@@ -57,8 +63,6 @@ struct plic_regs {
 	} ctx[PLIC_CTX_CNT];
 };
 
-#define PLIC (*(volatile struct plic_regs*)PLIC_MMIO_BASE)
-
 // INTERNAL FUNCTION DECLARATIONS
 //
 
@@ -95,11 +99,18 @@ char plic_initialized = 0;
 // contexts, so we only need to modify the high-level functions (plit_init,
 // plic_claim_request, plic_finish_request)to add support for multiple harts.
 
+// INTERNAL GLOBAL VARIABLES
+//
+
+static struct plic_regs * plic;
+
 // EXPORTED FUNCTION DEFINITIONS
 // 
 
-void plic_init(void) {
+void plic_init(void * mmio_base) {
 	int i;
+
+	plic = mmio_base;
 
 	// Disable all sources by setting priority to 0
 
@@ -145,53 +156,53 @@ extern void plic_finish_interrupt(int irqno) {
 //
 
 static inline void plic_set_source_priority(uint_fast32_t srcno, uint_fast32_t level) {
-	PLIC.priority[srcno] = level;
+	plic->priority[srcno] = level;
 }
 
 static inline int plic_source_pending(uint_fast32_t srcno) {
 	const int i = srcno / 32; // in uint32_t units
 	const int j = srcno % 32; // bit index inside uint32_t
 
-	return ((PLIC.pending[i] >> j) & 1);
+	return ((plic->pending[i] >> j) & 1);
 }
 
 static inline void plic_enable_source_for_context(uint_fast32_t ctxno, uint_fast32_t srcno) {
 	const int i = srcno / 32; // in uint32_t units
 	const int j = srcno % 32; // bit index inside uint32_t
-	volatile uint32_t * const ptr = PLIC.enable[ctxno]+i;
+	volatile uint32_t * const ptr = plic->enable[ctxno]+i;
 	__atomic_or_fetch(ptr, UINT32_C(1) << j, __ATOMIC_RELAXED);
 }
 
 static inline void plic_disable_source_for_context(uint_fast32_t ctxno, uint_fast32_t srcid) {
 	const int i = srcid / 32; // in uint32_t units
 	const int j = srcid % 32; // bit index in uint32_t
-	volatile uint32_t * const ptr = PLIC.enable[ctxno]+i;
+	volatile uint32_t * const ptr = plic->enable[ctxno]+i;
 
 	__atomic_or_fetch(ptr, ~(UINT32_C(1) << j), __ATOMIC_RELAXED);
 }
 
 static inline void plic_set_context_threshold(uint_fast32_t ctxno, uint_fast32_t level) {
-	PLIC.ctx[ctxno].threshold = level;
+	plic->ctx[ctxno].threshold = level;
 }
 
 static inline uint_fast32_t plic_claim_context_interrupt(uint_fast32_t ctxno) {
-	return PLIC.ctx[ctxno].claim;
+	return plic->ctx[ctxno].claim;
 }
 
 static inline void plic_complete_context_interrupt(uint_fast32_t ctxno, uint_fast32_t srcno) {
-	PLIC.ctx[ctxno].claim = srcno;
+	plic->ctx[ctxno].claim = srcno;
 }
 
 static void plic_enable_all_sources_for_context(uint_fast32_t ctxno) {
 	int i;
 
 	for (i = 0; i < PLIC_SRC_CNT/32; i++)
-		PLIC.enable[ctxno][i] = ~UINT32_C(0);
+		plic->enable[ctxno][i] = ~UINT32_C(0);
 }
 
 static void plic_disable_all_sources_for_context(uint_fast32_t ctxno) {
 	int i;
 
 	for (i = 0; i < PLIC_SRC_CNT/32; i++)
-		PLIC.enable[ctxno][i] = UINT32_C(0);
+		plic->enable[ctxno][i] = UINT32_C(0);
 }

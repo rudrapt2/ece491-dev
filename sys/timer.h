@@ -7,19 +7,18 @@
 #ifndef _TIMER_H_
 #define _TIMER_H_
 
-#include "thread.h" // struct condition
-
 // SYSTEM TIMER AND PREEMPTION INTERRUPTS
 //
 // The timer subsystem provides two services:
 //
 // - One-time alarms for placing threads to sleep until a specified time.
-// - Coarse periodic interrupts.
+// - [MP3cp3] Coarse periodic interrupts.
 //
-// The timer subsystem guarantees that a timer interrupt will be generated at a
-// minimum frequency (given as interrupts per second) specified by the
-// compile-time constant BOLT_FREQ, provided interrupts are enabled for at least
-// some part of the period. The interrupt frequency and timing are not exact.
+// [MP3cp3] The timer subsystem guarantees that a timer interrupt will be
+// generated at a minimum frequency (given as interrupts per second) specified
+// by the compile-time constant BOLT_FREQ, provided interrupts are enabled for
+// at least some part of the period. The interrupt frequency and timing are not
+// exact.
 //
 // All timer services use the system timer, which may beread using rdtime(), as
 // their time reference.
@@ -82,8 +81,8 @@ extern void handle_timer_interrupt(void);
 // - If there are suspended threads still waiting for an alarm, the next timer
 //   interrupt is set to occur no later than the earliest alarm time of any
 //   threads still waiting for future alarms.
-// - The next timer interrupt is set to occur no more than N ticks from the
-//   current time, where N = timer_frequency / BOLT_FREQ.
+// - [MP3cp3] The next timer interrupt is set to occur no more than N ticks from
+//   the current time, where N = timer_frequency / BOLT_FREQ.
 //
 // * This function should be called from an ISR in response to a timer
 //   interrupt.

@@ -8,12 +8,14 @@
 #ifndef _DEVICE_H_
 #define _DEVICE_H_
 
-#include "io.h"
+struct io; // extern decl.
 
 extern char devmgr_initialized;
 extern void devmgr_init(void);
 
+#ifndef NO_FS
 extern struct filesystem devfs;
+#endif
 
 typedef int (*device_openfn_t)(struct io ** ioptr, void * aux);
 

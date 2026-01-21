@@ -12,7 +12,6 @@
 #include "console.h"
 #include "sbi.h" // for sbi_shutdown()
 #include "intr.h"
-#include "see.h"  // for halt_failure()
 
 // EXPORTED FUNCTION DEFINITIONS
 //

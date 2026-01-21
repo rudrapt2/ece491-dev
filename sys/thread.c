@@ -22,12 +22,14 @@
 #include "string.h"
 #include "riscv.h"
 #include "intr.h"
-#include "process.h"
-#include "memory.h"
 #include "error.h"
 #include "misc.h"
-#include "see.h"
 #include "timer.h"
+
+#ifndef MP2
+#include "process.h"
+#include "memory.h"
+#endif
 
 // COMPILE-TIME PARAMETERS
 //
@@ -67,8 +69,12 @@ struct thread_stack_anchor {
     void * kgp;
 };
 
+// [MP3cp2] The /thread_stack_anchor/ structure is placed at the base of the
+// stack to allow us to restore the thread pointer when entering the kernel from
+// U mode.
+
 struct thread {
-    struct thread_context ctx;  // must be first member (thrasm.s)
+    struct thread_context ctx;  // must be first (thrasm.s)
     int id; // index into thrtab[]
     enum thread_state state;
     const char * name;
@@ -78,8 +84,13 @@ struct thread {
     struct thread * parent;
     struct thread * list_next;
     struct condition * wait_cond;
+#ifndef STUDENT
     struct condition child_exit;
+#endif
 
+#ifdef STUDENT
+    // (you may add additional structure members here)
+#else
     // Accounting. All times and durations (ticks) are based on rdtime()
 
     unsigned long long time_spawned;    // when thread was spawned
@@ -87,6 +98,7 @@ struct thread {
     unsigned long long time_resumed;    // when thread was last resumed
     unsigned long long running_ticks;   // number of ticks in RUNNING state
     int ticks_balance;                  // how many ticks available in slice
+#endif // STUDENT
 };
 
 // INTERNAL MACRO DEFINITIONS
@@ -117,12 +129,15 @@ static void init_idle_thread(void);
 
 // Initializes the main and idle threads. called from threads_init().
 
+
 static const char * thread_state_name(enum thread_state state)
-    __attribute__ ((unused));
+    __attribute__ ((unused)); // may be unused
 
 // Returns a string representing a thread state. Used by debug and trace
 // statements, so marked unused to avoid compiler warnings.
 
+
+#ifndef STUDENT
 static struct thread * create_thread(const char * name);
 
 // Creates a new thread structure, assigns it a TID, and allocates stack for it.
@@ -134,6 +149,7 @@ static struct thread * create_thread(const char * name);
 // for the list of waiting threads of each condition variable. These functions
 // are not interrupt-safe! The caller must disable interrupts before calling any
 // thread list function that may modify a list that is used in an ISR.
+#endif
 
 static void tlclear(struct thread_list * list);
 static int tlempty(const struct thread_list * list);
@@ -164,15 +180,18 @@ static struct thread idle_thread;
 extern char _main_stack_lowest[]; // from start.s
 extern char _main_stack_anchor[]; // from start.s
 
+#ifndef STUDENT
 static int sched_slice_ticks; // ticks in a scheduler time slice
 static int sched_min_ticks;   // minimum tick balance needed to run
+#endif
 
 static struct thread main_thread = {
     .id = MAIN_TID,
     .name = "main",
     .state = THREAD_RUNNING,
     .stack_anchor = (void*)_main_stack_anchor,
-    .stack_lowest = _main_stack_lowest
+    .stack_lowest = _main_stack_lowest,
+    .child_exit = { .name = "main_thread.child_exit" }
 };
 
 extern char _idle_stack_lowest[]; // from thrasm.s
@@ -209,12 +228,14 @@ int running_thread(void) {
 void thrmgr_init(void) {
     trace("%s()", __func__);
 
+#ifndef STUDENT
     assert (timer_frequency > 0);
     sched_slice_ticks = timer_frequency / 1000 * SCHED_SLICE_MS;
     sched_min_ticks = sched_slice_ticks / 16;
 
     debug("sched_slice_ticks = %u", sched_slice_ticks);
     debug("sched_min_ticks = %u", sched_min_ticks);
+#endif
 
     init_main_thread();
     init_idle_thread();
@@ -227,10 +248,15 @@ int spawn_thread (
     void (*entry)(void),
     ...)
 {
+#ifdef STUDENT
+    // (your MP2cp3 code here)
+#else
     struct thread * child;
     va_list ap;
     int pie;
     int i;
+
+    trace("%s(\"%s\",%p) in <%s:%d>", __func__, name, entry, TP->name, TP->id);
 
     child = create_thread(name);
 
@@ -266,37 +292,55 @@ int spawn_thread (
     restore_interrupts(pie);
 
     return child->id;
+#endif // STUDENT
 }
 
 void exit_running_thread(void) {
+#ifndef STUDENT
     int ctid; // child TID
+#endif
 
     if (TP == &main_thread)
         halt();
     
     set_thread_state(TP, THREAD_EXITED);
 
+#ifdef STUDENT
+    // (your MP3cp3 code here)
+#else
     // Signal parent in case it is waiting for us to exit
 
     assert(TP->parent != NULL);
     condition_broadcast(&TP->parent->child_exit);
 
-    // Reparent the current thread's children to main_thread
+    // Reclaim any children that have exited and orphan any children that have
+    // not (by setting their /parent/ pointer to NULL).
 
     for (ctid = 1; ctid < NTHR; ctid++) {
-        if (thrtab[ctid] != NULL && thrtab[ctid]->parent == TP)
-            thrtab[ctid]->parent = &main_thread;
+        if (thrtab[ctid] != NULL && thrtab[ctid]->parent == TP) {
+            if (thrtab[ctid]->state == THREAD_EXITED) {
+                kfree(thrtab[ctid]);
+                thrtab[ctid] = NULL;
+            } else
+                thrtab[ctid]->parent = NULL;
+        }   
     }
 
-    // Note: A thread in the EXITED state no longer needs its stack. However,
-    // we can't free it just yet, because we're still using it. So we free it
-    // in the context of the next scheduled thread.
+    // Note: A thread in the EXITED state no longer needs its stack. However, we
+    // can't free it just yet, because we're still using it. So we free it in
+    // the context of the next scheduled thread. The /thread/ structure itself
+    // will be freed either in thread_join() or, when the parent exists in
+    // exit_running_thread() if the parent exists before joining with us.
 
     yield_running_thread(); // should not return
     panic(NULL);
+#endif // STUDENT
 }
 
 void submit_running_thread(void) {
+#ifdef STUDENT
+    // (your MP3cp3 code here)
+#else
     unsigned long long time_must_suspend; // time thread must suspend
     unsigned long long time_now;
 
@@ -305,13 +349,16 @@ void submit_running_thread(void) {
 
     if (time_must_suspend <= time_now)
         yield_running_thread();
+#endif // STUDENT
 }
 
 void yield_running_thread(void) {
     extern void switch_running_thread(struct thread *); // thrasm.s
+#ifndef STUDENT
     struct thread * susp_thread; // suspending thread
     struct thread * next_thread; // resuming thread
     int pie;
+#endif
 
     trace("%s() in <%s:%d>", __func__, TP->name, TP->id);
 
@@ -320,6 +367,9 @@ void yield_running_thread(void) {
 
     assert (!tlempty(&ready_list));
 
+#ifdef STUDENT
+    // (your MP2cp3 code here)
+#else
     susp_thread = TP;
 
     // Add current thtread to the ready list if it is still considered RUNNING.
@@ -376,7 +426,7 @@ void yield_running_thread(void) {
     
     set_thread_state(next_thread, THREAD_RUNNING);
 
-#ifdef HAVE_MEMORY
+#ifndef MP2
     // If the thread to be resumed has an associated process, switch to its
     // memory space. Otherwise, switch to the main thread's memory space. If
     // there is no process associated with the main thread, then virtual address
@@ -395,7 +445,7 @@ void yield_running_thread(void) {
             switch_mspace(next_mtag);
         }
     }
-#endif
+#endif // !defined(MP2)
 
     trace("Thread <%s:%d> calling switch_running_thread(<%s:%d>)",
         TP->name, TP->id, next_thread->name, next_thread->id);
@@ -407,6 +457,7 @@ void yield_running_thread(void) {
     trace("switch_running_thread() returned in <%s:%d>", TP->name, TP->id);
     
     restore_interrupts(pie);
+#endif // STUDENT
 }
 
 // The finish thread function is only called from switch_running_thread() in
@@ -414,6 +465,9 @@ void yield_running_thread(void) {
 // stack of an exited thread.
 
 void finish_thread_switch(struct thread * susp_thread) {
+#ifdef STUDENT
+    // (your MP2cp3 code here)
+#else
     unsigned long long time_now;
     unsigned int ticks_used;
 
@@ -433,7 +487,7 @@ void finish_thread_switch(struct thread * susp_thread) {
     // switch_threads().
 
     if (susp_thread->state == THREAD_EXITED) {
-#ifdef HAVE_MEMORY
+#ifndef MP2
         free_phys_page(susp_thread->stack_lowest);
 #else
         kfree(susp_thread->stack_lowest);
@@ -442,15 +496,21 @@ void finish_thread_switch(struct thread * susp_thread) {
         susp_thread->stack_anchor = NULL;
         susp_thread->time_exited = time_now;
     }
+#endif // STUDENT
 }
 
 int join_thread(int u_tid) {
+#ifndef STUDENT
     struct thread * thr;
     int ctid;
     int haschild = 0;
+#endif
 
-    trace("%s(u_tid=%d) in <%s:%d>", __func__, u_tid, TP->name, TP->id);
+    trace("%s(%d) in <%s:%d>", __func__, u_tid, TP->name, TP->id);
 
+#ifdef STUDENT
+    // (your MP2cp3 code here)
+#else
     if (u_tid < 0 || NTHR <= u_tid)
         return -ECHILD;
     
@@ -492,10 +552,10 @@ int join_thread(int u_tid) {
     kfree(thr);
     
     return u_tid;
+#endif
 }
 
-// TODO Do we call this anywhere? If not, get rid of it.
-
+#ifndef MP2
 struct process * thread_process(int tid) {
     assert (0 <= tid && tid < NTHR);
     assert (thrtab[tid] != NULL);
@@ -512,6 +572,7 @@ void thread_attach_process(int tid, struct process * proc) {
     assert (proc != NULL);
     thrtab[tid]->proc = proc;
 }
+#endif // !defined(MP2)
 
 const char * thread_name(int tid) {
     assert (0 <= tid && tid < NTHR);
@@ -523,9 +584,11 @@ const char * running_thread_name(void) {
     return TP->name;
 }
 
-void * running_thread_stack_anchor(void){
+#ifndef MP2
+void * running_thread_stack_anchor(void) {
     return TP->stack_anchor;
 }
+#endif
 
 // EXPORTED CONDITION VARIABLE FUNCTION DEFINITIONS
 //
@@ -541,12 +604,17 @@ const char * condition_name(const struct condition * cond) {
 }
 
 void condition_wait(struct condition * cond) {
+#ifndef STUDENT
     int pie;
+#endif
 
     trace("%s(<%s>) in <%s:%d>", __func__, cond->name, TP->name, TP->id);
 
     assert(TP->state == THREAD_RUNNING);
 
+#ifdef STUDENT
+    // (your MP2cp3 code here)
+#else
     // Insert current thread into condition wait list
     
     set_thread_state(TP, THREAD_WAITING);
@@ -557,12 +625,15 @@ void condition_wait(struct condition * cond) {
     restore_interrupts(pie);
 
     yield_running_thread();
+#endif // STUDENT
 }
 
 void condition_broadcast(struct condition * cond) {
+#ifndef STUDENT
     struct thread_list list;
     struct thread * thr;
     int pie;
+#endif
 
     trace("%s(<%s>) in <%s:%d>", __func__, cond->name, TP->name, TP->id);
 
@@ -571,6 +642,9 @@ void condition_broadcast(struct condition * cond) {
     if (tlempty(&cond->wait_list))
         return;
 
+#ifdef STUDENT
+    // (your MP2cp3 code here)
+#else
     // Copy wait list and clear the one in the condition itself. Once we save
     // the wait list in the /list/ variable and clear the wait list in the
     // condition structure, it is safe to re-enable interrupts. This is because
@@ -596,13 +670,14 @@ void condition_broadcast(struct condition * cond) {
 
     pie = disable_interrupts();
 
-#if 0
+#if 1
     tlappend(&ready_list, &list);
 #else
     tlprepend(&ready_list, &list);
 #endif
 
     restore_interrupts(pie);
+#endif // STUDENT
 }
 
 // EXPORTED READERS-WRITER LOCK FUNCTION DEFINITIONS
@@ -625,8 +700,12 @@ void condition_broadcast(struct condition * cond) {
 //
 
 void rwlock_init(struct rwlock * rwlk, const char * name) {
+#ifdef STUDENT
+    // (your MP2cp3 code here)
+#else
     memset(rwlk, 0, sizeof(*rwlk));
     condition_init(&rwlk->released, "rwlock.released");
+#endif
     rwlk->name = (name != NULL) ? name : "anon";
 }
 
@@ -637,6 +716,9 @@ const char * rwlock_name(const struct rwlock * rwlk) {
 void rwlock_acquire(struct rwlock * rwlk, int exclusive) {
     trace("%s(<%s>,%d)", __func__, rwlk->name, exclusive);
 
+#ifdef STUDENT
+    // (your MP2cp3 code here)
+#else
     if (exclusive) {
         if (rwlk->owner != TP) {
             while (rwlk->cnt > 0)
@@ -652,11 +734,15 @@ void rwlock_acquire(struct rwlock * rwlk, int exclusive) {
 
     if (rwlk->cnt == 0)
         panic("rwlock.cnt overflow");
+#endif // STUDENT
 }
 
 void rwlock_release(struct rwlock * rwlk) {
     trace("%s(<%s>)", __func__, rwlk->name);
 
+#ifdef STUDENT
+    // (your MP2cp3 code here)
+#else
     assert (rwlk->cnt > 0);
     rwlk->cnt -= 1;
 
@@ -665,6 +751,7 @@ void rwlock_release(struct rwlock * rwlk) {
         condition_broadcast(&rwlk->released);
         rwlk->owner = NULL;
     }
+#endif // STUDENT
 }
 
 
@@ -672,21 +759,26 @@ void rwlock_release(struct rwlock * rwlk) {
 //
 
 void init_main_thread(void) {
+#ifndef STUDENT
     unsigned long long time_now;
 
     time_now = rdtime();
 
+#ifndef MP2
     // Most of the main thread structure is initialized statically (near the top
     // of this file). What's left is to initialize the main thread stack anchor
     // to point to the main thread structure itself (a circular reference), and
     // the thread start time.
 
     main_thread.stack_anchor->ktp = &main_thread;
+#endif
     main_thread.time_spawned = time_now;
     main_thread.time_resumed = time_now;
+#endif // STUDENT
 }
 
 void init_idle_thread(void) {
+#ifndef STUDENT
     unsigned long long time_now;
 
     time_now = rdtime();
@@ -694,6 +786,7 @@ void init_idle_thread(void) {
     // Initialize stack anchor with pointer to self (see init_main_thread()).
     idle_thread.stack_anchor->ktp = &idle_thread;
     main_thread.time_spawned = time_now;
+#endif // STUDENT
 }
 
 const char * thread_state_name(enum thread_state state) {
@@ -711,10 +804,11 @@ const char * thread_state_name(enum thread_state state) {
         return names[THREAD_UNDEFINED];
 };
 
+#ifndef STUDENT
 struct thread * create_thread(const char * name) {
-    struct thread * thr;
-    void * stack_page;
     struct thread_stack_anchor * anchor;
+    struct thread * thr;
+    void * stkmem;
     int tid;
 
     trace("%s(\"%s\") in <%s:%d>", __func__, name, TP->name, TP->id);
@@ -733,26 +827,32 @@ struct thread * create_thread(const char * name) {
 
     thr = kcalloc(1, sizeof(struct thread));
 
-#ifdef HAVE_MEMORY
-    stack_page = alloc_phys_page();
-    anchor = stack_page + PAGE_SIZE;
+#ifndef MP2
+    stkmem = alloc_phys_page();
+    anchor = stkmem + PAGE_SIZE;
 #else
-    stack_page = kmalloc(HEAP_ALLOC_MAX);
-    anchor = stack_page + HEAP_ALLOC_MAX;
+    stkmem = kmalloc(HEAP_ALLOC_MAX);
+    anchor = stkmem + HEAP_ALLOC_MAX;
 #endif
+    assert (stkmem != NULL);
     anchor -= 1; // anchor is at base of stack
-    thr->stack_lowest = stack_page;
+    thr->stack_lowest = stkmem;
     thr->stack_anchor = anchor;
+#ifndef MP2
     anchor->ktp = thr;
     anchor->kgp = NULL;
+#endif
 
     thrtab[tid] = thr;
 
     thr->name = (name != NULL) ? name : "anon";
     thr->id = tid;
 
+    condition_init(&thr->child_exit, "thread.child_exit");
+
     return thr;
 }
+#endif // STUDENT
 
 void tlclear(struct thread_list * list) {
     list->head = NULL;

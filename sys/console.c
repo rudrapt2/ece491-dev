@@ -23,9 +23,9 @@ static void vprintf_putc(char c, void * aux);
 // and perform putchar/getchar I/O. They are declared weak so that they may be
 // overridden elsewhere.
 
-extern void console_device_init(void) __attribute__ ((weak));
-extern void console_putchar(char c) __attribute__ ((weak));
-extern char console_getchar(void) __attribute__ ((weak));
+extern void console_impl_init(void) __attribute__ ((weak));
+extern void console_impl_putc(char c) __attribute__ ((weak));
+extern char console_impl_getc(void) __attribute__ ((weak));
 
 // EXPORTED GLOBAL VARIABLES
 //
@@ -36,7 +36,7 @@ char console_initialized = 0;
 //
 
 void console_init(void) {
-    console_device_init();
+    console_impl_init();
     console_initialized = 1;
 }
 
@@ -45,15 +45,15 @@ void kputc(char c) {
 
     switch (c) {
     case '\r':
-        console_putchar(c);
-        console_putchar('\n');
+        console_impl_putc(c);
+        console_impl_putc('\n');
         break;
     case '\n':
         if (cprev != '\r')
-            console_putchar('\r');
+            console_impl_putc('\r');
         // nobreak
     default:
-        console_putchar(c);
+        console_impl_putc(c);
         break;
     }
 
@@ -67,7 +67,7 @@ char kgetc(void) {
     // Convert \r followed by any number of \n to just \n
 
     do {
-        c = console_getchar();
+        c = console_impl_getc();
     } while (c == '\n' && cprev == '\r');
   
     cprev = c;
@@ -155,14 +155,14 @@ void vprintf_putc(char c, void * __attribute__ ((unused)) aux) {
 // The default implementation of console getchar and putchar use SBI. The
 // functions above may be re-defined elsewhere to provide alternatives.
 
-void console_device_init(void) {
+void console_impl_init(void) {
     // nothing
 }
 
-void console_putchar(char c) {
+void console_impl_putc(char c) {
     sbi_console_putchar(c);
 }
 
-char console_getchar(void) {
+char console_impl_getc(void) {
     return sbi_console_getchar();
 }

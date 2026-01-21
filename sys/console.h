@@ -10,7 +10,6 @@
 #include <stddef.h>
 #include <stdarg.h>
 
-#include "see.h"
 
 extern char console_initialized;
 

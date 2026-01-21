@@ -27,17 +27,19 @@
 //
 
 #ifndef BOLT_FREQ
-#define BOLT_FREQ 50 // Hz
+#define BOLT_FREQ 50 // Hz [MP3cp3]
 #endif
 
 // INTERNAL TYPE DEFINITIONS
 //
 
+#ifndef STUDENT
 struct timer_alarm {
     struct timer_alarm * next;
     struct condition woken;
     unsigned long long twake;
 };
+#endif
 
 // EXPORTED GLOBAL VARIABLES
 //
@@ -51,22 +53,24 @@ unsigned int timer_frequency = 0;
 
 static struct timer_alarm * sleep_list; // list of pending alarms
 
+#ifndef STUDENT
 static unsigned long long tbolt; // next system periodic interrupt time
 static unsigned int bolt_period; // ticks between system periodic interrupts
-
+#endif // STUDENT
 
 // INTERNAL FUNCTION DECLARATIONS
 //
 
+#ifndef STUDENT
 static void add_alarm(struct timer_alarm * al);
 
 // Adds an alarm to the sleep_list and adjusts the next timer interrupt time if
 // necessary. Must be called with timer interrupts DISABLED.
+#endif
 
-static void enable_timer_interrupts(void);
-static void disable_timer_interrupts(void);
+static void enable_timer_interrupts(void); // sets sie.STIE=1
+static void disable_timer_interrupts(void); // clears sie.STIE
 
-// Enabled and disables timer interrupts (sie.STIE). Does not touch sstatus.SIE.
 
 // EXPORTED FUNCTION DEFINITIONS
 //
@@ -74,14 +78,21 @@ static void disable_timer_interrupts(void);
 void timer_init(unsigned int freq) {
     assert (freq > 0);
     timer_frequency = freq;
+
+#ifdef STUDENT
+    // (your MP3cp3 code here)
+#else
     bolt_period = freq / BOLT_FREQ;
     timer_initialized = 1;
-
     sbi_set_timer(0); // interrupt immediately
     enable_timer_interrupts();
+#endif // STUDENT
 }
 
 void alarm_sleep_until(unsigned long long twake) {
+#ifdef STUDENT
+    // (your MP2cp3 code here)
+#else
     struct timer_alarm alarm;
     unsigned long long tnow;
     int pie;
@@ -94,6 +105,7 @@ void alarm_sleep_until(unsigned long long twake) {
         return;
 
     memset(&alarm, 0, sizeof(alarm));
+    condition_init(&alarm.woken, "alarm.woken");
     alarm.twake = twake;
 
     // We need to have timer interrupts disabled while modifying the sleep list
@@ -115,6 +127,7 @@ void alarm_sleep_until(unsigned long long twake) {
     while (rdtime() < twake)
         condition_wait(&alarm.woken);
     restore_interrupts(pie);
+#endif // STUDENT
 }
 
 void sleep_sec(unsigned int sec) {
@@ -130,6 +143,7 @@ void sleep_us(unsigned int us) {
 }
 
 void handle_timer_interrupt(void) {
+#ifndef STUDENT
     unsigned long long talarm;   // next alarm interrupt time
     unsigned long long tnow;
     struct timer_alarm * head;
@@ -140,11 +154,15 @@ void handle_timer_interrupt(void) {
     // disabling timer interrupts in critical sections elsewhere.
 
     head = sleep_list;
+#endif // STUDENT
 
     tnow = rdtime();
 
     trace("[%lu] %s()", tnow, __func__);
 
+#ifdef STUDENT
+    // (your MP2cp3 code here)
+#else
     while (head != NULL && head->twake <= tnow) {
         debug("[%lu] Waking threads sleeping on <%p>", tnow, head);
         condition_broadcast(&head->woken);
@@ -156,20 +174,20 @@ void handle_timer_interrupt(void) {
 
     sleep_list = head;
 
-    // Calculate next system periodic interrupt time and next alarm wake time
-    // and set timer interrupt for the earlier of the two
-
-    tbolt = ROUND_UP(tnow+1, bolt_period);
     talarm = (head != NULL) ? head->twake : ULLONG_MAX;
-    debug("[%llu] %s(): tbolt = %llu", tnow, __func__, tbolt);
     debug("[%llu] %s(): talarm = %llu", tnow, __func__, talarm);
-    debug("[%llu] %s(): Calling sbi_set_timer(%llu)", tnow, __func__, MIN(tbolt, talarm));
+    tbolt = ROUND_UP(tnow+1, bolt_period);
+    debug("[%llu] %s(): tbolt = %llu", tnow, __func__, tbolt);
+    debug("[%llu] %s(): Calling sbi_set_timer(%llu)",
+        tnow, __func__, MIN(tbolt, talarm));
     sbi_set_timer(MIN(tbolt, talarm));
+#endif // STUDENT
 }
 
 // INTERNAL FUNCTION DEFINITIONS
 //
 
+#ifndef STUDENT
 static void add_alarm(struct timer_alarm * al) {
     struct timer_alarm * prev;
 
@@ -187,9 +205,6 @@ static void add_alarm(struct timer_alarm * al) {
 
         al->next = sleep_list;
         sleep_list = al;
-
-        debug("[%llu] %s(): tbolt = %llu", rdtime(), __func__, tbolt);
-        debug("[%llu] %s(): al->twake = %llu", rdtime(), __func__, al->twake);
 
         if (al->twake < tbolt) {
             debug("[%llu] %s(): Calling sbi_set_timer(%llu)", rdtime(), __func__, al->twake);
@@ -214,6 +229,7 @@ static void add_alarm(struct timer_alarm * al) {
 
     prev->next = al;
 }
+#endif
 
 void enable_timer_interrupts(void) {
     csrs_sie(RISCV_SIE_STIE);

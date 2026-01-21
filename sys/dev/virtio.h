@@ -166,16 +166,8 @@ struct virtq_used {
     (sizeof(struct virtq_used)+(n)*sizeof(struct virtq_used_elem))
 
 
-// EXPORTED FUNCTION DEFINITIONS
+// EXPORTED FUNCTION DECLARATIONS
 //
-
-/**
-* @brief Finds virtio device and calls corresponding attach
-* @param mmio_base memory mapped registers' address
-* @param irqno interrupt request no. for the device
-* @return void
-*/
-extern void attach_virtio(void * mmio_base, int irqno);
 
 /**
 * @brief Checks the features device has enabled
