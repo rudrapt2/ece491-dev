@@ -295,6 +295,17 @@ int spawn_thread (
 #endif // STUDENT
 }
 
+
+const char * thread_name(int tid) {
+    assert (0 <= tid && tid < NTHR);
+    assert (thrtab[tid] != NULL);
+    return thrtab[tid]->name;
+}
+
+const char * running_thread_name(void) {
+    return TP->name;
+}
+
 void exit_running_thread(void) {
 #ifndef STUDENT
     int ctid; // child TID
@@ -572,19 +583,7 @@ void thread_attach_process(int tid, struct process * proc) {
     assert (proc != NULL);
     thrtab[tid]->proc = proc;
 }
-#endif // !defined(MP2)
 
-const char * thread_name(int tid) {
-    assert (0 <= tid && tid < NTHR);
-    assert (thrtab[tid] != NULL);
-    return thrtab[tid]->name;
-}
-
-const char * running_thread_name(void) {
-    return TP->name;
-}
-
-#ifndef MP2
 void * running_thread_stack_anchor(void) {
     return TP->stack_anchor;
 }

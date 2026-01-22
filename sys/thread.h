@@ -44,13 +44,18 @@ extern int spawn_thread (
     void (*entry)(void),
     ...);
 
-// Creates a new thread. The /name/ argument is the name of the new thread; it
-// must be a pointer to a null-terminated string or NULL. If /name/ is NULL, the
-// thread is given an implementation-defined name. The new thread will start
-// execution in /entry/, which must be a pointer to executable code, when it is
-// scheduled to run. Up to 8 optional arguments may be passed to spawn_thread().
-// These arguments will be passed to /entry/ as function arguments in the same
-// order when it is started. That is, if spawn_thread() is invoked as,
+// Creates a new thread and adds it to the ready list. The name of the spawned
+// thead is given by /name/, which must be either a pointer to a null-terminated
+// string or NULL. If NULL, the thread name is implementation-defined.
+// Otherwise, if /name/ is not NULL, it must be a pointer to to a
+// null-terminated string that remains unchanged during the lifetime of the
+// thread.
+//
+// The new thread will start execution in /entry/, which must be a pointer to
+// executable code, when it is scheduled to run. Up to 8 optional arguments may
+// be passed to spawn_thread(). These arguments will be passed to /entry/ as
+// function arguments in the same order when it is started. That is, if
+// spawn_thread() is invoked as,
 //
 //     spawn_thread("myname", (void(*)()) &myfunc, "one", 2);
 //
@@ -66,9 +71,9 @@ extern int spawn_thread (
 // exit_running_thread() in the context of the new thread.
 //
 // Note: spawn_thread() does *not* suspend the calling thread. The thread
-// created by spawn_thread() will be scheduled to run after the calling thread
-// calls one of the functions that suspends the calling thread, such as
-// thread_yield() or condition_wait().
+// created by spawn_thread() will run some time after the calling thread calls
+// one of the functions that suspends the calling thread, such as thread_yield()
+// or condition_wait().
 
 // The calling thread is designated as the parent of the new thread. The
 // spawn_thread() function returns the TID of the new thread or one of the
@@ -109,6 +114,38 @@ extern int spawn_thread (
 // * This function may _not_ be called from an ISR.
 //
 // See also: exit_running_thread(), join_thread().
+
+
+extern const char * thread_name(int tid);
+
+// Returns the name of a thread. The /tid/ argument gives the TID of the thread
+// whose name is returned. If spawn_thread() was called with a non-NULL /name/
+// argument, then the same pointer is returned by thread_name(). Otherwise, if
+// spawn_thread() was called with a NULL /name/ argument, thread_name() returns
+// the implementation-defined name assigned to the thread. In all cases, the
+// returned value is a pointer to a null-terminated string that is valid for the
+// lifetime of the thread.
+//
+// On entry thread_name() assumes:
+// - /tid/ is a thread id of an existing thread.
+//
+// On return thread_name() guarantees:
+// - If the thread associated with /tid/ was created using spawn_thread() with a
+//   non-NULL /name/ argument, the value returned is /name/.
+// - If the thread associated with /tid/ was created using spawn_thread() with a
+//   NULL /name/ argument, the value returned is a pointer to an
+//   imlementation-defined null-terminated string.
+//
+// See also spawn_thread(), running_thread_name().
+
+
+extern const char * running_thread_name(void);
+
+// Returns the name of the running thread. This function call is equivalent to:
+//
+//    thread_name(running_thread())
+//
+// See also: thread_name(), running_thread().
 
 
 extern void submit_running_thread(void);
@@ -241,40 +278,8 @@ extern void thread_attach_process(int tid, struct process * proc);
 // - If /proc/ is not NULL, it becomes the process associated thread /tid/.
 //
 // See also: thread_process().
-#endif // !defined(MP2)
 
 
-extern const char * thread_name(int tid);
-
-// Returns the name of a thread. The /tid/ argument gives the TID of the thread
-// whose name is returned. If spawn_thread() was called with a non-NULL /name/
-// argument, then the same pointer is returned by thread_name(). Otherwise, if
-// spawn_thread() was called with a NULL /name/ argument, thread_name() returns
-// the implementation-defined name assigned to the thread. In all cases, the
-// returned value is a pointer to a null-terminated string.
-//
-// On entry thread_name() assumes:
-// - /tid/ is a thread id of an existing thread.
-//
-// On return thread_name() guarantees:
-// - If the thread associated with /tid/ was created using spawn_thread() with a
-//   non-NULL /name/ argument, the value returned is /name/.
-// - If the thread associated with /tid/ was created using spawn_thread() with a
-//   NULL /name/ argument, the value returned is a pointer to an
-//   imlementation-defined null-terminated string.
-//
-// See also spawn_thread(), running_thread_name().
-
-
-extern const char * running_thread_name(void);
-
-// Returns the name of the running thread. This function call is equivalent to:
-//
-//    thread_name(running_thread())
-//
-// See also: thread_name(), running_thread().
-
-#ifndef NO_PROC
 extern void * running_thread_stack_anchor(void);
 
 // Returns a pointer to the thread stack anchor structure that is placed at the
@@ -299,7 +304,7 @@ extern void * running_thread_stack_anchor(void);
 //
 // See also: _smode_trap_entry in trap.s, spawn_thread(), process_exec(),
 // process_fork().
-#endif // NO_PROC
+#endif // MP2
 
 // CONDITION VARIABLES
 //
@@ -338,10 +343,12 @@ extern void condition_init(struct condition * cond, const char * name);
 // of memory large enough to hold an instance of a /condition/ structure. This
 // function does _not_ allocate space for this structure.
 //
-// The /name/ argument specifies the name of the condition variable. It must be
-// either a pointer to a null-terminated string or NULL. If NULL,
-// condition_init() assigns it an implementation-defined name.
-//
+// The name of the new condition variable is given by /name/, which must be
+// either a pointer to a null-terminated string or NULL. If NULL, the thread
+// name is implementation-defined. Otherwise, if /name/ is not NULL, it must be
+// a pointer to to a null-terminated string that remains unchanged during the
+// lifetime of the condition variable.
+
 // The condition variable is initialized to a state with no threads are
 // considered to be waiting on the condition variable.
 //
@@ -375,7 +382,8 @@ extern const char * condition_name(const struct condition * cond);
 // condition_name(). Otherwise, if condition_init() was called with a NULL
 // /name/ argument, condition_name() returns the implementation-defined name
 // assigned to the condition variable. In all cases, the returned value is a
-// pointer to a null-terminated string.
+// pointer to a null-terminated string that is valid for the lifetime of the
+// condition variable.
 //
 // On entry condition_name() assumes:
 // - /cond/ is a pointer to properly initialized condition structure.
@@ -493,6 +501,12 @@ extern void rwlock_init(struct rwlock * rwlk, const char * name);
 // Initializes an rw-lock in the _unlocked_ state. Any thread may then acquire
 // the lock either in shared or exclusive mode.
 //
+// The name of the new rw-lock is given by /name/, which must be either a
+// pointer to a null-terminated string or NULL. If NULL, the thread name is
+// implementation-defined. Otherwise, if /name/ is not NULL, it must be a
+// pointer to to a null-terminated string that remains unchanged during the
+// lifetime of the rw-lock.
+//
 // When an rw-lock is no longer needed, the memory associated with the /rwlock/
 // structure may be reclaimed. After that point, a pointer to this structure is
 // no longer considered to be a valid lock and must not be used. It is safe,
@@ -521,7 +535,8 @@ extern const char * rwlock_name(const struct rwlock * rwlk);
 // argument, then the same pointer is returned by rwlock_name(). Otherwise, if
 // condition_init() was called with a NULL /name/, rwlock_name() returns the
 // implementation-defined name assigned to the rw-lock. In all cases, the
-// returned value is a pointer to a null-terminated string.
+// returned value is a pointer to a null-terminated string that is valid for the
+// lifetime of the rw-lock.
 //
 // On entry rwlock_name() assumes:
 // - /rwlk/ is a pointer to properly initialized rw-lock.
