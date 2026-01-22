@@ -9,6 +9,7 @@ AS=$(PREFIX)as
 LD=$(PREFIX)ld
 OBJCOPY=$(PREFIX)objcopy
 OBJDUMP=$(PREFIX)objdump
+UNIFDEF=unifdef
 
 BASE_OBJS = \
 	start.o \
@@ -26,7 +27,6 @@ BASE_OBJS = \
 	string.o \
 	error.o \
 	thrasm.o \
-	thread.o \
 	timer.o \
 	intr.o \
 	excp.o \
@@ -36,8 +36,7 @@ BASE_OBJS = \
 MP2_OBJS = \
 	$(BASE_OBJS) \
 	mp2-main.o \
-#	games/mp2-trek.o \
-#	games/mp2-rule30.o
+	mp2-thread.o
 
 MP3_OBJS = \
 	$(BASE_OBJS) \
@@ -101,12 +100,12 @@ MP3X_QEMUOPTS += -device virtio-gpu-device -display gtk
 all: mp2-kernel.elf # mp3-kernel.elf
 
 clean:
-	rm -rf *.o dev/*.o test/*.o fs/*.o *.elf
+	rm -rf *.o dev/*.o test/*.o fs/*.o *.elf mp2-*.c
 
 # MP2
 #
 
-mp2-kernel.elf: $(MP2_OBJS) mp2-main.o
+mp2-kernel.elf: $(MP2_OBJS)
 	$(LD) $(LDFLAGS) -T kernel.ld -o $@ $^
 
 run-mp2: mp2-kernel.elf
@@ -114,6 +113,9 @@ run-mp2: mp2-kernel.elf
 
 debug-mp2: mp2-kernel.elf
 	$(QEMU) $(MP2_QEMUOPTS) -m 8M -kernel $< -S -s
+
+mp2-%.c: %.c
+	$(UNIFDEF) -x2 -o $@ -DMP2 $<
 
 # MP3
 #

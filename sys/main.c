@@ -17,7 +17,14 @@
 #include "heap.h"
 #include "io.h"
 
-static void run_mp2(void);
+#ifndef MP2
+#endif
+
+#ifndef MP2
+static void exec_init();
+#else
+static void run_games(void);
+#endif // MP2
 
 extern void board_init(void); // from board/xxx.c
 extern void attach_devices(void); // from board/xxx.c
@@ -28,19 +35,28 @@ void main(void) {
     devmgr_init();
     thrmgr_init();
 
+#ifndef MP2
+    // MP3 stuff
+#endif
+
     attach_devices();
 
     enable_interrupts();
 
-    run_mp2();
+#ifndef MP2
+    exec_init();
+#else
+    run_games();
+#endif
 }
 
+#ifdef MP2
 #define TREK_TERM_NAME "uart1"
 #define RULE30_TERM_NAME "uart2"
 #define RNG_NAME "viorng0"
 #define RTC_NAME "rtc"
 
-void run_mp2(void) {
+void run_games(void) {
     extern void trek_start(struct io * tio, unsigned long rngseed);
     extern void rule30_start(struct io * tio);
     struct io * rngio;
@@ -58,17 +74,8 @@ void run_mp2(void) {
         halt();
     }
 
-    // Open UART for rule30.
-
-    result = open_device(RULE30_TERM_NAME, &rule30_term);
-
-    if (rule30_term == NULL) {
-        kprintf("%s: %s\n", RULE30_TERM_NAME, error_name(result));
-        halt();
-    }
-
-    // Open a RNG to get a PRNG seed. If We fail to open viorng0, try to use
-    // the RTC. If we can't open that, use rdtime().
+    // Open a RNG to get a PRNG seed. Try, in decreasing order of preference:
+    // viorng0 device, rtc device, and rdtime().
 
     result = open_device(RNG_NAME, &rngio);
 
@@ -81,10 +88,26 @@ void run_mp2(void) {
     if (result != 0)
         rngseed = rdtime();
 
+#if 1 // Set to 1 for MP3cp3
+
+    // Open UART for rule30.
+
+    result = open_device(RULE30_TERM_NAME, &rule30_term);
+
+    if (rule30_term == NULL) {
+        kprintf("%s: %s\n", RULE30_TERM_NAME, error_name(result));
+        halt();
+    }
+
     spawn_thread("rule30", (void(*)(void))&rule30_start, rule30_term);
+#else
+    (void)rule30_term; // suppress unused variable warning
+#endif
 
     trek_start(trek_term, rngseed);
 }
+
+// Get rid of these once we have trek and rule30 working.
 
 void __attribute__ ((weak)) trek_start(struct io * tio, unsigned long rngseed) {
     char msgbuf[120];
@@ -110,3 +133,5 @@ void __attribute__ ((weak)) rule30_start(struct io * tio) {
         sleep_ms(500);
     }
 }
+
+#endif
