@@ -84,9 +84,7 @@ struct thread {
     struct thread * parent;
     struct thread * list_next;
     struct condition * wait_cond;
-#ifndef STUDENT
     struct condition child_exit;
-#endif
 
 #ifdef STUDENT
     // (you may add additional structure members here)

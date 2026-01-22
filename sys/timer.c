@@ -145,7 +145,6 @@ void sleep_us(unsigned int us) {
 void handle_timer_interrupt(void) {
 #ifndef STUDENT
     unsigned long long talarm;   // next alarm interrupt time
-    unsigned long long tnow;
     struct timer_alarm * head;
     struct timer_alarm * next;
 
@@ -156,7 +155,7 @@ void handle_timer_interrupt(void) {
     head = sleep_list;
 #endif // STUDENT
 
-    tnow = rdtime();
+    unsigned long long tnow = rdtime();
 
     trace("[%lu] %s()", tnow, __func__);
 
