@@ -1,9 +1,8 @@
-/*! @file elf.c
-    @brief ELF file loader    
-    @copyright Copyright (c) 2024-2025 University of Illinois
-    @license SPDX-License-identifier: NCSA
-
-*/
+// elf.c - ELF executable loader
+//
+// Copyright (c) 2024-2025 University of Illinois
+// SPDX-License-identifier: NCSA
+//
 
 #ifdef ELF_TRACE
 #define TRACE
@@ -15,7 +14,7 @@
 
 #include "elf.h"
 #include "conf.h"
-#include "uio.h"
+#include "io.h"
 #include "string.h"
 #include "memory.h"
 #include "error.h"

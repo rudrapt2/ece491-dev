@@ -1,9 +1,8 @@
-/*! @file scnum.h
-    @brief This file contains all the syscall numbers
-    @copyright Copyright (c) 2024-2025 University of Illinois
-    @license SPDX-License-identifier: NCSA
-
-*/
+// scnum.h - System call numbers
+//
+// Copyright (c) 2026 University of Illinois
+// SPDX-License-identifier: NCSA
+//
 
 #ifndef _SCNUM_H_
 #define _SCNUM_H_

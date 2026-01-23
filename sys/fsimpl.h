@@ -1,8 +1,8 @@
-/*! @file fsimpl.h
-    @brief File system implementers' interface
-    @copyright Copyright (c) 2024-2025 University of Illinois
-
-*/
+// fsimpl.h - File system implementation interface
+//
+// Copyright (c) 2024-2026 University of Illinois
+// SPDX-License-identifier: NCSA
+//
 
 #ifndef _FSIMPL_H_
 #define _FSIMPL_H_

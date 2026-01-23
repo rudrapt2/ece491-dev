@@ -1,4 +1,4 @@
-// mp2-main.c - main function of the kernel (called from start.s) for MP2
+// main.c - main function of the kernel (called from start.s)
 //
 // Copyright (c) 2024-2026 University of Illinois
 // SPDX-License-identifier: NCSA

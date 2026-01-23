@@ -245,7 +245,6 @@ void * __attribute__ ((weak)) alloc_phys_page(void) {
     debug("alloc_maxsz = %u", stats.alloc_maxsz);
     debug("avail_bytes = %u", stats.avail_bytes);
     debug("avail_maxsz = %u", stats.avail_maxsz);
-
     panic("Out of memory");
 }
 

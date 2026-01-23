@@ -1,8 +1,8 @@
-/*! @file conf.h
-    @brief Compile-time configuration constants
-    @copyright Copyright (c) 2024-2025 University of Illinois
-
-*/
+// conf.h - Compile-time configuration
+//
+// Copyright (c) 2024-2026 University of Illinois
+// SPDX-License-identifier: NCSA
+//
 
 // QEMU-BASED CONSTANTS
 //

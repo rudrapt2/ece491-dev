@@ -1,9 +1,8 @@
-/*! @file process.h
-    @brief Process management
-    @copyright Copyright (c) 2024-2025 University of Illinois
-    @license SPDX-License-identifier: NCSA
-
-*/
+// process.h - Processes and process manager
+//
+// Copyright (c) 2024-2026 University of Illinois
+// SPDX-License-identifier: NCSA
+//
 
 #ifndef _PROCESS_H_
 #define _PROCESS_H_

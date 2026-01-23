@@ -1,8 +1,8 @@
-/*! @file intr.c
-    @brief Interrupt management
-    @copyright Copyright (c) 2024-2025 University of Illinois
-
-*/
+// intr.c - Interrupt manager
+//
+// Copyright (c) 2024-2026 University of Illinois
+// SPDX-License-identifier: NCSA
+//
 
 #ifdef INTR_TRACE
 #define TRACE

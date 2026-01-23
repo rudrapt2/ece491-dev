@@ -1,8 +1,8 @@
-/*! @file syscall.c
-    @brief system call handlers
-    @copyright Copyright (c) 2024-2025 University of Illinois
-    @license SPDX-License-identifier: NCSA
-*/
+// syscall.c - System call handling
+//
+// Copyright (c) 2024-2026 University of Illinois
+// SPDX-License-identifier: NCSA
+//
 
 #ifdef SYSCALL_TRACE
 #define TRACE

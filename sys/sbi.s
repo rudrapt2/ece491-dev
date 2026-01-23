@@ -1,4 +1,7 @@
-# sbi.s
+# sbi.s - Supervisor binary interface
+#
+# Copyright (c) 2026 University of Illinois
+# SPDX-License-identifier: NCSA
 #
 
         .text

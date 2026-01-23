@@ -1,9 +1,9 @@
-/*! @file string.c
-    @brief String and memory functions   
-    @copyright Copyright (c) 2024-2025 University of Illinois
-    @license SPDX-License-identifier: NCSA
+// string.c - String and memory functions
+//
+// Copyright (c) 2026 University of Illinois
+// SPDX-License-identifier: NCSA
+//
 
-*/
 
 #include "string.h"
 #include "console.h"

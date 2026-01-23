@@ -1,8 +1,8 @@
-/*! @file filesys.c
-    @brief File system interface
-    @copyright Copyright (c) 2024-2025 University of Illinois
-
-*/
+// fsimpl.h - File system manager
+//
+// Copyright (c) 2025-2026 University of Illinois
+// SPDX-License-identifier: NCSA
+//
 
 #ifdef FILESYS_TRACE
 #define TRACE

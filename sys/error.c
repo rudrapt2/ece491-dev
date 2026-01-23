@@ -1,8 +1,8 @@
-/*! @file error.c
-    @brief Error names
-    @copyright Copyright (c) 2024-2025 University of Illinois
-
-*/
+// error.c - Error numbers and functions
+//
+// Copyright (c) 2024-2026 University of Illinois
+// SPDX-License-identifier: NCSA
+//
 
 #include "error.h"
 

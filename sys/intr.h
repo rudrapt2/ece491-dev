@@ -1,8 +1,8 @@
-/*! @file intr.h
-    @brief Interrupt management
-    @copyright Copyright (c) 2024-2025 University of Illinois
-
-*/
+// intr.h - Interrupt manager
+//
+// Copyright (c) 2024-2026 University of Illinois
+// SPDX-License-identifier: NCSA
+//
 
 #ifndef _INTR_H_
 #define _INTR_H_

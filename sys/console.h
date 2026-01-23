@@ -1,8 +1,8 @@
-/*! @file console.h
-    @brief Console i/o
-    @copyright Copyright (c) 2024-2025 University of Illinois
-
-*/
+// console.h - Console I/O
+//
+// Copyright (c) 2024-2025 University of Illinois
+// SPDX-License-identifier: NCSA
+//
 
 #ifndef _CONSOLE_H_
 #define _CONSOLE_H_
@@ -12,7 +12,6 @@
 
 
 extern char console_initialized;
-
 extern void console_init(void);
 
 extern void kputc(char c);

@@ -1,8 +1,8 @@
-/*! @file trap.h
-    @brief Defines the trap frame structure and related functions for handling traps and interrupts.
-    @copyright Copyright (c) 2024-2025 University of Illinois
-    @license SPDX-License-Identifier: NCSA
-*/
+// trap.g - Trap frame and trap handling
+//
+// Copyright (c) 2024-2026 University of Illinois
+// SPDX-License-identifier: NCSA
+//
 
 #ifndef _TRAP_H_
 #define _TRAP_H_
