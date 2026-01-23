@@ -1,8 +1,8 @@
-/*! @file uart.c 
-    @brief NS8250-compatible serial port
-    @copyright Copyright (c) 2024-2025 University of Illinois
-
-*/
+// uart.c - NS8550-compatible UART
+//
+// Copyright (c) 2024-2026 University of Illinois
+// SPDX-License-identifier: NCSA
+//
 
 #ifdef UART_TRACE
 #define TRACE
@@ -13,17 +13,17 @@
 #endif
 
 #include "conf.h"
-#include "uart.h"
-#include "devimpl.h"
 #include "intr.h"
 #include "heap.h"
 #include "thread.h"
 #include "console.h"
+#include "device.h"
 #include "misc.h"
-
+#include "ioimpl.h"
 #include "error.h"
 
 #include <stdint.h>
+
 
 // COMPILE-TIME CONSTANT DEFINITIONS
 //
@@ -85,16 +85,16 @@ struct ringbuf {
 
 // UART device structure
 
-struct uart_serial {
-    struct serial base;
+struct uart_device {
     volatile struct uart_regs * regs;
     int irqno;
-    char opened;
 
-    unsigned long rxovrcnt; ///< number of times OE was set
+    struct io io;
+
+    unsigned long rxovrcnt; // number of times OE was set
     
-    struct condition rxbnotempty; ///< signalled when rxbuf becomes not empty
-    struct condition txbnotfull;  ///< signalled when txbuf becomes not full
+    struct condition rxbnotempty; // signalled when rxbuf becomes not empty
+    struct condition txbnotfull;  // signalled when txbuf becomes not full
 
     struct ringbuf rxbuf;
     struct ringbuf txbuf;
@@ -103,10 +103,10 @@ struct uart_serial {
 // INTERNAL FUNCTION DEFINITIONS
 //
 
-static int uart_serial_open(struct serial * ser);
-static void uart_serial_close(struct serial * ser);
-static int uart_serial_recv(struct serial * ser, void * buf, unsigned int buflen);
-static int uart_serial_send(struct serial * ser, const void * buf, unsigned int buflen);
+static int uart_open(struct io ** ioptr, void * aux);
+static void uart_reclaim(struct io * io);
+static long uart_read(struct io * io, void * buf, long bufsz);
+static long uart_write(struct io * io, const void * buf, long len);
 
 static void uart_isr(int srcno, void * aux);
 
@@ -121,52 +121,30 @@ static char rbuf_getc(struct ringbuf * rbuf);
 // INTERNAL GLOBAL VARIABLES
 //
 
-static const struct serial_intf uart_serial_intf = {
-    .blksz = 1,
-    .open = &uart_serial_open,
-    .close = &uart_serial_close,
-    .recv = &uart_serial_recv,
-    .send = &uart_serial_send
+static const struct iointf uart_intf = {
+    .implname = "uart",
+    .read = &uart_read,
+    .write = &uart_write,
+    .reclaim = &uart_reclaim
 };
 
 // EXPORTED FUNCTION DEFINITIONS
 // 
 
-/**
- * @brief This function attaches an NS8250/16550 compatible UART device. It
- * returns an instance of the serial device class.
- * @param mmio_base The address at which the device registers are mapped
- * @param irqno The interrupt source number of the device
- * @return a pointer to a struct serial corresponding to the device
- */
-
 void attach_uart(void * mmio_base, int irqno) {
-    struct uart_serial * uart;
+    static unsigned short instcnt = 0; // number of UARTs
+    struct uart_device * uart;
 
-    // UART0 is used for the console and should not be attached as a normal
-    // device. It should already be initialized by console_init(). We still
-    // register the device (to reserve the name uart0), but pass a NULL device
-    // pointer, so that find_serial("uart", 0) returns NULL.
-
-    if (mmio_base == (void*)UART0_MMIO_BASE) {
-        register_device(UART_DEVNAME, DEV_SERIAL, NULL);
-        return;
-    }
-    
     uart = kcalloc(1, sizeof(*uart));
 
     uart->regs = mmio_base;
     uart->irqno = irqno;
-    uart->opened = 0;
-
-    // Initialize condition variables. The ISR is registered when our interrupt
-    // source is enabled in uart_serial_open().
 
     condition_init(&uart->rxbnotempty, "uart.rxnotempty");
     condition_init(&uart->txbnotfull, "uart.txnotfull");
 
 
-    // Initialize hardware
+    // Initialize hardware device
 
     uart->regs->ier = 0;
     uart->regs->lcr = LCR_DLAB;
@@ -176,17 +154,16 @@ void attach_uart(void * mmio_base, int irqno) {
     // fence o,o ?
     uart->regs->lcr = 0; // DLAB=0
 
-    serial_init(&uart->base, &uart_serial_intf);
-    register_device(UART_DEVNAME, DEV_SERIAL, uart);
+    register_device(UART_DEVNAME, instcnt++, &uart_open, uart);
+    ioinit(&uart->io, &uart_intf, 1, 0);
 }
 
-int uart_serial_open(struct serial * ser) {
-    struct uart_serial * const uart =
-        (void*)ser - offsetof(struct uart_serial, base);
+int uart_open(struct io ** ioptr, void * aux) {
+    struct uart_device * const uart = aux;
 
     trace("%s()", __func__);
 
-    if (uart->opened)
+    if (iorefcnt(&uart->io) != 0)
         return -EBUSY;
     
     // Reset receive and transmit buffers
@@ -204,46 +181,29 @@ int uart_serial_open(struct serial * ser) {
 
     enable_intr_source(uart->irqno, UART_INTR_PRIO, uart_isr, uart);
 
-    uart->opened = 1;
+    *ioptr = ioaddref(&uart->io);
     return 0;
 }
 
-void uart_serial_close(struct serial * ser) {
-    struct uart_serial * const uart =
-        (void*)ser - offsetof(struct uart_serial, base);
+void uart_reclaim(struct io * io) {
+    struct uart_device * const uart =
+        (void*)io - offsetof(struct uart_device, io);
 
     trace("%s()", __func__);
-    assert (uart->opened);
 
     // Disable all interrupts from device
 
     uart->regs->ier = 0;
     disable_intr_source(uart->irqno);
-
-    uart->opened = 0;
 }
 
-/**
- * @brief Implements the recv() function of the serial device class.
- * @details This function is called via the function pointer in the
- * uart_serial_intf struct by serial_recv() to receive data to a buffer. The
- * bufsz parameter gives the buffer capacity, i.e., the maximum number of bytes
- * to receive. The function may return after receiving fewer than bufsz bytes,
- * but always receives at least one byte.
- * @param ser a pointer to a struct uart_serial
- * @param buf pointer to where the first received character will be written
- * @param bufsz size of the buffer (capacity)
- * @return the number of characters actually received, which may be fewer than
- * bufsz
- */
-
-int uart_serial_recv(struct serial * ser, void * buf, unsigned int bufsz) {
-    struct uart_serial* const uart = (struct uart_serial*)ser;
+long uart_read(struct io * io, void * buf, long bufsz) {
+    struct uart_device * const uart =
+        (void*)io - offsetof(struct uart_device, io);
     long n = 0; // number of bytes copied from ring buffer
     int pie;
 
-    trace("%s(bufsz=%ld)", __func__, bufsz);
-    assert (uart->opened);
+    trace("%s(%ld)", __func__, bufsz);
     
     if (bufsz == 0)
         return 0;
@@ -272,29 +232,15 @@ int uart_serial_recv(struct serial * ser, void * buf, unsigned int bufsz) {
     return n;
 }
 
-
-/**
- * @brief Implements the send() function of the serial device class.
- * @details This function is called via the function pointer in the
- * uart_serial_intf struct by serial_send() to send data from a buffer. The len
- * parameter gives the number of bytes to send. The function always sends all
- * len bytes before returning.
- * @param ser a pointer to a struct uart_serial
- * @param buf pointer to the first character to send
- * @param len number of bytes to send
- * @return the number of bytes actually send, always equal to len
- */
-
-int uart_serial_send(struct serial * ser, const void * buf, unsigned int buflen) {
-    struct uart_serial * const uart =
-        (void*)ser - offsetof(struct uart_serial, base);
+long uart_write(struct io * io, const void * buf, long len) {
+    struct uart_device * const uart =
+        (void*)io - offsetof(struct uart_device, io);
     long n = 0; // number of bytes written so far
     int pie;
    
-    trace("%s(len=%ld)", __func__, buflen);
-    assert (uart->opened);
+    trace("%s(%ld)", __func__, len);
 
-    if (buflen == 0)
+    if (len == 0)
         return 0;
 
     assert (buf != NULL);
@@ -303,7 +249,7 @@ int uart_serial_send(struct serial * ser, const void * buf, unsigned int buflen)
     // _buf_ to ring buffer. Unlike the read case, we write all characters
     // before returning.
 
-    while (n < buflen) {
+    while (n < len) {
         pie = disable_interrupts();
 
         while (rbuf_full(&uart->txbuf))
@@ -311,7 +257,7 @@ int uart_serial_send(struct serial * ser, const void * buf, unsigned int buflen)
 
         restore_interrupts(pie);
 
-        while (!rbuf_full(&uart->txbuf) && n < buflen)
+        while (!rbuf_full(&uart->txbuf) && n < len)
             rbuf_putc(&uart->txbuf, ((const char*)buf)[n++]);
         
         uart->regs->ier |= IER_THREIE;
@@ -321,7 +267,7 @@ int uart_serial_send(struct serial * ser, const void * buf, unsigned int buflen)
 }
 
 void uart_isr(int srcno, void * aux) {
-    struct uart_serial * const uart = aux;
+    struct uart_device * const uart = aux;
     const uint_fast8_t line_status = uart->regs->lsr;
 
     if (line_status & LSR_OE)
@@ -344,44 +290,18 @@ void uart_isr(int srcno, void * aux) {
     }
 }
 
-/**
- * @brief Initializes the ring buffer structure. The ring buffer is initially empty.
- * @param rbuf a pointer to a pre-allocated ringbuf structure
- */
-
 void rbuf_init(struct ringbuf * rbuf) {
     rbuf->hpos = 0;
     rbuf->tpos = 0;
 }
 
-
-/**
- * @brief Tests if a ring buffer is empty
- * @param rbuf pointer to a ring buffer structure
- * @return 1 if the ring buffer is empty, and 0 otherwise
- */
-
 int rbuf_empty(const struct ringbuf * rbuf) {
     return (rbuf->hpos == rbuf->tpos);
 }
 
-
-/**
- * @brief Tests if a ring buffer is full
- * @param rbuf pointer to a ring buffer structure
- * @return 1 if the ring buffer is full, and 0 otherwise
- */
-
 int rbuf_full(const struct ringbuf * rbuf) {
     return (rbuf->tpos - rbuf->hpos == UART_RBUFSZ);
 }
-
-/**
- * @brief Adds a character to the tail of the ring buffer. The ring buffer
- * must not be full before calling this function.
- * @param rbuf pointer to a ring buffer structure
- * @param c character to insert into the ring buffer
- */
 
 void rbuf_putc(struct ringbuf * rbuf, char c) {
     uint_fast16_t tpos;
@@ -391,13 +311,6 @@ void rbuf_putc(struct ringbuf * rbuf, char c) {
     asm volatile ("" ::: "memory");
     rbuf->tpos = tpos + 1;
 }
-
-/**
- * @brief Removes a character from the head of the ring buffer. The ring buffer
- * must not be empty before calling this function.
- * @param rbuf pointer to a ring buffer structure
- * @return character removed from the head of the ring buffer
- */
 
 char rbuf_getc(struct ringbuf * rbuf) {
     uint_fast16_t hpos;

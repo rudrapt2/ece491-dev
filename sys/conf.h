@@ -1,8 +1,8 @@
-/*! @file conf.h
-    @brief Compile-time configuration constants
-    @copyright Copyright (c) 2024-2025 University of Illinois
-
-*/
+// conf.h - Compile-time configuration
+//
+// Copyright (c) 2024-2026 University of Illinois
+// SPDX-License-identifier: NCSA
+//
 
 // QEMU-BASED CONSTANTS
 //
@@ -21,27 +21,6 @@
 #define RAM_END_PMA (RAM_START_PMA + RAM_SIZE)
 #define RAM_END (RAM_START + RAM_SIZE)
 
-// MMIO addresses
-#define UART0_MMIO_BASE 0x10000000UL  // PMA
-#define UART1_MMIO_BASE 0x10000100UL  // PMA
-#define UART_MMIO_BASE(i) (UART0_MMIO_BASE + (i) * (UART1_MMIO_BASE - UART0_MMIO_BASE))
-#define UART0_INTR_SRCNO 10
-
-#define VIRTIO0_MMIO_BASE 0x10001000UL  // PMA
-#define VIRTIO1_MMIO_BASE 0x10002000UL  // PMA
-#define VIRTIO_MMIO_BASE(i) (VIRTIO0_MMIO_BASE + (i) * (VIRTIO1_MMIO_BASE - VIRTIO0_MMIO_BASE))
-#define VIRTIO0_INTR_SRCNO 1
-
-#ifndef PLIC_MMIO_BASE
-#define PLIC_MMIO_BASE 0x0C000000L
-#endif
-
-#define TIMER_FREQ 10000000UL  // qemu/include/hw/intc/riscv_aclint.h
-
-#define PLIC_SRC_CNT 96  // QEMU VIRT_IRQCHIP_NUM_SOURCES
-#define PLIC_CTX_CNT 2
-
-#define RTC_MMIO_BASE 0x00101000L
 
 // KERNEL CONFIGURATION
 //
@@ -74,16 +53,10 @@
 #define NTHR 32
 #endif
 
-// Maximum number of processes
-
-#ifndef NPROC
-#define NPROC 16
-#endif
-
 // Heap allocator alignment
 
 #ifndef HEAP_ALIGN
-#define HEAP_ALIGN 16
+#define HEAP_ALIGN 8
 #endif
 
 // Interrupt priorities
@@ -94,9 +67,9 @@
 #define VIORNG_INTR_PRIO 1
 #define VIOGPU_INTR_PRIO 2
 
-// Maximum number of open uio objects
+// Maximum number of open Io objects
 
-#define PROCESS_UIOMAX 16
+#define PROC_IOMAX 16
 
 // Capacity of block cache
 

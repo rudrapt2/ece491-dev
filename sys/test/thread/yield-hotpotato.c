@@ -1,4 +1,4 @@
-// test/thread/create-yield-hotpotato.c
+// test/thread/yield-hotpotato.c
 //
 // Copyright (c) 2026 University of Illinois
 // SPDX-License-identifier: NCSA
@@ -29,7 +29,7 @@ static volatile int yieldcnt2;
 static void thread_func1(void) {
     for (;;) {
         while (potato != 1) {
-            running_thread_yield();
+            yield_running_thread();
             yieldcnt1 += 1;
         }
 
@@ -40,7 +40,7 @@ static void thread_func1(void) {
 static void thread_func2(void) {
     for (;;) {
         while (potato != 2) {
-            running_thread_yield();
+            yield_running_thread();
             yieldcnt2 += 1;
         }
 
@@ -51,7 +51,7 @@ static void thread_func2(void) {
 void main(void) {
     test_name_init();
     console_init();
-    timer_init(/* qemu virt timer frequency*/ 24000000);
+    timer_init(/* qemu virt timer frequency */ 24000000);
     memory_init();
     thrmgr_init();
     
@@ -64,7 +64,7 @@ void main(void) {
 
     for (int i = 0; i < 100; i++) {
         while (potato != 0) {
-            running_thread_yield();
+            yield_running_thread();
             yieldcnt0 += 1;
         }
 

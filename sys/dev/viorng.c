@@ -10,10 +10,11 @@
 #include "error.h"
 #include "string.h"
 #include "thread.h"
-#include "devimpl.h"
+#include "device.h"
 #include "conf.h"
 #include "intr.h"
 #include "misc.h"
+#include "ioimpl.h"
 
 // INTERNAL CONSTANT DEFINITIONS
 //
@@ -33,11 +34,11 @@
 // INTERNAL TYPE DEFINITIONS
 //
 
-struct viorng_serial {
-    struct serial base;
+struct viorng_device {
     volatile struct virtio_mmio_regs * regs;
     int irqno;
-    char opened;
+
+    struct io io;
 
     struct {
         uint16_t last_used_idx;
@@ -70,31 +71,33 @@ struct viorng_serial {
 // INTERNAL FUNCTION DECLARATIONS
 //
 
-static int viorng_serial_open(struct serial * ser);
+static int viorng_open(struct io ** ioptr, void * aux);
 
-static void viorng_serial_close(struct serial * ser);
-static int viorng_serial_recv(struct serial * ser, void * buf, unsigned int bufsz);
+static void viorng_reclaim(struct io * io);
+
+static long viorng_read(struct io * io, void * buf, long bufsz);
 
 static void viorng_isr(int irqno, void * aux);
 
 // INTERNAL GLOBAL VARIABLES
 //
 
-static const struct serial_intf viorng_serial_intf = {
-    .blksz = 1,
-    .open = &viorng_serial_open,
-    .close = &viorng_serial_close,
-    .recv = &viorng_serial_recv
+static const struct iointf viorng_intf = {
+    .implname = "viorng",
+    .reclaim = &viorng_reclaim,
+    .read = &viorng_read
 };
 
 // EXPORTED FUNCTION DEFINITIONS
 //
 
-// Attaches a VirtIO rng device. Declared and called directly from virtio.c.
+// The vioblk_attach function is declared and called from virtio_attach() in
+// virtio.c when a VirtIO RNG device is found.
 
 void viorng_attach(volatile struct virtio_mmio_regs * regs, int irqno) {
+    static unsigned short instcnt = 0; // number of viorng devices
     virtio_featset_t enabled_features, wanted_features, needed_features;
-    struct viorng_serial * vrng;
+    struct viorng_device * vrng;
     int result;
     
     assert (regs->device_id == VIRTIO_ID_RNG);
@@ -117,8 +120,8 @@ void viorng_attach(volatile struct virtio_mmio_regs * regs, int irqno) {
 
     // Allocate and initialize device struct
 
-    vrng = kmalloc(sizeof(struct viorng_serial));
-    memset(vrng, 0, sizeof(struct viorng_serial) - VIORNG_BUFSZ);
+    vrng = kmalloc(sizeof(struct viorng_device));
+    memset(vrng, 0, sizeof(struct viorng_device) - VIORNG_BUFSZ);
 
     vrng->regs = regs;
     vrng->irqno = irqno;
@@ -145,41 +148,36 @@ void viorng_attach(volatile struct virtio_mmio_regs * regs, int irqno) {
     // fence o,oi
     __sync_synchronize();
 
-    serial_init(&vrng->base, &viorng_serial_intf);
-    register_device(VIORNG_NAME, DEV_SERIAL, vrng);
+    register_device(VIORNG_NAME, instcnt++, &viorng_open, vrng);
+    ioinit(&vrng->io, &viorng_intf, 1, 0);
 }
 
-int viorng_serial_open(struct serial * ser) {
-    struct viorng_serial * vrng = (struct viorng_serial*)ser; 
+int viorng_open(struct io ** ioptr, void * aux) {
+    struct viorng_device * vrng = aux;
+
     vrng->regs->status |= VIRTIO_STAT_ACKNOWLEDGE;
 
-    if (vrng->opened)
-		return -EBUSY;
-
     virtio_enable_virtq(vrng->regs, 0);
-    enable_intr_source(vrng->irqno, VIORNG_INTR_PRIO, viorng_isr, vrng);
+    enable_intr_source(vrng->irqno, VIORNG_INTR_PRIO, &viorng_isr, vrng);
 
-    vrng->opened = 1;
+    *ioptr = ioaddref(&vrng->io);
 
     return 0;
 }
 
-void viorng_serial_close(struct serial * ser) {
-    struct viorng_serial * vrng = (struct viorng_serial*)ser;
-
-    assert (vrng->opened);
-
+void viorng_reclaim(struct io * io) {
+    struct viorng_device * const vrng = 
+        (void*)io - offsetof(struct viorng_device, io);
+    
     virtio_reset_virtq(vrng->regs, 0);
     disable_intr_source(vrng->irqno);
-    vrng->opened = 0;
 }
 
-int viorng_serial_recv(struct serial * ser, void * buf, unsigned int bufsz) {
-    struct viorng_serial * vrng = (struct viorng_serial*)ser;
+long viorng_read(struct io * io, void * buf, long bufsz) {
+    struct viorng_device * const vrng = 
+        (void*)io - offsetof(struct viorng_device, io);
     long rcnt;
     int pie;
-
-    assert (vrng->opened);
 
     if (bufsz == 0)
         return 0;
@@ -203,7 +201,7 @@ int viorng_serial_recv(struct serial * ser, void * buf, unsigned int bufsz) {
 }
 
 void viorng_isr(int irqno, void * aux) {
-    struct viorng_serial * vrng = (struct viorng_serial *)aux;
+    struct viorng_device * vrng = aux;
     uint32_t intr_status;
 
     trace("%s(irqno=%d)", __func__, irqno);

@@ -46,7 +46,7 @@ void attach_virtio(void * mmio_base, int irqno) {
     }
 
     if (regs->version != 2) {
-        debug("%p: Unexpected virtio version (found %u, expected %u)\n",
+        debug("%p: Unexpected virtio version (found %u, expected %u)",
             mmio_base, (unsigned int)regs->version, 2);
         return;
     }
@@ -59,27 +59,27 @@ void attach_virtio(void * mmio_base, int irqno) {
 
     switch (regs->device_id) {
     case VIRTIO_ID_CONSOLE:
-        debug("%p: Found virtio console device\n", regs);
+        debug("%p: Found virtio console device", regs);
         viocons_attach(regs, irqno);
         break;
     case VIRTIO_ID_BLOCK:
-        debug("%p: Found virtio block device\n", regs);
+        debug("%p: Found virtio block device", regs);
         vioblk_attach(regs, irqno);
         break;
     case VIRTIO_ID_RNG:
-        debug("%p: Found virtio rng device\n", regs);
+        debug("%p: Found virtio rng device", regs);
         viorng_attach(regs, irqno);
         break;
     case VIRTIO_ID_GPU:
-        debug("%p: Found virtio gpu device\n", regs);
+        debug("%p: Found virtio gpu device", regs);
         viogpu_attach(regs, irqno);
         break;
     case VIRTIO_ID_INPUT:
-        debug("%p: Found virtio input device\n", regs);
+        debug("%p: Found virtio input device", regs);
         viohi_attach(regs, irqno);
         break;
     default:
-        debug("%p: Unknown virtio device type %u ignored\n",
+        debug("%p: Unknown virtio device type %u ignored",
             mmio_base, (unsigned int) regs->device_id);
         return;
     }

@@ -7,19 +7,18 @@
 #ifndef _TIMER_H_
 #define _TIMER_H_
 
-#include "thread.h" // struct condition
-
 // SYSTEM TIMER AND PREEMPTION INTERRUPTS
 //
 // The timer subsystem provides two services:
 //
 // - One-time alarms for placing threads to sleep until a specified time.
-// - Coarse periodic interrupts.
+// - [MP3cp3] Coarse periodic interrupts.
 //
-// The timer subsystem guarantees that a timer interrupt will be generated at a
-// minimum frequency (given as interrupts per second) specified by the
-// compile-time constant BOLT_FREQ, provided interrupts are enabled for at least
-// some part of the period. The interrupt frequency and timing are not exact.
+// [MP3cp3] The timer subsystem guarantees that a timer interrupt will be
+// generated at a minimum frequency (given as interrupts per second) specified
+// by the compile-time constant BOLT_FREQ, provided interrupts are enabled for
+// at least some part of the period. The interrupt frequency and timing are not
+// exact.
 //
 // All timer services use the system timer, which may beread using rdtime(), as
 // their time reference.
@@ -82,8 +81,8 @@ extern void handle_timer_interrupt(void);
 // - If there are suspended threads still waiting for an alarm, the next timer
 //   interrupt is set to occur no later than the earliest alarm time of any
 //   threads still waiting for future alarms.
-// - The next timer interrupt is set to occur no more than N ticks from the
-//   current time, where N = timer_frequency / BOLT_FREQ.
+// - [MP3cp3] The next timer interrupt is set to occur no more than N ticks from
+//   the current time, where N = timer_frequency / BOLT_FREQ.
 //
 // * This function should be called from an ISR in response to a timer
 //   interrupt.
@@ -92,116 +91,39 @@ extern void handle_timer_interrupt(void);
 // ONE-TIME ALARMS
 //
 
-// An /alarm/ can be used to put the calling thread to sleep until a specified
-// future time, expressed in timer ticks, which increment at the same rate as
-// the CPU timer returned by rdtime().
-//
-// An alarm can be used repeatedly, but only by one thread at a time.
-//
-// The timer interrupt handler wakes sleeping threads by broadcasting the alarm
-// condition variables associated with expired alarms.
-//
-// Interrupts must be enabled for the timer subsystem to provide alarm service.
-// The system interrupt handler _must_ call handle_timer_interrupt() declared
-// below to servie timer interrupts.
-
-// The /alarm/ structure represents an alarm. The definition is provided so
-// alarms can be allocated statically. Do not access members of alarm struct
-// directly; use only the functions declared below.
-
-struct alarm {
-    // NO DIRECT ACCESS!
-    struct alarm * next;
-    const char * name;
-    struct condition cond;
-    unsigned long long twake;
-};
-
-extern void alarm_init(struct alarm * al, const char * name);
-
-// Initializes an alarm. The /al/ argument must point to a region of memory
-// large enough to hold an instance of `struct alarm`. This function does _not_
-// allocate space for this structure.
-//
-// The /name/ argument must be a pointer to a null-terminated string or NULL,
-// which will serve as the name of the alarm. If /name/ is NULL, the alarm is
-// given an implementation-defined name. The value of the /name/ argument may be
-// retrived later using alarm_name().
-//
-// alarm_init() must be called before any other operations on an alarm.
-//
-// When an alarm is no longer needed, the memory associated with the /alarm/
-// structure may be reclaimed. After that point, a pointer to this structure is
-// no longer considered to be a valid alarm and must not be used. It is safe,
-// however, to initialize and use a stack-allocated /alarm/ structure, provided
-// that the alarm is only used during the lifetime of the structure.
-//
-// On entry alarm_init() assumes:
-// - /al/ is a pointer to a region of memory large enough to hold an instance of
-//   an /alarm/ structure.
-// - /name/ is a pointer to a null-terminated string or NULL.
-//
-// On return alarm_init() guarantees:
-// - /al/ is a pointer to an initialized instance of an alarm.
-//
-// Performance guarantees:
-// - The number of alarms in the system is unlimited.
-//
-// * This function may be called from an ISR provided no other functions
-//   operating on the same alarm are executed concurrently.
-//
-// See also: alarm_sleep_until().
-
-extern void alarm_sleep_until(struct alarm * al, unsigned long long twake);
+extern void sleep_until(unsigned long long twake);
 
 // Suspends the calling thread until the specified time. The /twake/ argument
 // specifies the time at which the calling thread should be resumed. The /twake/
-// argument is an absolute time referenced to the same reference clock as the
+// argument is an absolute time, referenced to the same reference clock as the
 // rdtime() function (riscv.h).
 //
 // If /twake/ is at or after the current time, as obtained by rdtime(),
-// alarm_sleep_until() returns immediately. Otherwise, the calling thread is
-// suspended until /twake/.
-//
-// On entry alarm_sleep_until() assumes:
-// - /al/ is a pointer to properly initialized alarm structure.
+// leep_until() returns immediately. Otherwise, the calling thread is suspended
+// until /twake/.
 //
 // On return alarm_sleep_until() guarantees:
 // - The current time, as returned by rdtime(), it not before /twake/.
 //
 // Performance guarantees:
-// - If alarm_sleep_until() is called at or after /twake/, it returns
-//   immediately without suspending the calling thread.
-// - The calling thread becomes RUNNABLE no later than after the next call after
-//   /twake/ to handle_timer_interrupt() returns.
-
+// - If sleep_until() is called at or after /twake/, it returns immediately
+//   without suspending the calling thread.
+// - The calling thread becomes RUNNABLE no later than on return from first call
+//   to handle_timer_interrupt() after /twake/.
+//
 // * This function may switch to another thread context.
 // * This function may _not_ be called from an ISR.
 //
-// See also: alarm_sleep_ms(), alarm_sleep_us(), alarm_sleep_sec().
-
-extern void alarm_sleep_sec(struct alarm * al, unsigned int sec);
-extern void alarm_sleep_ms(struct alarm * al, unsigned int ms);
-extern void alarm_sleep_us(struct alarm * al, unsigned int us);
-
-// Convenience wrappers around alarm_sleep_until() that sleep for a duration
-// expressed in seconds, milliseconds, or microseconds. The /sec/, /ms/, and
-// /us/ arguments express a _duration_. The calling thread is suspended for the
-// specified duration relative to the current time as returned by rdtime().
-//
-// These functions are equivalent to calling alarm_sleep_until() with /twake/
-// set to the current time plus a number of clock ticks equal to the expressed
-// duration.
-//
-// * These functions may switch to another thread context.
-// * These functions may _not_ be called from an ISR.
+// See also: sleep_ms(), sleep_us(), sleep_sec().
 
 extern void sleep_sec(unsigned int sec);
 extern void sleep_ms(unsigned int ms);
 extern void sleep_us(unsigned int us);
 
-// Convenience sleep functions that create a temporary alarm and sleep for the
-// specified duration.
+// Suspends the calling thread for the specified duration, expressed in seconds,
+// milliseconds, or microseconds. These functions are equivalent to calling
+// sleep_until() with the specified duration added to the value returned by
+// rdtime(). See sleep_until() for details.
 //
 // * These functions may switch to another thread context.
 // * These functions may _not_ be called from an ISR.

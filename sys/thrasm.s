@@ -24,8 +24,8 @@ switch_running_thread:
 # The first element of struct thread is:
 #
 #     struct thread_context {
-#         uint64_t s[12];
-#         void (*ra)(uint64_t);
+#         uintptr_t s[12];
+#         void * ra;
 #         void * sp;
 #     };
 #

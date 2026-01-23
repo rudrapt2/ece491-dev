@@ -1,29 +1,23 @@
 // main.c - main function of the kernel (called from start.s)
 //
-// Copyright (c) 2024-2025 University of Illinois
+// Copyright (c) 2024-2026 University of Illinois
 // SPDX-License-identifier: NCSA
 //
 
 #include "conf.h"
 #include "console.h"
 #include "intr.h"
+#include "plic.h"
 #include "device.h"
 #include "thread.h"
-#include "memory.h"
-#include "process.h"
-#include "dev/rtc.h"
-#include "dev/uart.h"
-#include "dev/virtio.h"
-#include "dev/ramdisk.h"
 #include "timer.h"
 #include "string.h"
-#include "filesys.h"
-#include "lffs.h"
-#include "ktfs.h"
 #include "error.h"
-#include "cache.h"
 #include "misc.h" // for halt()
+#include "heap.h"
+#include "io.h"
 
+#ifndef MP2
 #define INITEXE "shell"
 
 #define CMNTNAME "c" // lffs
@@ -37,63 +31,40 @@
 #ifndef NUART // number of UARTs
 #define NUART 3
 #endif
-
-#ifndef NVIODEV // number of VirtIO devices
-#define NVIODEV 8
 #endif
 
-static void attach_devices(void);
+#ifndef MP2
+static void exec_init();
 static void mount_cdrive(void); // mount primary storage device ("C drive")
 static void mount_ddrive(void); // mount secondary storage device ("D drive")
-static void run_init(void);
+#else
+static void run_games(void);
+#endif // MP2
 
-// MP2 stuff
-static void run_mp2(void);
-void trek_start(struct serial* term, unsigned long rngseed);
-void rule30_start(struct serial* term);
+
+extern void board_init(void); // from board/xxx.c
+extern void attach_devices(void); // from board/xxx.c
 
 void main(void) {
-    console_init();
-    timer_init(TIMER_FREQ);
-    memory_init();
-
+    board_init();
     intrmgr_init();
     devmgr_init();
     thrmgr_init();
-    procmgr_init();
-    fsmgr_init();
 
-    attach_devices();
-
-    enable_interrupts();
-
+#ifndef MP2
+    // MP3 stuff
     mount_cdrive();
     mount_ddrive();
-    // run_mp2();
-    run_init();
-}
+#endif
 
+    attach_devices();
+    enable_interrupts();
 
-void attach_devices(void) {
-    int i;
-    int result;
-
-    rtc_attach((void*)RTC_MMIO_BASE);
-    ramdisk_attach();
-
-    for (i = 0; i < NUART; i++)
-        attach_uart((void*)UART_MMIO_BASE(i), UART0_INTR_SRCNO+i);
-    
-    for (i = 0; i < NVIODEV; i++)
-        attach_virtio((void*)VIRTIO_MMIO_BASE(i), VIRTIO0_INTR_SRCNO+i);
-
-    result = mount_devfs(DEVMNTNAME);
-
-    if (result != 0) {
-        kprintf("mount_devfs(%s) failed: %s\n",
-            CDEVNAME, error_name(result));
-        halt();
-    }
+#ifndef MP2
+    exec_init();
+#else
+    run_games();
+#endif
 }
 
 void mount_cdrive(void) {
@@ -170,7 +141,7 @@ void mount_ddrive(void) {
     }
 }
 
-void run_init(void) {
+void exec_init() {
     char * argv[] = { NULL };
     struct uio * initexe;
     int result;
@@ -189,71 +160,88 @@ void run_init(void) {
     process_exec(initexe, 0, argv);
 }
 
-void run_mp2(void) {
-    #define MP2CP3
-    struct serial* trek_term;
-    struct serial* seedsrc;
+#ifdef MP2
+#define TREK_TERM_NAME "uart1"
+#define RULE30_TERM_NAME "uart2"
+#define RNG_NAME "viorng0"
+#define RTC_NAME "rtc"
+
+void run_games(void) {
+    extern void trek_start(struct io * tio, unsigned long rngseed);
+    extern void rule30_start(struct io * tio);
+    struct io * rngio;
+    struct io * trek_term;
+    struct io * rule30_term;
     unsigned long rngseed;
     int result;
     
-    trek_term = find_serial("uart", 1);
+    // Open UART for trek.
 
-    if (trek_term == NULL) {
-        kprintf("Serial device uart1 not found\n");
-        halt();
-    }
+    result = open_device(TREK_TERM_NAME, &trek_term);
 
-    result = serial_open(trek_term);
     if (result != 0) {
-        kprintf("failed to open uart 1\n");
+        kprintf("%s: %s\n", TREK_TERM_NAME, error_desc(result));
         halt();
     }
 
-    seedsrc = find_serial("viorng", 0);
-    if (seedsrc == NULL) {
-        kprintf("viorng 0 is NULL\n");
-    } else {
-        kprintf("using viorng as seedsrc\n");
-    }
+    // Open a RNG to get a PRNG seed. Try, in decreasing order of preference:
+    // viorng0 device, rtc device, and rdtime().
 
-    if (seedsrc == NULL) {
-        seedsrc = find_serial("rtc0", 0);
-    }
+    result = open_device(RNG_NAME, &rngio);
 
+    if (result != 0)
+        result = open_device(RTC_NAME, &rngio);
 
-    if (seedsrc != NULL) {
-        result = serial_open(seedsrc);
-        if (result != 0) {
-            kprintf("failed to open seed source device\n");
-        }
-        result = serial_recv(seedsrc, &rngseed, sizeof(rngseed));
-        if (result != sizeof(rngseed)) {
-            kprintf("failed to receive from seed source device\n");
-        }
-        serial_close(seedsrc);
-    } else {
-        rngseed = 0xECE391;
-    }
+    if (result == 0)
+        result = ioread(rngio, &rngseed, 8);
+    
+    if (result != 0)
+        rngseed = rdtime();
 
-    rngseed = 0xECE391;
-    kprintf("rngseed = %lu\n", rngseed);
+#if 1 // Set to 1 for MP3cp3
 
-#ifdef MP2CP3
+    // Open UART for rule30.
 
-    struct serial * rule30_term;
-
-    rule30_term = find_serial("uart", 2);
+    result = open_device(RULE30_TERM_NAME, &rule30_term);
 
     if (rule30_term == NULL) {
-        kprintf("Serial device uart2 not found\n");
+        kprintf("%s: %s\n", RULE30_TERM_NAME, error_name(result));
         halt();
     }
 
-    serial_open(rule30_term);
-
     spawn_thread("rule30", (void(*)(void))&rule30_start, rule30_term);
-
+#else
+    (void)rule30_term; // suppress unused variable warning
 #endif
 
     trek_start(trek_term, rngseed);
 }
+
+// Get rid of these once we have trek and rule30 working.
+
+void __attribute__ ((weak)) trek_start(struct io * tio, unsigned long rngseed) {
+    char msgbuf[120];
+    int n;
+    
+    for (;;) {
+        n = snprintf(msgbuf, sizeof(msgbuf),
+            "[%llu] This is trek (rngseed = %lu)\r\n", rdtime(), rngseed);
+        
+        iowrite(tio, msgbuf, n);
+        sleep_ms(500);
+    }
+}
+
+void __attribute__ ((weak)) rule30_start(struct io * tio) {
+    char msgbuf[120];
+    int n;
+    
+    for (;;) {
+        n = snprintf(msgbuf, sizeof(msgbuf),
+            "[%llu] This is rule30\r\n", rdtime());
+        iowrite(tio, msgbuf, n);
+        sleep_ms(500);
+    }
+}
+
+#endif

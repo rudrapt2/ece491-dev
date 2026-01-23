@@ -12,7 +12,6 @@
 #include "console.h"
 #include "sbi.h" // for sbi_shutdown()
 #include "intr.h"
-#include "see.h"  // for halt_failure()
 
 // EXPORTED FUNCTION DEFINITIONS
 //
@@ -64,3 +63,8 @@ void trace_actual(const char* filename, int lineno, const char* fmt, ...) {
 void halt(void) {
     sbi_shutdown();
 }
+
+void shutdown(void) __attribute__((weak, alias("halt")));
+
+// The default shutdown() function is aliased to halt(). It may be overridden
+// elsewhere to add additional processing at shutdown.

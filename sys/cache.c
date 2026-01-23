@@ -1,8 +1,9 @@
-/*! @file cache.c
-    @brief Block cache for a storage device. 
-    @copyright Copyright (c) 2024-2025 University of Illinois
+// cache.c - Block cache for a storage device
+//
+// Copyright (c) 2024-2026 University of Illinois
+// SPDX-License-identifier: NCSA
+//
 
-*/
 
 #ifdef CACHE_TRACE
 #define TRACE
@@ -21,7 +22,7 @@
 #include "thread.h"
 #include "heap.h"
 #include "misc.h"
-#include "devimpl.h"
+#include "io.h"
 #include "console.h"
 
 // INTERNAL TYPE DEFINITIONS
@@ -51,7 +52,7 @@ struct cache_entry {
  *
  */
 struct cache {
-    struct storage * disk;
+    struct io * bkgio;
     struct condition unlocked; // an entry has been unlocked
     struct condition evictable; // a entry became evictable
     struct condition writable; // a block can be written back
@@ -117,33 +118,26 @@ static void cache_writeback_thrfn(struct cache * cache);
 // EXPORTED FUNCTION DEFINITIONS
 //
 
-
-//Helper for ktfs to get a reference to the backing device for arbitrary r/w.
-int cache_get_backing_device(struct cache * cache, struct storage ** disk){
-    if(cache == NULL)
-        return -EINVAL;
-
-    *(disk) = cache->disk;
-    return 0;
-}
-
-int create_cache(struct storage * disk, struct cache ** cptr, unsigned long blksz) {
+struct cache * create_cache(struct io * bkgio, unsigned long cache_blksz) {
     struct cache * cache;
-    int bkgblksz;
+    unsigned int blksz;
     int i;
 
     trace("%s(%p)", __func__, disk);
 
-    // Get backing device block size. Make sure it divides cache block size.
+    assert (bkgio != NULL);
 
-    bkgblksz = disk->intf->blksz;
-    assert (bkgblksz < 0 || blksz % bkgblksz == 0);
+    blksz = ioblksz(bkgio);
+
+    if (cache_blksz % blksz != 0)
+        panic("Cache size not a multiple if backing device block size");
+
 
     cache = kcalloc(1, sizeof(struct cache));
 
-    cache->blksz = blksz;
+    cache->blksz = cache_blksz;
 
-    cache->disk = disk;
+    cache->bkgio = bkgio;
     condition_init(&cache->unlocked, "cache.unlocked");
     condition_init(&cache->evictable, "cache.evictable");
     condition_init(&cache->writable, "cache.writable");
@@ -163,13 +157,12 @@ int create_cache(struct storage * disk, struct cache ** cptr, unsigned long blks
         "cache_writeback", (void(*)(void))&cache_writeback_thrfn, cache);
     
     assert (0 <= cache->wtid);
-    // thread_detach(cache->wtid);
+    thread_attach_process(cache->wtid, NULL);
 
-    *cptr = cache;
-    return 0;
+    return cache;
 }
 
-int cache_get_block(struct cache * cache, unsigned long long pos, void ** pptr) {
+int cache_fetch(struct cache * cache, unsigned long long pos, void ** pptr) {
     struct cache_entry * ent; // cache entry for block
     long rcnt; // return value from fetch
     int i; // block index
@@ -268,7 +261,7 @@ int cache_get_block(struct cache * cache, unsigned long long pos, void ** pptr) 
 
     *pptr = blkidx_to_blkptr(cache, i);
     debug("Reading block from 0x%llx into cache at %d (pblk = %lp)", pos, i, *pptr);
-    rcnt = storage_fetch(cache->disk, pos, *pptr, cache->blksz);
+    rcnt = iofetch(cache->bkgio, pos, *pptr, cache->blksz);
 
     debug("%08lx: "
         "%02x %02x %02x %02x %02x %02x %02x %02x "
@@ -305,11 +298,11 @@ int cache_get_block(struct cache * cache, unsigned long long pos, void ** pptr) 
     return 0;
 }
 
-void cache_release_block(struct cache * cache, void * pblk, int dirty) {
+void cache_release(struct cache * cache, void * pblk, int dirty) {
     struct cache_entry * ent;
     int i;
 
-    trace("%s(%p,dirty:%d)", __func__, pblk, dirty);
+    trace("%s(%p,dirty=%d)", __func__, pblk, dirty);
 
     debug("%08lx: "
         "%02x %02x %02x %02x %02x %02x %02x %02x "
@@ -429,7 +422,7 @@ void cache_writeback_thrfn(struct cache * cache) {
 
                 debug("Writing dirty block 0x%llx to storage", ents[i].pos);
 
-                wcnt = storage_store(cache->disk,
+                wcnt = iostore(cache->bkgio,
                     ents[i].pos, blkidx_to_blkptr(cache, i), cache->blksz);
                 
                 if (wcnt != cache->blksz) {

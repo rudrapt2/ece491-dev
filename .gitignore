@@ -13,8 +13,10 @@ util/fs/unmkfs_lffs
 .clangd
 *.log
 usr/bin
+mp2-*.c
 
 */.gdbhist
+*/.gdb_history
 */.gdbinit
 */*.o
 */*.dump

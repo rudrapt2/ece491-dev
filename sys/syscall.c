@@ -1,8 +1,8 @@
-/*! @file syscall.c
-    @brief system call handlers
-    @copyright Copyright (c) 2024-2025 University of Illinois
-    @license SPDX-License-identifier: NCSA
-*/
+// syscall.c - System call handling
+//
+// Copyright (c) 2024-2026 University of Illinois
+// SPDX-License-identifier: NCSA
+//
 
 #ifdef SYSCALL_TRACE
 #define TRACE
@@ -26,35 +26,43 @@
 #include "string.h"
 #include "thread.h"
 #include "timer.h"
-#include "uio.h"
+#include "io.h"
+
+#ifndef PATH_MAX
+// Maximum path name length. Must be less than HEAP_ALLOC_MAX.
+#define PATH_MAX 255
+#endif
 
 // EXPORTED FUNCTION DECLARATIONS
 //
 
 extern void handle_syscall(struct trap_frame *tfr);  // called from excp.c
 
+
 // INTERNAL FUNCTION DECLARATIONS
 //
 
-static int64_t syscall(const struct trap_frame *tfr);
+static long syscall(const struct trap_frame *tfr);
 
 static int sysexit(void);
-static int sysexec(int fd, int argc, char **argv);
-static int sysfork(const struct trap_frame *tfr);
+static int sysexec(int fd, int argc, char ** argv);
+static int sysfork(const struct trap_frame * tfr);
 static int syswait(int tid);
-static int sysprint(const char *msg);
+static int sysprint(const char * msg);
 static int sysusleep(unsigned long us);
 
-static int sysfsdelete(const char *path);
-static int sysfscreate(const char *path);
+static int sysdelete(const char * path);
+static int syscreate(const char * path);
 
-static int sysopen(int fd, const char *path);
+static int sysopen(int fd, const char * path);
 static int sysclose(int fd);
-static long sysread(int fd, void *buf, size_t bufsz);
-static long syswrite(int fd, const void *buf, size_t len);
-static int sysfcntl(int fd, int cmd, void *arg);
-static int syspipe(int *wfdptr, int *rfdptr);
-static int sysuiodup(int oldfd, int newfd);
+static long sysread(int fd, void * buf, size_t bufsz);
+static long syswrite(int fd, const void * buf, size_t len);
+static int sysioctl(int fd, int cmd, uintptr_t arg_uma);
+static int syspipe(int * wfd, int * rfd);
+static int sysiodup(int oldfd, int newfd);
+
+static int allocfd(struct process * proc, int reqfd, int notfd);
 
 // EXPORTED FUNCTION DEFINITIONS
 //
@@ -67,10 +75,10 @@ static int sysuiodup(int oldfd, int newfd);
  * @return void
  */
 
-void handle_syscall(struct trap_frame *tfr) {
+void handle_syscall(struct trap_frame * tfr) {
     tfr->sepc += 4;
     tfr->a0 = syscall(tfr);
-    running_thread_submit();
+    submit_running_thread();
 }
 
 // INTERNAL FUNCTION DEFINITIONS
@@ -84,10 +92,8 @@ void handle_syscall(struct trap_frame *tfr) {
  * @return result of syscall
  */
 
-int64_t syscall(const struct trap_frame *tfr)
-{
-    switch (tfr->a7)
-    {
+long syscall(const struct trap_frame * tfr) {
+    switch (tfr->a7) {
     case SYSCALL_EXIT:
         return sysexit();
     case SYSCALL_EXEC:
@@ -108,112 +114,74 @@ int64_t syscall(const struct trap_frame *tfr)
         return sysread(tfr->a0, (void *)tfr->a1, tfr->a2);
     case SYSCALL_WRITE:
         return syswrite(tfr->a0, (void *)tfr->a1, tfr->a2);
-    case SYSCALL_FCNTL:
-        return sysfcntl(tfr->a0, tfr->a1, (void *)tfr->a2);
+    case SYSCALL_IOCTL:
+        return sysioctl(tfr->a0, tfr->a1, tfr->a2);
     case SYSCALL_PIPE:
-        return syspipe((int *)tfr->a0, (int *)tfr->a1);
-    case SYSCALL_FSCREATE:
-        return sysfscreate((char *)tfr->a0);
-    case SYSCALL_FSDELETE:
-        return sysfsdelete((char *)tfr->a0);
-    case SYSCALL_UIODUP:
-        return sysuiodup(tfr->a0, tfr->a1);
+        return syspipe((int *)tfr->a0, (int *)tfr->a0);
+    case SYSCALL_CREATE:
+        return syscreate((char *)tfr->a0);
+    case SYSCALL_DELETE:
+        return sysdelete((char *)tfr->a0);
+    case SYSCALL_IODUP:
+        return sysiodup(tfr->a0, tfr->a1);
     default:
         return -ENOTSUP;
     }
 }
 
-/**
- * @brief Calls process exit
- * @return void
- */
-
-int sysexit(void)
-{
+int sysexit(void) {
+    trace("%s()", __func__);
     process_exit();
 }
 
-/**
- * @brief Executes new process given a executable and arguments
- * @details Valid fd checks, get current process struct, close fd being executed, finally calls
- * process_exec with arguments and executable io "file"
- * @param fd file descripter idx
- * @param argc number of arguments in argv
- * @param argv array of arguments for multiple args
- * @return result of process_exec, else -EBADFD on invalid file descriptors
- */
-
-int sysexec(int fd, int argc, char **argv)
-{
-    struct process *self;
-    struct uio *exeio;
+int sysexec(int fd, int argc, char ** argv) {
+    struct process * self;
+    struct io * exeio;
 
     trace("%s(%d)", __func__, fd);
 
-    if (fd < 0 || PROCESS_IOMAX <= fd)
-        return -EBADFD;
+    if (fd < 0 || PROC_IOMAX <= fd)
+        return -EBADF;
 
     self = current_process();
 
-    if (self->uiotab[fd] == NULL)
-        return -EBADFD;
+    if (self->iotab[fd] == NULL)
+        return -EBADF;
 
     // We need to close the file descriptor being exec'd. We'll do that in
     // process_exec, but we need to clear iotab[fd] here.
 
-    exeio = self->uiotab[fd];
-    debug("sysexec: fd=%d, refcnt before clear=%lu", fd, uio_refcnt(exeio));
-    self->uiotab[fd] = 0;
+    exeio = self->iotab[fd];
+    self->iotab[fd] = NULL;
 
     return process_exec(exeio, argc, argv);
 }
 
-/**
- * @brief Forks a new child process using process_fork
- * @param tfr pointer to the trap frame
- * @return result of process_fork
- */
-
-int sysfork(const struct trap_frame *tfr)
-{
+int sysfork(const struct trap_frame * tfr) {
     trace("%s()", __func__);
     return process_fork(tfr);
 }
 
-/**
- * @brief Sleeps till a specified child process completes
- * @details Calls thread_join with the thread id the process wishes to wait for
- * @param tid thread_id
- * @return result of thread_join else invalid on invalid thread id
- */
-
-int syswait(int tid)
-{
+int syswait(int tid) {
     trace("%s(%d)", __func__, tid);
 
     if (0 <= tid)
-        return thread_join(tid);
+        return join_thread(tid);
     else
         return -EINVAL;
 }
 
-/**
- * @brief Prints to console via kprintf
- * @details Validates that msg string is valid via validate_vstr and pages are mapped, calls kprintf
- * on current running process
- * @param msg string msg in userspace
- * @return 0 on sucess else error from validate_vstr
- */
-
-int sysprint(const char *msg)
-{
+int sysprint(const char *msg) {
     int result;
 
-    trace("%s(msg=%p)", __func__, msg);
+    trace("%s(%p)", __func__, msg);
 
     result = validate_vstr(msg, PTE_U);
+
     if (result != 0)
         return result;
+
+    trace("%s(\"%s\")", __func__, msg);
 
     kprintf("<%s:%d> %s\n",
             thread_name(running_thread()), running_thread(), msg);
@@ -221,396 +189,302 @@ int sysprint(const char *msg)
     return 0;
 }
 
-/**
- * @brief Sleeps process till specificed amount of time has passed
- * @details Creates alarm struct, inits struct with name usleep, which sets the current time via the
- * rd_time() function, taking values from the csr, makes frequency calcuation to determine us has
- * passed before waking process
- * @param us time in us for process to sleep
- * @return 0
- */
-
-int sysusleep(unsigned long us)
-{
-    struct alarm alarm;
-
-    alarm_init(&alarm, "usleep");
-    alarm_sleep_us(&alarm, us);
+int sysusleep(unsigned long us) {
+    sleep_us(us);
     return 0;
 }
 
-/**
- * @brief Creates a new file in the filesystem specified by the path.
- * @details Validates and parses the user provided path for mountpoint name, file name and calls
- * create_file.
- * @param path User provided path string.
- * @return 0 on success, negative error code if error on error.
- */
-
-int sysfscreate(const char *path)
-{
-    int result = validate_vstr(path, PTE_U);
-    char *mpname;
-    char *flname;
-    char *cppath;
-
-    if (result != 0)
-        return result;
-
-    cppath = kcalloc(1, strlen(path) + 1);
-    strncpy(cppath, path, strlen(path));
-    result = parse_path(cppath, &mpname, &flname);
-
-    if (result == 0)
-        result = create_file(mpname, flname);
-
-    kfree(cppath);
-    return result;
-}
-
-/**
- * @brief Deletes a file in the filesystem specified by the path.
- * @details Validates and parses the user provided path for mountpoint name, file name and calls
- * delete_file.
- * @param path User provided path string.
- * @return 0 on success, negative error code if error on error.
- */
-
-int sysfsdelete(const char *path)
-{
-    int result = validate_vstr(path, PTE_U);
-    char *mpname;
-    char *flname;
-    char *cppath;
-
-    if (result != 0)
-        return result;
-
-    cppath = kcalloc(1, strlen(path) + 1);
-    strncpy(cppath, path, strlen(path));
-    result = parse_path(cppath, &mpname, &flname);
-
-    if (result == 0)
-        result = delete_file(mpname, flname);
-
-    kfree(cppath);
-    return result;
-}
-
-/**
- * @brief Opens a file or device of specified fd for given process
- * @details gets current process, allocates file descriptor (if fd = -1) or uses valid file
- * descriptor given, validates and parses user provided path, calls open_file
- * @param fd file descriptor number
- * @param path User provided path string
- * @return fd number if sucessful else return error that occured -EMFILE or -EBADFD
- */
-
-int sysopen(int fd, const char *path)
-{
-    struct process *proc;
-    struct uio *uio;
+int syscreate(const char *path) {
+    size_t pathlen;
+    char * pathbuf;
+    char * mpname;
+    char * flname;
     int result;
-    char *mpname;
-    char *flname;
-    char *cppath;
 
-    trace("%s(fd=%d,path=%s)", __func__, fd, path);
-
-    if (PROCESS_IOMAX <= fd)
-        return -EBADFD;
-
-    proc = current_process();
-
-    if (fd < 0)
-    {
-        fd = 0;
-        while (fd < PROCESS_IOMAX)
-            if (proc->uiotab[fd] == NULL)
-                goto sysopen_fd_ok;
-            else
-                fd += 1;
-        return -EMFILE;
-    }
-    else if (proc->uiotab[fd] != NULL)
-        return -EBADFD;
-
-sysopen_fd_ok:
+   if (path == NULL)
+        return -EINVAL;
+    
+    trace("%s(%p)", __func__, path);
 
     result = validate_vstr(path, PTE_U);
 
     if (result != 0)
         return result;
 
-    cppath = kcalloc(1, strlen(path) + 1);
-    strncpy(cppath, path, strlen(path));
-    result = parse_path(cppath, &mpname, &flname);
+    // Print trace statement again with path string
+
+    trace("%s(\"%s\")", __func__, path);
+
+    pathlen = strlen(path);
+
+    if (pathlen == 0 || PATH_MAX < pathlen)
+        return -EINVAL;
+    
+    pathbuf = kmalloc(pathlen+1);
+    memcpy(pathbuf, path, pathlen+1);
+    parse_path(pathbuf, &mpname, &flname);
+
+    if (*mpname == '\0')
+        result = -EINVAL;
 
     if (result == 0)
-        result = open_file(mpname, flname, &uio);
+        result = create_file(mpname, flname);
+
+    kfree(pathbuf);
+    return result;
+}
+
+int sysdelete(const char * path) {
+    size_t pathlen;
+    char * pathbuf;
+    char * mpname;
+    char * flname;
+    int result;
+
+    if (path == NULL)
+        return -EINVAL;
+    
+    trace("%s(%p)", __func__, path);
+
+    result = validate_vstr(path, PTE_U);
+
+    if (result != 0)
+        return result;
+
+    // Print trace statement again with path string
+
+    trace("%s(\"%s\")", __func__, path);
+
+    pathlen = strlen(path);
+
+    if (pathlen == 0 || PATH_MAX < pathlen)
+        return -EINVAL;
+    
+    pathbuf = kmalloc(pathlen+1);
+    memcpy(pathbuf, path, pathlen+1);
+    parse_path(pathbuf, &mpname, &flname);
+
+    if (*mpname == '\0')
+        result = -EINVAL;
 
     if (result == 0)
-        proc->uiotab[fd] = uio;
+        result = delete_file(mpname, flname);
 
-    kfree(cppath);
+    kfree(pathbuf);
+    return result;
+}
+
+int sysopen(int fd, const char * path) {
+    struct process * self;
+    size_t pathlen;
+    char * pathbuf;
+    char * mpname;
+    char * flname;
+    struct io * io;
+    int result;
+
+    if (path == NULL)
+        return -EINVAL;
+    
+    trace("%s(%d,%p)", __func__, fd, path);
+
+    result = validate_vstr(path, PTE_U);
+
+    if (result != 0)
+        return result;
+
+    // Print trace statement again with path string
+
+    trace("%s(%d,\"%s\")", __func__, fd, path);
+
+    self = current_process();
+
+    fd = allocfd(self, fd, -1);
+
+    if (fd < 0)
+        return fd;
+
+    pathlen = strlen(path);
+
+    if (pathlen == 0 || PATH_MAX < pathlen)
+        return -EINVAL;
+    
+    pathbuf = kmalloc(pathlen+1);
+    memcpy(pathbuf, path, pathlen+1);
+    parse_path(pathbuf, &mpname, &flname);
+
+    if (*mpname == '\0')
+        result = -EINVAL;
+
+    if (result == 0)
+        result = open_file(mpname, flname, &io);
+
+    if (result == 0)
+        self->iotab[fd] = io;
+
+    kfree(pathbuf);
     return (result != 0) ? result : fd;
 }
 
-/**
- * @brief Closes file or device of specified fd for given process
- * @details gets current process, calls close function of the io, deallocates the file descriptor
- * @param fd file descriptor
- * @return 0 on success, error on invalid file descriptor or empty file descriptor
- */
-
-int sysclose(int fd)
-{
-    struct process *self;
+int sysclose(int fd) {
+    struct process * self;
 
     trace("%s(%d)", __func__, fd);
 
-    if (fd < 0 || PROCESS_IOMAX <= fd)
-        return -EBADFD;
+    if (fd < 0 || PROC_IOMAX <= fd)
+        return -EBADF;
 
     self = current_process();
 
-    if (self->uiotab[fd] == NULL)
-        return -EBADFD;
+    if (self->iotab[fd] == NULL)
+        return -EBADF;
 
-    uio_close(self->uiotab[fd]);
-    self->uiotab[fd] = NULL;
+    iodropref(self->iotab[fd]);
+    self->iotab[fd] = NULL;
     return 0;
 }
 
-/**
- * @brief Calls read function of file io on given buffer
- * @details get current process, valid file descriptor checks, find io struct via file descriptor,
- * validate buffer, call ioread with given buffer
- * @param fd file descriptor number
- * @param buf pointer to buffer
- * @param bufsz number of bytes to be read
- * @return number of bytes read
- */
-
-long sysread(int fd, void *buf, size_t bufsz)
-{
-    struct process *self;
-    int validate_result;
+long sysread(int fd, void * buf, size_t bufsz) {
+    struct process * self;
+    int result;
 
     trace("%s(%d,%p,%zu)", __func__, fd, buf, bufsz);
 
-    if (fd < 0 || PROCESS_IOMAX <= fd)
-        return -EBADFD;
+    if (fd < 0 || PROC_IOMAX <= fd)
+        return -EBADF;
 
     self = current_process();
 
-    if (self->uiotab[fd] == NULL)
-        return -EBADFD;
+    if (self->iotab[fd] == NULL)
+        return -EBADF;
 
     // Ensure memory region is user-writable
 
-    validate_result = validate_vptr(buf, bufsz, PTE_W | PTE_U);
+    result = validate_vptr(buf, bufsz, PTE_W | PTE_U);
 
-    if (validate_result != 0)
-        return validate_result;
+    if (result != 0)
+        return result;
 
-    return uio_read(self->uiotab[fd], buf, bufsz);
+    return ioread(self->iotab[fd], buf, bufsz);
 }
 
-/**
- * @brief Calls write function of file io on given buffer
- * @details get current process, valid file descriptor checks, find io struct via file descriptor,
- * validate buffer, call iowrite with given buffer
- * @param fd file descriptor number
- * @param buf pointer to buffer
- * @param len number of bytes to be written
- * @return number of bytes written
- */
-
-long syswrite(int fd, const void *buf, size_t len)
-{
-    struct process *self;
+long syswrite(int fd, const void *buf, size_t len) {
+    struct process * self;
     int result;
 
     trace("%s(%d,%p,%zu)", __func__, fd, buf, len);
 
-    if (fd < 0 || PROCESS_IOMAX <= fd)
-        return -EBADFD;
+    if (fd < 0 || PROC_IOMAX <= fd)
+        return -EBADF;
 
     self = current_process();
 
-    if (self->uiotab[fd] == NULL)
-        return -EBADFD;
+    if (self->iotab[fd] == NULL)
+        return -EBADF;
 
-    // Ensure memory region is user-writable
+    // Ensure memory region is user-readable
 
     result = validate_vptr(buf, len, PTE_R | PTE_U);
 
     if (result != 0)
         return result;
 
-    return uio_write(self->uiotab[fd], buf, len);
+    return iowrite(self->iotab[fd], buf, len);
 }
 
-/**
- * @brief Calls device input output commands for a given device instance
- * @details get current process, valid file descriptor checks, find io struct via file descriptor,
- * ensure that fcntl type exists, validate argument pointer, issue fcntl
- * @param fd file descriptor number
- * @param cmd selection of fcntl
- * @param arg pointer to arguments
- * @return number of bytes written
- */
+int sysioctl(int fd, int op, uintptr_t arg_uma) {
+    struct process * self;
 
-int sysfcntl(int fd, int cmd, void *arg)
-{
-    static const struct
-    {
-        uint8_t size;  ///< size of argument
-        uint8_t flags; ///< permissions
-    } argdef[] = {     ///< definition of arguments for each ioctal
-                  [FCNTL_GETPOS] = {sizeof(unsigned long long), PTE_W},
-                  [FCNTL_SETPOS] = {sizeof(unsigned long long), PTE_R},
-                  [FCNTL_GETEND] = {sizeof(unsigned long long), PTE_W},
-                  [FCNTL_SETEND] = {sizeof(unsigned long long), PTE_R},
-                  [FCNTL_MMAP] = {sizeof(unsigned long long), PTE_W}};
+    trace("%s(%d,%d,%p)", __func__, fd, op, arg);
 
-    struct process *self;
-    int result;
-
-    trace("%s(%d,%d,%p)", __func__, fd, cmd, arg);
-
-    if (fd < 0 || PROCESS_IOMAX <= fd)
-        return -EBADFD;
+    if (fd < 0 || PROC_IOMAX <= fd)
+        return -EBADF;
 
     self = current_process();
 
-    if (self->uiotab[fd] == NULL)
-        return -EBADFD;
+    if (self->iotab[fd] == NULL)
+        return -EBADF;
 
-    // Negative command values means the driver validates the argument. Positive
-    // command values are checked here so make drivers simpler.
+    return ioctl_u(self->iotab[fd], op, arg_uma);
+}
 
-    if (cmd < 0)
-        return uio_cntl(self->uiotab[fd], cmd, arg);
+int syspipe(int * wfdptr, int * rfdptr) {
+    struct process * self;
+    int wfd, rfd;
+    int result;
 
-    // Check if we know the fcntl type
-    if (sizeof(argdef) / sizeof(argdef[0]) <= cmd)
-        return -ENOTSUP;
+    trace("%s(wfd=%d,rfd=%d)", __func__, wfd, rfd);
 
-    // Check if the argument pointer has the right access
+    // Ensure memory region is user-writable
 
-    result = validate_vptr(
-        arg, argdef[cmd].size, argdef[cmd].flags | PTE_U);
+    result = validate_vptr(wfdptr, sizeof(int), PTE_W | PTE_U);
 
     if (result != 0)
         return result;
 
-    // Issue the fcntl
+    result = validate_vptr(rfdptr, sizeof(int), PTE_W | PTE_U);
 
-    return uio_cntl(self->uiotab[fd], cmd, arg);
-}
-
-/**
- * @brief Creates a pipe for the current process
- * @details The function retrieves the current process. If either the write or read descriptor
- * pointer stores a negative value, an unused descriptor is assigned. If both file descriptors are
- * unused and valid, the function connects them via create_pipe function.
- * @param wfdptr pointer to write file descriptor
- * @param rfdptr pointer to read file descriptor
- * @return 0 on success. Else, negative error code on invalid file descriptor, or if a file
- * descriptor is already in use, or if no descriptors are found available.
- */
-int syspipe(int *wfdptr, int *rfdptr)
-{
-    struct process *self;
-
-    trace("%s(wfd=%d,rfd=%d)", __func__, *wfdptr, *rfdptr);
-
-    if (PROCESS_IOMAX <= *wfdptr)
-        return -EBADFD;
-
-    if (PROCESS_IOMAX <= *rfdptr)
-        return -EBADFD;
-
+    if (result != 0)
+        return result;
+    
     self = current_process();
 
-    if (*wfdptr < 0)
-    {
-        *wfdptr = 0;
-        while (*wfdptr < PROCESS_IOMAX)
-            if (self->uiotab[*wfdptr] == NULL)
-                goto syspipeopen_wfd_ok;
-            else
-                *wfdptr += 1;
-        return -EMFILE;
-    }
-    else if (self->uiotab[*wfdptr] != NULL)
-        return -EBADFD;
+    // Find two free file descriptor slots
 
-syspipeopen_wfd_ok:
+    wfd = allocfd(self, /* reqfd */ -1, /* notfd */ -1);
 
-    if (*rfdptr < 0)
-    {
-        *rfdptr = 0;
-        while (*rfdptr < PROCESS_IOMAX)
-            if (self->uiotab[*rfdptr] == NULL && *rfdptr != *wfdptr)
-                goto syspipeopen_rfd_ok;
-            else
-                *rfdptr += 1;
-        return -EMFILE;
-    }
-    else if (self->uiotab[*rfdptr] != NULL && *rfdptr != *wfdptr)
-        return -EBADFD;
+    if (wfd < 0)
+        return wfd;
+    
+    rfd = allocfd(self, /* reqfd */ -1, /* notfd */ wfd);
 
-syspipeopen_rfd_ok:
+    if (rfd < 0)
+        return rfd;
 
-    create_pipe(&self->uiotab[*wfdptr], &self->uiotab[*rfdptr]);
-    return 0;
+    *wfdptr = wfd;
+    *rfdptr = rfd;
+
+    create_iopipe(&self->iotab[wfd], &self->iotab[rfd]);
 }
 
-/**
- * @brief Duplicates a file description
- * @details Allocates a new file descriptor that refers to the same open _uio_ as the descriptor
- * _oldfd_. Increments the _refcnt_ if successful.
- * @param oldfd old file descriptor number
- * @param newfd new file descriptor number
- * @return fd number if sucessful else return error on invalid file descriptor or empty file
- * descriptor
- */
-
-int sysuiodup(int oldfd, int newfd)
-{
+int sysiodup(int oldfd, int newfd) {
     struct process *self;
+
     trace("%s(oldfd=%d,newfd=%d)", __func__, oldfd, newfd);
 
-    if (oldfd < 0 || PROCESS_IOMAX <= oldfd)
-        return -EBADFD;
+    if (oldfd < 0 || PROC_IOMAX <= oldfd)
+        return -EBADF;
 
-    if (PROCESS_IOMAX <= newfd)
-        return -EBADFD;
+    if (PROC_IOMAX <= newfd)
+        return -EBADF;
 
     self = current_process();
 
-    if (self->uiotab[oldfd] == NULL)
-        return -EBADFD;
+    if (self->iotab[oldfd] == NULL)
+        return -EBADF;
 
-    if (newfd < 0)
-    {
-        newfd = 0;
-        while (newfd < PROCESS_IOMAX)
-            if (self->uiotab[newfd] == NULL)
-                goto sysdup_fd_ok;
-            else
-                newfd += 1;
-        return -EMFILE;
-    }
-    else if (self->uiotab[newfd] != NULL)
-        return -EBADFD;
+    newfd = allocfd(self, newfd, oldfd);
 
-sysdup_fd_ok:
-
-    uio_addref(self->uiotab[oldfd]);
-    self->uiotab[newfd] = self->uiotab[oldfd];
+    self->iotab[newfd] = ioaddref(self->iotab[oldfd]);
     return newfd;
+}
+
+int allocfd(struct process * proc, int reqfd, int notfd) {
+    int fd;
+
+    assert (proc != NULL);
+
+    if (0 <= reqfd) {
+        if (reqfd != notfd && proc->iotab[reqfd] == NULL)
+            return reqfd;
+        else
+            return -EBADF;
+    }
+
+    for (fd = 0; fd < PROC_IOMAX; fd++) {
+        if (fd != notfd && proc->iotab[fd] == NULL)
+            return fd;
+    }
+
+    return -EMFILE;
 }

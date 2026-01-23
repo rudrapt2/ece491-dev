@@ -1,8 +1,8 @@
-/*! @file intr.c
-    @brief Interrupt management
-    @copyright Copyright (c) 2024-2025 University of Illinois
-
-*/
+// intr.c - Interrupt manager
+//
+// Copyright (c) 2024-2026 University of Illinois
+// SPDX-License-identifier: NCSA
+//
 
 #ifdef INTR_TRACE
 #define TRACE
@@ -18,7 +18,6 @@
 
 #include "conf.h"
 #include "misc.h"
-#include "plic.h"
 #include "riscv.h"
 #include "thread.h"
 #include "timer.h"
@@ -35,8 +34,8 @@ char intrmgr_initialized = 0;
 
 static struct {
     void (*isr)(int, void*);
-    void* isr_aux;
-} isrtab[NIRQ];
+    void* israux;
+} isrtab[INTR_SRC_CNT];
 
 // INTERNAL FUNCTION DECLARATIONS
 //
@@ -47,37 +46,38 @@ static void handle_extern_interrupt(void);
 // EXPORTED FUNCTION DEFINITIONS
 //
 
-/**
- * @brief initializes interrupt manager
- * @return void
- */
 void intrmgr_init(void) {
     trace("%s()", __func__);
 
-    disable_interrupts();  // should not be enabled yet
-    plic_init();
+    disable_interrupts();
+    
+    assert (plic_initialized);
 
-    // Enable timer and external interrupts
-    csrw_sie(RISCV_SIE_SEIE | RISCV_SIE_STIE);
+    // Enable external interrupts. The timer module controls the sie.STIE bit.
+
+    csrw_sie(RISCV_SIE_SEIE);
 
     intrmgr_initialized = 1;
 }
 
 void enable_intr_source (
-    int srcno, int prio, void (*isr)(int srcno, void* aux), void* isr_aux)
+    int srcno,
+    int prio,
+    void (*isr)(int srcno, void* aux),
+    void* israux)
 {
     assert(0 < srcno && srcno < NIRQ);
     assert(0 < prio);
 
     isrtab[srcno].isr = isr;
-    isrtab[srcno].isr_aux = isr_aux;
+    isrtab[srcno].israux = israux;
     plic_enable_source(srcno, prio);
 }
 
 void disable_intr_source(int srcno) {
     plic_disable_source(srcno);
     isrtab[srcno].isr = NULL;
-    isrtab[srcno].isr_aux = NULL;
+    isrtab[srcno].israux = NULL;
 }
 
 void handle_smode_interrupt(unsigned int cause) {
@@ -86,12 +86,36 @@ void handle_smode_interrupt(unsigned int cause) {
 }
 
 void handle_umode_interrupt(unsigned int cause) {
+#ifdef STUDENT
+    // (your MP3cp2 code here)
+#else
     // called from trap.s
     handle_interrupt(cause);
-
+#ifndef MP2
     enable_interrupts();
+    submit_running_thread();
+#endif // MP2
+#endif // STUDENT
+}
 
-    running_thread_submit();
+extern long enable_interrupts(void) {
+    return csrrsi_sstatus_SIE();
+}
+
+extern long disable_interrupts(void) {
+    return csrrci_sstatus_SIE();
+}
+
+extern void restore_interrupts(int prev_status) {
+    csrwi_sstatus_SIE(prev_status);
+}
+
+extern int interrupts_enabled(void) {
+    return ((csrr_sstatus() & RISCV_SSTATUS_SIE) != 0);
+}
+
+extern int interrupts_disabled(void) {
+    return ((csrr_sstatus() & RISCV_SSTATUS_SIE) == 0);
 }
 
 // INTERNAL FUNCTION DEFINITIONS
@@ -115,13 +139,15 @@ void handle_extern_interrupt(void) {
     int srcno;
 
     srcno = plic_claim_interrupt();
-    assert(0 <= srcno && srcno < NIRQ);
+    assert (0 <= srcno && srcno < NIRQ);
 
-    if (srcno == 0) return;
+    if (srcno == 0)
+        return;
 
-    if (isrtab[srcno].isr == NULL) panic(NULL);
+    if (isrtab[srcno].isr == NULL)
+        panic("Interrupt without ISR");
 
-    isrtab[srcno].isr(srcno, isrtab[srcno].isr_aux);
+    isrtab[srcno].isr(srcno, isrtab[srcno].israux);
 
     plic_finish_interrupt(srcno);
 }

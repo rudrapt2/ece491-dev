@@ -11,7 +11,6 @@
 #include "thread.h"
 #include "string.h"
 #include "console.h"
-#include "devimpl.h"
 #include "memory.h"
 #include "assert.h"
 
@@ -207,11 +206,10 @@ struct viogpu_device {
 };
 
 
-static int  viogpu_open (struct video *vid, int mode, void **fbptr);
-static void viogpu_close(struct video *vid);
-static void viogpu_isr  (int irqno, void *aux);
-static void viogpu_flush(struct video *vid);
-static int  viogpu_cntl (struct video *vid, int op, void *arg);
+static int  viogpu_open(struct video * vid, int mode, void ** fbptr);
+static void viogpu_flush(struct video * vid);
+static void viogpu_close(struct video * vid);
+static void viogpu_isr(int irqno, void * aux);
 
 static int viogpu_create_resource_2d (struct viogpu_device * viogpu);
 static int viogpu_attach_backing     (struct viogpu_device * viogpu);

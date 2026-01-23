@@ -1,9 +1,9 @@
-/*! @file string.c
-    @brief String and memory functions   
-    @copyright Copyright (c) 2024-2025 University of Illinois
-    @license SPDX-License-identifier: NCSA
+// string.c - String and memory functions
+//
+// Copyright (c) 2026 University of Illinois
+// SPDX-License-identifier: NCSA
+//
 
-*/
 
 #include "string.h"
 #include "console.h"
@@ -88,7 +88,7 @@ size_t strlen(const char * s) {
     return (p - s);
 }
 
-char * strncpy(char *dst, const char *src, size_t n) {
+char * strncpy(char * dst, const char * src, size_t n) {
     char * orig_dst = dst;
 
     while (n != 0 && *src != '\0') {
@@ -102,6 +102,15 @@ char * strncpy(char *dst, const char *src, size_t n) {
     }
     
     return orig_dst;
+}
+
+char * strlcpy(char * dst, const char * src, size_t n) {
+    if (n != 0) {
+        strncpy(dst, src, n);
+        dst[n-1] = '\0';
+    }
+    
+    return dst;
 }
 
 char * strchr(const char * s, int c) {
@@ -139,7 +148,7 @@ void * memset(void * s, int c, size_t n) {
 
 void * memcpy(void * restrict dst, const void * restrict src, size_t n) {
     const char * q = src;
-    char *p = dst;
+    char * p = dst;
     while (n != 0) {
         *p = *q;
         p += 1;
@@ -165,7 +174,7 @@ int memcmp(const void * p1, const void * p2, size_t n) {
     return 0;
 }
 
-unsigned long strtoul(const char * str, char ** endptr, int base) {
+unsigned long strtoul(const char * str, char * * endptr, int base) {
     unsigned long val = 0;
     int neg = 0;
     char c;
@@ -222,16 +231,19 @@ size_t vsnprintf(char * buf, size_t bufsz, const char * fmt, va_list ap) {
     struct vsnprintf_state state;
     size_t n;
 
-    state.pos = buf;
-    state.rem = bufsz;
+    if (bufsz != 0) {
+        state.pos = buf;
+        state.rem = bufsz-1;
+    } else {
+        state.pos = NULL;
+        state.rem = 0;
+    }
 
     n = vgprintf(vsnprintf_putc, &state, fmt, ap);
 
-    if (state.rem != 0) {
+    if (bufsz != 0)
         *state.pos = '\0';
-        n += 1;
-    }
-
+    
     return n;
 }
 
@@ -336,7 +348,7 @@ size_t vgprintf (
                 break;
             
             case 's':
-                nout += format_str(putcfn, aux, va_arg(ap, char *), len);
+                nout += format_str(putcfn, aux, va_arg(ap, char * ), len);
                 break;
             
             case 'c':
@@ -381,12 +393,11 @@ size_t vgprintf (
 void vsnprintf_putc(char c, void * aux) {
     struct vsnprintf_state * state = aux;
 
-    if (state->rem <= 1)
-        return;
-
-    *state->pos = c;
-    state->pos += 1;
-    state->rem -= 1;
+    if (state->rem != 0) {
+        *state->pos = c;
+        state->pos += 1;
+        state->rem -= 1;
+    }
 }
 
 size_t format_int (
