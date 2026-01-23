@@ -5,6 +5,17 @@
 #include "../heap.h"
 #include "../uio.h"
 
+unsigned long long rand_state;
+
+// helper functions
+static unsigned long long rand(void) {
+    rand_state *= 25214903917UL;
+    rand_state += 11;
+    return (rand_state >> 12);
+}
+
+// test cases
+
 void test_malloc(int argc, char * argv[]) {
     char* arr;
     int dev_fd;
@@ -300,20 +311,226 @@ void test_set_end(int argc, char * argv[]) {
     }
 }
 
+void test_write_multi(int argc, char * argv[]) {
+    int num_iters, write_size, num_uios;
+    char path[26];
+    int * fds;
+    int result;
+    char* mp = "/c/";
+    char* buffer;
+    char c = 0;
+    int fd_idx = 0;
+
+    if (argc < 4) {
+        printf("USAGE: %s [NUM_ITERS] [NUM_UIOS] [WRITE_SIZE] [MOUNTPOINT (c)]\n", argv[0]);
+        return;
+    }
+
+    num_iters = strtoul(argv[1], NULL, 10);
+    num_uios = strtoul(argv[2], NULL, 10);
+    write_size = strtoul(argv[3], NULL, 10);
+
+    if (argc >= 5)
+        mp = argv[4];
+
+    snprintf(path, 26, "%stestfile", mp);
+    _fsdelete(path);
+    result = _fscreate(path);
+    if (result < 0) {
+        printf("Failed to create %s (%s)\n", path, error_name(result));
+        return;
+    }
+
+    fds = calloc(num_uios, sizeof(int));
+
+    fds[0] = _open(-1, path);
+    if (fds[0] < 0) {
+        printf("Failed to open %s (%s)\n", path, error_name(fds[0]));
+        return;        
+    }
+
+    for (int i = 1; i < num_uios; i++) {
+        fds[i] = _uiodup(fds[0], -1);
+        if (fds[0] < 0) {
+            printf("Failed dup %d (%s)\n", i, error_name(fds[i]));
+            return;        
+        }
+    }
+
+    buffer = calloc(1, write_size);
+
+    for (int i = 0; i < num_iters; i++) {
+        for (int j = 0; j < write_size; j++)
+            buffer[j] = c++;
+        result = _write(fds[fd_idx], buffer, write_size);
+
+        if (result < 0) {
+            printf("Failed write at iteration %d, fd=%d (%s)\n", i, fd_idx, error_name(result));
+            return;
+        }
+
+        if (result < write_size) {
+            printf("Failed full write at iteration %d, fd=%d (wrote %d bytes)\n", i, fd_idx, result);
+            return;
+        }
+
+        fd_idx = (fd_idx+1) % num_uios;
+    }
+
+    dprintf(STDOUT, "SUCCESS: wrote %d bytes with %d uios\n", num_iters*write_size, num_uios);
+}
+
+void test_read_multi(int argc, char * argv[]) {
+    int num_iters, read_size, num_uios;
+    char path[26];
+    int * fds;
+    int result;
+    char* mp = "/c/";
+    char* buffer;
+    char c = 0;
+    int fd_idx = 0;
+
+    if (argc < 4) {
+        printf("USAGE: %s [NUM_ITERS] [NUM_UIOS] [READ_SIZE] [MOUNTPOINT (c)]\n", argv[0]);
+        return;
+    }
+
+    num_iters = strtoul(argv[1], NULL, 10);
+    num_uios = strtoul(argv[2], NULL, 10);
+    read_size = strtoul(argv[3], NULL, 10);
+
+    if (argc >= 5)
+        mp = argv[4];
+
+    snprintf(path, 26, "%stestfile", mp);
+
+    fds = calloc(num_uios, sizeof(int));
+
+    fds[0] = _open(-1, path);
+    if (fds[0] < 0) {
+        printf("Failed to open %s (%s)\n", path, error_name(fds[0]));
+        return;        
+    }
+
+    for (int i = 1; i < num_uios; i++) {
+        fds[i] = _uiodup(fds[0], -1);
+        if (fds[0] < 0) {
+            printf("Failed dup %d (%s)\n", i, error_name(fds[i]));
+            return;        
+        }
+    }
+
+    buffer = calloc(1, read_size);
+
+    for (int i = 0; i < num_iters; i++) {
+        result = _read(fds[fd_idx], buffer, read_size);
+
+        if (result < 0) {
+            printf("Failed read at iteration %d, fd=%d (%s)\n", i, fd_idx, error_name(result));
+            return;
+        }
+
+        if (result < read_size) {
+            printf("Failed full read at iteration %d, fd=%d (read %d bytes)\n", i, fd_idx, result);
+            return;
+        }
+
+        for (int j = 0; j < read_size; j++) {
+            if (c++ != buffer[j]) {
+                printf("Read incorrect value at iteration %d\n", i);
+                return;
+            }
+        }
+        fd_idx = (fd_idx+1) % num_uios;
+    }
+
+    dprintf(STDOUT, "SUCCESS: read %d bytes with %d uios\n", num_iters*read_size, num_uios);
+}
+
+void test_race(int argc, char * argv[]) {
+    int num_iters, num_forks;
+    int fd, result;
+    char path[26];
+    char* mp = "/c/";
+    int proc_idx = 0;
+    char c;
+
+    if (argc < 3) {
+        printf("USAGE: %s [NUM_FORKS] [NUM_ITERS] [MOUNTPOINT (c)]\n", argv[0]);
+        return;
+    }
+
+    num_forks = strtoul(argv[1], NULL, 10);
+    num_iters = strtoul(argv[2], NULL, 10);
+
+    if (argc >= 4)
+        mp = argv[3];
+
+    snprintf(path, 26, "%stestfile", mp);
+    _fsdelete(path);
+    result = _fscreate(path);
+    if (result < 0) {
+        printf("Failed to create %s (%s)\n", path, error_name(result));
+        return;
+    }
+
+    for (int i = 0; i < num_forks; i++) {
+        proc_idx *= 2;
+        if (_fork() > 0) proc_idx++;
+    }
+
+    rand_state = proc_idx;
+
+    fd = _open(-1, path);
+    if (fd < 0) {
+        printf("proc%d failed to open %s (%s)\n", proc_idx, path, error_name(fd));
+        return;
+    }
+
+    dprintf(STDOUT, "proc%d initialized\n", proc_idx);
+
+    for (int i = 0; i < num_iters; i++) {
+        switch (rand() % 2) {
+            case 0: // read
+                result = _read(fd, &c, sizeof(c));
+                if (result < 0) 
+                    printf("proc%d failed to read (%s)\n", proc_idx, error_name(result));
+                if (result == 0)
+                    printf("proc%d read 0 bytes\n", proc_idx);
+                else
+                    printf("proc%d read %c\n", proc_idx, c);
+                continue;
+            case 1: // write
+                c = '0' + proc_idx;
+                result = _write(fd, &c, sizeof(c));
+                if (result < 0) 
+                    printf("proc%d failed to write (%s)\n", proc_idx, error_name(result));
+                if (result == 0)
+                    printf("proc%d wrote 0 bytes\n", proc_idx);
+                else
+                    printf("proc%d wrote %c\n", proc_idx, c);
+                continue;
+        }
+    }
+}
+
 struct testcase {
     const char * name;
     void (*main)(int argc, char * argv[]);
 };
 
 const struct testcase testcases[] = {
-    {.name="malloc",    .main=test_malloc},
-    {.name="create",    .main=test_create},
-    {.name="write",     .main=test_write},
-    {.name="read",      .main=test_read},
-    {.name="delete",    .main=test_delete},
-    {.name="write_long",.main=test_write_long},
-    {.name="read_long", .main=test_read_long},
-    {.name="set_end",   .main=test_set_end},
+    {.name="malloc",        .main=test_malloc},
+    {.name="create",        .main=test_create},
+    {.name="write",         .main=test_write},
+    {.name="read",          .main=test_read},
+    {.name="delete",        .main=test_delete},
+    {.name="write_long",    .main=test_write_long},
+    {.name="read_long",     .main=test_read_long},
+    {.name="set_end",       .main=test_set_end},
+    {.name="write_multi",   .main=test_write_multi},
+    {.name="read_multi",    .main=test_read_multi},
+    {.name="race",          .main=test_race},
 };
 
 void main (int argc, char* argv[]) {

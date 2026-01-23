@@ -192,11 +192,11 @@ int process_fork(const struct trap_frame * tfr) {
 
     condition_init(&done, "fork_child_done");
     ctid = spawn_thread("fork_child", (void*)&fork_func, &done, tfr);
-    thread_attach_process(ctid, child);
 
     if (ctid < 0)
         return ctid;
     
+    thread_attach_process(ctid, child);
     condition_wait(&done);
 
     return ctid;
