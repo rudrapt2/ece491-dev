@@ -171,14 +171,13 @@ int uart_open(struct io ** ioptr, void * aux) {
     rbuf_init(&uart->rxbuf);
     rbuf_init(&uart->txbuf);
 
-    // Read receive buffer register to flush any stale data in hardware buffer
+    // Read RBR to flush any stale data in hardware buffer
 
     uart->regs->rbr; // forces a read because uart->regs is volatile
 
     // Enable interrupts when data ready (DR) status asserted
 
     uart->regs->ier = IER_DRIE;
-
     enable_intr_source(uart->irqno, UART_INTR_PRIO, uart_isr, uart);
 
     *ioptr = ioaddref(&uart->io);

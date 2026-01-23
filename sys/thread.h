@@ -28,8 +28,10 @@ extern void thrmgr_init(void);
 // On return thrmgr_init() guarantees:
 // - /thrmgr_initialized/ is set to 1.
 //
-// * This function must be called once at system initialization time before any
-//   other functions declared in thread.h.
+// * This function must be called once at system initialization time with
+//   interrupts disabled before any other functions declared in thread.h.
+// * This function may allocate memory from the heap.
+// * this function may allocate physical memory pages.
 //
 // See spawn_thread().
 
@@ -37,6 +39,7 @@ extern void thrmgr_init(void);
 extern int running_thread(void);
 
 // Returns the TID if the current (calling) thread.
+//
 
 
 extern int spawn_thread (
@@ -45,11 +48,16 @@ extern int spawn_thread (
     ...);
 
 // Creates a new thread and adds it to the ready list. The name of the spawned
-// thead is given by /name/, which must be either a pointer to a null-terminated
-// string or NULL. If NULL, the thread name is implementation-defined.
-// Otherwise, if /name/ is not NULL, it must be a pointer to to a
-// null-terminated string that remains unchanged during the lifetime of the
-// thread.
+// thread is given by /name/, which must be either a pointer to a
+// null-terminated string or NULL. If NULL, the thread name is
+// implementation-defined. Otherwise, if /name/ is not NULL, it must be a
+// pointer to to a null-terminated string that remains unchanged during the
+// lifetime of the thread.
+//
+#ifndef MP2
+// The spawned thread has no associated process. Use thread_attach_process() to
+// associate a process with it.
+#endif
 //
 // The new thread will start execution in /entry/, which must be a pointer to
 // executable code, when it is scheduled to run. Up to 8 optional arguments may
@@ -83,9 +91,6 @@ extern int spawn_thread (
 //            threads in system has been reached. The maximum number of threads
 //            is given by the compile-time paramter NTHR.
 //
-// In addition, spawn_thread() may call panic(), halting the system, if there is
-// insufficient memory to create a new thread.
-//
 // The calling thread may wait for the new thread to exit using join_thread().
 //
 // On entry spawn_thread() assumes:
@@ -111,7 +116,9 @@ extern int spawn_thread (
 //   than NTHR (compile-time parameter) and there is sufficient memory to
 //   allocate a thread stack and at least 256 bytes of additional memory.
 //
-// * This function may _not_ be called from an ISR.
+// * This function may allocate memory from the heap.
+// * this function may allocate memory pages from the memory manager.
+// * This function must _not_ be called from an ISR.
 //
 // See also: exit_running_thread(), join_thread().
 
@@ -127,7 +134,7 @@ extern const char * thread_name(int tid);
 // lifetime of the thread.
 //
 // On entry thread_name() assumes:
-// - /tid/ is a thread id of an existing thread.
+// - /tid/ is the TID of an existing thread.
 //
 // On return thread_name() guarantees:
 // - If the thread associated with /tid/ was created using spawn_thread() with a
@@ -135,6 +142,8 @@ extern const char * thread_name(int tid);
 // - If the thread associated with /tid/ was created using spawn_thread() with a
 //   NULL /name/ argument, the value returned is a pointer to an
 //   imlementation-defined null-terminated string.
+//
+// * This function may be called from an ISR.
 //
 // See also spawn_thread(), running_thread_name().
 
@@ -155,10 +164,11 @@ extern void submit_running_thread(void);
 // in its allocation or no other threads are runnable.
 //
 // * This function may switch to another thread context.
-// * This function may _not_ be called from an ISR.
+// * This function must _not_ be called from an ISR.
 // 
 // See also: yield_running_thread().
 #endif
+
 
 extern void yield_running_thread(void);
 
@@ -166,7 +176,7 @@ extern void yield_running_thread(void);
 // without suspending the calling thread if no other threads are runnable.
 //
 // * This function may switch to another thread context.
-// * This function may _not_ be called from an ISR.
+// * This function must _not_ be called from an ISR.
 //
 // See also: submit_running_thread().
 
@@ -192,7 +202,7 @@ extern void __attribute__ ((noreturn)) exit_running_thread(void);
 //   after the thread is joined.)
 //
 // * This function switches to another thread context.
-// * This function may _not_ be called from an ISR.
+// * This function must _not_ be called from an ISR.
 //
 // See also: join_thread().
 
@@ -218,7 +228,7 @@ extern int join_thread(int u_tid);
 // no children, join_thread() also returns -ECHILD.
 //
 // * This function may switch to another thread context.
-// * This function may _not_ be called from an ISR.
+// * This function must _not_ be called from an ISR.
 //
 // On sucessful (non-error) return join_thread() guarantees:
 // - The returned TID is is a child of the calling thread and the child has
@@ -235,17 +245,21 @@ extern struct process * thread_process(int tid);
 // associated process (kernel threads). A process may be associated with a
 // thread using thread_attach_process().
 //
-// [MP3cp2] During a context switch, the active memory space is switched to the
-// memory space of the resuming thread, if not NULL. If the resuming thread does
-// not have an associated process, the active memory space is not switched.
+// During a context switch, the active memory space is switched to the memory
+// space of the resuming thread, if not NULL. If the resuming thread does not
+// have an associated process, the active memory space is not switched.
+//
+// The returned pointer is valid for the lifetime of the thread.
 //
 // On entry thread_process() assumes:
-// - /tid/ is a TID of an existing thread.
+// - /tid/ is the TID of an existing thread.
 //
 // On return thread_process() guarantees:
 // - If the return value is NULL, the thread has no associated process.
 // - If the return value is not NULL, the returned pointer points to a process
 //   structure most recently associated with the specified process.
+//
+// * This function may be called from an ISR.
 //
 // See also: running_thread_process(), thread_attach_process(),
 // thread_detach_process(), spawn_thread().
@@ -258,6 +272,8 @@ extern struct process * running_thread_process(void);
 //
 //    thread_process(running_thread())
 //
+// * This function may be called from an ISR.
+//
 // See also: thread_process(), running_thread().
 
 
@@ -265,17 +281,17 @@ extern void thread_attach_process(int tid, struct process * proc);
 
 // Sets the process associated with a thread. The /tid/ argument specifies a
 // thread and the /proc/ argument specifies the process to associate with that
-// thread. If thread /tid/ already has an associated process, the association
-// with /proc/ replaces it. If /proc/ is NULL, any process association is
-// removed and the thread is no longer considered to be attached to a process. 
+// thread. The /proc/ argument must be a pointer to the process struct of an
+// existing process. The process must be valid for the lifetime of the thread.
 //
 // On entry thread_attach_process() assumes:
-// - /tid/ is a thread id of an existing thread.
-// - /proc/ is a pointer to the process struct of an existing process or NULL.
+// - /tid/ is the TID of an existing thread without an associated process.
+// - /proc/ is a pointer to the process struct of an existing process.
 //
 // On return thread_attach_process() guarantees:
-// - If /proc/ is NULL, thread /tid/ is no longer has an associated process.
-// - If /proc/ is not NULL, it becomes the process associated thread /tid/.
+// - /proc/ is the process associated thread /tid/.
+//
+// * This function may be called from an ISR.
 //
 // See also: thread_process().
 
@@ -301,10 +317,15 @@ extern void * running_thread_stack_anchor(void);
 // spawn_thread for spawned threads and by thrmgr_init() for the main and idle
 // threads. Because it should not be accessed anywhere else, it is defined in
 // thread.c and (implicitly) in trap.s.
+// 
+// The returned pointer is valid for the lifetime of the running thread.
+//
+// * This function may be called from an ISR.
 //
 // See also: _smode_trap_entry in trap.s, spawn_thread(), process_exec(),
 // process_fork().
 #endif // MP2
+
 
 // CONDITION VARIABLES
 //
@@ -362,6 +383,7 @@ extern void condition_init(struct condition * cond, const char * name);
 // On entry condition_init() assumes:
 // - /cond/ is a pointer to a region of memory large enough to hold an instance
 //   of a /condition/ structure.
+// - /name/ is a pointer to a null-terminated string or NULL.
 //
 // On return condition_init() guarantees:
 // - /cond/ points to an initialized instance of a condition variable.
@@ -370,6 +392,9 @@ extern void condition_init(struct condition * cond, const char * name);
 // Performance guarantees:
 // - The number of condition variables in the system is unlimited.
 // - condition_init() does not allocate memory.
+//
+// * This function may be called from an ISR provided the same condition
+//   variable is not accessed concurrently.
 //
 // See also condition_name(), condition_wait(), condition_broadcast().
 
@@ -395,6 +420,8 @@ extern const char * condition_name(const struct condition * cond);
 // - If the condition variable /cond/ was initialized with a NULL /name/
 //   argument, the value returned is a pointer to an imlementation-defined
 //   null-terminated string.
+//
+// * This function may be called from an ISR.
 //
 // See also condition_init().
 
@@ -432,7 +459,7 @@ extern void condition_wait(struct condition * cond);
 // There are _no_ guarantees on the order in which waiting threads are resumed.
 //
 // * This function may switch to another thread context.
-// * This function may _not_ be called from an ISR.
+// * This function must _not_ be called from an ISR.
 //
 // See also: condition_init(), condition_broadcast().
 
@@ -516,6 +543,7 @@ extern void rwlock_init(struct rwlock * rwlk, const char * name);
 // On entry rwlock_init() assumes:
 // - /rwlk/ is a valid pointer to a region of memory large enough to hold an
 //   instance of a /rwlock/ structure.
+// - /name/ is a pointer to a null-terminated string or NULL.
 //
 // On return rwlock_init() guarantees:
 // - /rwlk/ points to an initialized instance of an rw-lock.
@@ -524,6 +552,9 @@ extern void rwlock_init(struct rwlock * rwlk, const char * name);
 // Performance guarantees:
 // - The number of rw-locks in the system is unlimited.
 // - rwlock_init() does not allocate memory.
+//
+// * This function may be called from an ISR provided the same rw-lock is not
+//   accessed concurrently.
 //
 // See also: rwlock_name(), rwlock_acquire(), rwlock_release().
 
@@ -548,6 +579,8 @@ extern const char * rwlock_name(const struct rwlock * rwlk);
 // - If rwlock_init() was called to initialize the rw-lock with a NULL /name/
 //   argument, the value returned is a pointer to an imlementation-defined
 //   null-terminated string.
+//
+// * This function may be called from an ISR.
 //
 // See also rwlock_init().
 
@@ -599,7 +632,7 @@ extern void rwlock_acquire(struct rwlock * rwlk, int exclusive);
 // - rwlock_acquire() does not allocate memory.
 //
 // * This function may switch to another thread context.
-// * This function may _not_ be called from an ISR.
+// * This function must _not_ be called from an ISR.
 //
 // See also: rwlock_init(), rwlock_release().
 
@@ -629,7 +662,7 @@ extern void rwlock_release(struct rwlock * rwlk);
 //   exclusively will succeeds, or (b) all threads waiting to acquire a rw-lock
 //   shared will succeed.
 //
-// * This function may _not_ be called from an ISR.
+// * This function must _not_ be called from an ISR.
 //
 // See also: rwlock_acquire().
 
