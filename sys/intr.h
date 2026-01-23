@@ -20,8 +20,8 @@
 // EXPORTED FUNCTION DECLARATIONS
 //
 
-extern char intmgr_initialized;
-extern void intmgr_init(void);
+extern char intrmgr_initialized;
+extern void intrmgr_init(void);
 
 extern void enable_intr_source (
     int srcno,

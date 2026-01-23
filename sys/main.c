@@ -31,7 +31,7 @@ extern void attach_devices(void); // from board/xxx.c
 
 void main(void) {
     board_init();
-    intmgr_init();
+    intrmgr_init();
     devmgr_init();
     thrmgr_init();
 

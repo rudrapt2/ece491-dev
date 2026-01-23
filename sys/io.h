@@ -43,6 +43,8 @@ extern struct io * create_memio (
     void * buf, size_t size,
     void(*reclfn)(void*,size_t));
 
+#ifndef MP2
 extern void create_iopipe(struct io ** wioptr, struct io ** rioptr);
+#endif // MP2
 
 #endif // _IO_H_

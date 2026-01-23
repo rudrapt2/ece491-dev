@@ -417,6 +417,8 @@ int memio_ioctl(struct io * io, int op, void * arg) {
     }
 }
 
+#ifndef MP2
+
 // IOPIPE INTERNAL TYPE DEFINITIONS
 //
 
@@ -460,16 +462,11 @@ static const struct iointf iopipe_reader_intf = {
 void create_iopipe(struct io ** wioptr, struct io ** rioptr) {
     struct iopipe * p;
 
-#ifdef HAVE_MEMORY
     p = kcalloc(1, sizeof(*p));
     p->buf = alloc_phys_page();
     *wioptr = ioinit(&p->wio, &iopipe_writer_intf, 1, 1);
     *rioptr = ioinit(&p->rio, &iopipe_reader_intf, 1, 1);
     condition_init(&p->updated, "iopipe.updated");
-#else
-    panic("Pipes not implemented");
-    (void)p;
-#endif
 }
 
 // IOPIPE INTERNAL FUNCTION DEFINITIONS
@@ -551,12 +548,14 @@ long iopipe_write(struct io * io, const void * buf, long buflen) {
 
 long iopipe_read(struct io * io, void * buf, long bufsz) {
     struct iopipe * const p = (void*)io - offsetof(struct iopipe, rio);
+    (void)p;
+    (void)buf;
+    (void)bufsz;
     return -ENOTSUP; // TODO
 }
 
 void iopipe_reclaim(struct iopipe * p) {
-#ifdef HAVE_MEMORY
     free_phys_page(p->buf);
-#endif
     kfree(p);
 }
+#endif // MP2

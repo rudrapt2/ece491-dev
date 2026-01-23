@@ -14,39 +14,48 @@ UNIFDEF=unifdef
 BASE_OBJS = \
 	start.o \
 	sbi.o \
-	heap.o \
 	misc.o \
 	console.o \
 	dev/uart.o \
 	dev/rtc.o \
 	dev/virtio.o \
 	dev/viorng.o \
-	device.o \
-	io.o \
+	string.o \
 	plic.o \
 	string.o \
 	error.o \
 	thrasm.o \
-	timer.o \
-	intr.o \
-	excp.o \
 	trap.o \
 	board/qemu-virt.o
 
 MP2_OBJS = \
 	$(BASE_OBJS) \
 	mp2-main.o \
-	mp2-thread.o
+	mp2-thread.o \
+	mp2-timer.o \
+	mp2-device.o \
+	mp2-intr.o \
+	mp2-excp.o \
+	mp2-heap.o \
+	mp2-io.o 
 
 MP3_OBJS = \
 	$(BASE_OBJS) \
-	mp3-main.o \
+	main.o \
 	dev/vioblk.o \
 	filesys.o \
+	trap.o \
+	excp.o \
+	heap.o \
+	device.o \
 	elf.o \
+	intr.o \
 	memory.o \
 	process.o \
+	thread.o \
 	cache.o \
+	timer.o \
+	device.o \
 	ngfs.o
 
 CFLAGS = -Wall -Werror=implicit-function-declaration -Wno-unused-function
@@ -55,8 +64,6 @@ CFLAGS += -mcmodel=medany -fno-pie -no-pie -march=rv64imazicsr -mabi=lp64
 CFLAGS += -fno-common -nostdlib -mno-relax -ffreestanding 
 CFLAGS += -fno-asynchronous-unwind-tables -mno-riscv-attribute
 CFLAGS += -I.
-
-CFLAGS += -DMP2
 
 # CFLAGS += -DDEBUG -DTRACE # Everything!
 # CFLAGS += -DMEMORY_DEBUG -DMEMORY_TRACE
@@ -100,7 +107,7 @@ MP3X_QEMUOPTS += -device virtio-gpu-device -display gtk
 all: mp2-kernel.elf # mp3-kernel.elf
 
 clean:
-	rm -rf *.o dev/*.o test/*.o fs/*.o *.elf mp2-*.c
+	rm -rf *.o dev/*.o test/*.o fs/*.o *.elf
 
 # MP2
 #
@@ -114,8 +121,8 @@ run-mp2: mp2-kernel.elf
 debug-mp2: mp2-kernel.elf
 	$(QEMU) $(MP2_QEMUOPTS) -m 8M -kernel $< -S -s
 
-mp2-%.c: %.c
-	$(UNIFDEF) -x2 -o $@ -DMP2 $<
+mp2-%.o: %.c
+	$(CC) -c -o $@ $(CFLAGS) -DMP2 $<
 
 # MP3
 #

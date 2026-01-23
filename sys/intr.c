@@ -26,7 +26,7 @@
 // EXPORTED GLOBAL VARIABLE DEFINITIONS
 //
 
-char intmgr_initialized = 0;
+char intrmgr_initialized = 0;
 
 
 // INTERNAL GLOBAL VARIABLE DEFINITIONS
@@ -46,18 +46,18 @@ static void handle_extern_interrupt(void);
 // EXPORTED FUNCTION DEFINITIONS
 //
 
-void intmgr_init(void) {
+void intrmgr_init(void) {
     trace("%s()", __func__);
 
     disable_interrupts();
     
     assert (plic_initialized);
 
-    // Enable external interrupts. The timer module constrols the sie.STIE bit.
+    // Enable external interrupts. The timer module controls the sie.STIE bit.
 
     csrw_sie(RISCV_SIE_SEIE);
 
-    intmgr_initialized = 1;
+    intrmgr_initialized = 1;
 }
 
 void enable_intr_source (
@@ -86,10 +86,16 @@ void handle_smode_interrupt(unsigned int cause) {
 }
 
 void handle_umode_interrupt(unsigned int cause) {
+#ifdef STUDENT
+    // (your MP3cp2 code here)
+#else
     // called from trap.s
     handle_interrupt(cause);
+#ifndef MP2
     enable_interrupts();
     submit_running_thread();
+#endif // MP2
+#endif // STUDENT
 }
 
 extern long enable_interrupts(void) {

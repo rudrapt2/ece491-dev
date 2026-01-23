@@ -149,6 +149,16 @@ static struct thread * create_thread(const char * name);
 // for the list of waiting threads of each condition variable. These functions
 // are not interrupt-safe! The caller must disable interrupts before calling any
 // thread list function that may modify a list that is used in an ISR.
+
+static void reclaim_thread_stack(struct thread * thr);
+
+// Reclaims storage used for the thread stack. Sets the /stack_lowest/ and
+// /stack_anchor/ members of the /thread/ structure to NULL.
+
+static void reclaim_thread_struct(struct thread * thr);
+
+// Frees the /thread/structure clears its /thrtab/ entry.
+
 #endif
 
 static void tlclear(struct thread_list * list);
@@ -319,20 +329,19 @@ void exit_running_thread(void) {
 #ifdef STUDENT
     // (your MP3cp3 code here)
 #else
-    // Signal parent in case it is waiting for us to exit
+    // Signal parent (if we have one) in case it is waiting for us to exit
 
-    assert(TP->parent != NULL);
-    condition_broadcast(&TP->parent->child_exit);
+    if (TP->parent == NULL)
+        condition_broadcast(&TP->parent->child_exit);
 
-    // Reclaim any children that have exited and orphan any children that have
-    // not (by setting their /parent/ pointer to NULL).
+    // Reclaim any of our children that have exited and orphan any that have not
+    // (by setting their /parent/ pointer to NULL).
 
     for (ctid = 1; ctid < NTHR; ctid++) {
         if (thrtab[ctid] != NULL && thrtab[ctid]->parent == TP) {
-            if (thrtab[ctid]->state == THREAD_EXITED) {
-                kfree(thrtab[ctid]);
-                thrtab[ctid] = NULL;
-            } else
+            if (thrtab[ctid]->state == THREAD_EXITED)
+                reclaim_thread_struct(thrtab[ctid]);
+            else
                 thrtab[ctid]->parent = NULL;
         }   
     }
@@ -348,6 +357,7 @@ void exit_running_thread(void) {
 #endif // STUDENT
 }
 
+#ifndef MP2
 void submit_running_thread(void) {
 #ifdef STUDENT
     // (your MP3cp3 code here)
@@ -362,6 +372,7 @@ void submit_running_thread(void) {
         yield_running_thread();
 #endif // STUDENT
 }
+#endif // MP2
 
 void yield_running_thread(void) {
     extern void switch_running_thread(struct thread *); // thrasm.s
@@ -471,9 +482,15 @@ void yield_running_thread(void) {
 #endif // STUDENT
 }
 
+#ifdef STUDENT
+// The finish thread function is only called from switch_running_thread() in
+// thrasm.s. It is not declared in thread.h.
+#else
 // The finish thread function is only called from switch_running_thread() in
 // thrasm.s. It is not declared in thread.h. It's responsible for freeing the
-// stack of an exited thread.
+// stack of an exited thread. If the exited thread has no parent, it reclaims
+// the /thread/ structure and entry in /thrtab/.
+#endif
 
 void finish_thread_switch(struct thread * susp_thread) {
 #ifdef STUDENT
@@ -493,19 +510,16 @@ void finish_thread_switch(struct thread * susp_thread) {
     susp_thread->running_ticks += ticks_used;
     susp_thread->ticks_balance -= ticks_used;
 
-    // If the suspended thread exited, free its stack. We can't do it any
-    // earlier as we are still using the stack. This function is tail-called by
-    // switch_threads().
+    // If the suspended thread just exited, free its stack. We can't do this
+    // while the thread is still running, so we do it here when we switch away
+    // from it. If the thread is an orphan, free the structure and TID also. 
 
     if (susp_thread->state == THREAD_EXITED) {
-#ifndef MP2
-        free_phys_page(susp_thread->stack_lowest);
-#else
-        kfree(susp_thread->stack_lowest);
-#endif
-        susp_thread->stack_lowest = NULL;
-        susp_thread->stack_anchor = NULL;
-        susp_thread->time_exited = time_now;
+        reclaim_thread_stack(susp_thread);
+        if (susp_thread->parent == NULL)
+            reclaim_thread_struct(susp_thread);
+        else
+            susp_thread->time_exited = time_now;
     }
 #endif // STUDENT
 }
@@ -513,8 +527,8 @@ void finish_thread_switch(struct thread * susp_thread) {
 int join_thread(int u_tid) {
 #ifndef STUDENT
     struct thread * thr;
-    int ctid;
     int haschild = 0;
+    int ctid;
 #endif
 
     trace("%s(%d) in <%s:%d>", __func__, u_tid, TP->name, TP->id);
@@ -559,8 +573,7 @@ int join_thread(int u_tid) {
     while (thr->state != THREAD_EXITED)
         condition_wait(&TP->child_exit);
     
-    thrtab[u_tid] = NULL;
-    kfree(thr);
+    reclaim_thread_struct(thr);
     
     return u_tid;
 #endif
@@ -851,6 +864,27 @@ struct thread * create_thread(const char * name) {
 
     return thr;
 }
+
+void reclaim_thread_stack(struct thread * thr) {
+    assert (thr->stack_lowest != NULL);
+#ifndef MP2
+    free_phys_page(thr->stack_lowest);
+#else
+    kfree(thr->stack_lowest);
+#endif
+    thr->stack_lowest = NULL;
+    thr->stack_anchor = NULL;
+}
+
+void reclaim_thread_struct(struct thread * thr) {
+    int const tid = thr->id;
+
+    assert (thr->stack_lowest == NULL);
+
+    kfree(thr);
+    thrtab[tid] = NULL;
+}
+
 #endif // STUDENT
 
 void tlclear(struct thread_list * list) {
