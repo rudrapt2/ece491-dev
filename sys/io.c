@@ -69,6 +69,13 @@ long ioread(struct io * io, void * buf, long bufsz) {
     return io->intf->read(io, buf, bufsz);
 }
 
+long iofill(struct io * io, void * buf, long bufsz) {
+    (void)io;
+    (void)buf;
+    (void)bufsz;
+    panic("Not implemented"); // FIXME
+}
+
 long iowrite(struct io * io, const void * buf, long len) {
     assert (io != NULL);
     assert (buf != NULL || len == 0);
