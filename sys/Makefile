@@ -90,6 +90,7 @@ BASE_QEMUOPTS += -machine virt -nographic
 BASE_QEMUOPTS += -object rng-random,filename=/dev/urandom,id=rng0
 BASE_QEMUOPTS += -device virtio-rng-device,rng=rng0
 BASE_QEMUOPTS += -serial mon:stdio
+BASE_QEMUOPTS += -bios bios/osbi181q.bin
 
 MP2_QEMUOPTS = $(BASE_QEMUOPTS)
 MP2_QEMUOPTS += -serial pty
