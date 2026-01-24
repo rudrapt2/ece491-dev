@@ -96,7 +96,7 @@ char plic_initialized = 0;
 
 // We currently only support single-hart operation, sending interrupts to S mode
 // on hart 0 (context 0). The low-level PLIC functions already understand
-// contexts, so we only need to modify the high-level functions (plit_init,
+// contexts, so we only need to modify the high-level functions (plic_init,
 // plic_claim_request, plic_finish_request)to add support for multiple harts.
 
 // INTERNAL GLOBAL VARIABLES
@@ -143,13 +143,11 @@ extern void plic_disable_source(int srcno) {
 }
 
 extern int plic_claim_interrupt(void) {
-	// FIXME: Hardwired S-mode hart 0
 	trace("%s()", __func__);
 	return plic_claim_context_interrupt(CTX(0,1));
 }
 
 extern void plic_finish_interrupt(int irqno) {
-	// FIXME: Hardwired S-mode hart 0
 	trace("%s(irqno=%d)", __func__, irqno);
 	plic_complete_context_interrupt(CTX(0,1), irqno);
 }
