@@ -177,6 +177,7 @@ int mount_ktfs(const char * name, struct io * bkgio) {
 
     ktfs_backing_device = bkgio;
     ioaddref(bkgio);
+    ioctl(bkgio, IOC_GETEND, &fs_size);
 
     // loads the super block to memory
     arbitrary_read(0, &superblock, sizeof(struct ktfs_superblock));
@@ -197,7 +198,6 @@ int mount_ktfs(const char * name, struct io * bkgio) {
     for(uint64_t i = 0; i < root_directory.size / KTFS_DENSZ; i++) {
         // create a new file struct
         struct ktfs_file * new_file = kmalloc(sizeof(struct ktfs_file));
-        ioctl(bkgio, IOC_GETEND, &fs_size);
         seekio_init(&new_file->io, &file_intf, fs_size, 1, 0);
         new_file->flag = 0;
 

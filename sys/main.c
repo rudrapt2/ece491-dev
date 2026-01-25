@@ -56,6 +56,9 @@ void main(void) {
 
 #ifndef MP2
     // MP3 stuff
+    memory_init();
+    procmgr_init();
+    fsmgr_init();
 #endif
 
     attach_devices();
@@ -87,7 +90,7 @@ void mount_drive(char * mntname, char * devname,
     result = mount(mntname, hd);
 
     if (result != 0) {
-        kprintf("mount_ngfs(%s, bkgio(%s)) failed: %s\n",
+        kprintf("mount(%s, bkgio(%s)) failed: %s\n",
             mntname, devname, error_desc(result));
         halt();
     }

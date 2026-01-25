@@ -194,9 +194,9 @@ void main()
 
 	_open(CONSOLEOUT, "/dev/uart1");    // console device
 	_close(STDIN);              	    // close any existing stdin
-	_iodup(CONSOLEOUT, STDIN);         // stdin from console
+	_iodup(CONSOLEOUT, STDIN);          // stdin from console
 	_close(STDOUT);                     // close any existing stdout
-	_iodup(CONSOLEOUT, STDOUT);        // stdout to console
+	_iodup(CONSOLEOUT, STDOUT);         // stdout to console
 
 	printf("Starting 391 Shell\n");
 

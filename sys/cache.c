@@ -144,7 +144,7 @@ struct cache * create_cache(struct io * bkgio, unsigned long cache_blksz) {
     condition_init(&cache->nodirty, "cache.nodirty");
 
     cache->blkbuf = alloc_phys_pages (
-        (CACHE_CAPACITY * blksz + PAGE_SIZE-1) / PAGE_SIZE);
+        (CACHE_CAPACITY * cache_blksz + PAGE_SIZE-1) / PAGE_SIZE);
 
     for (i = 0; i < CACHE_CAPACITY; i++)
         cache->entries[i].pos = -1ULL;

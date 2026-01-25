@@ -102,6 +102,7 @@ int mount_filesys(const char * mpname, struct filesystem * fs) {
     mp->next = mplist;
     mp->name = mpname;
     mp->fs = fs;
+    mplist = mp;
     return 0;
 }
 
@@ -177,9 +178,9 @@ int delete_file(const char * mpname, const char * flname) {
 }
 
 void parse_path(char * path, char ** mpnameptr, char ** flnameptr) {
-    assert (path == NULL);
-    assert (mpnameptr == NULL);
-    assert (flnameptr == NULL);
+    assert (path != NULL);
+    assert (mpnameptr != NULL);
+    assert (flnameptr != NULL);
     char * ss; // slash in path
 
     // ignore leading slash

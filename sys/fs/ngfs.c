@@ -161,10 +161,11 @@ int mount_ngfs(const char * name, struct io * bkgio) {
         ngfs->num_fat_blocks, size / NGFS_BLKSZ);
 
     // root entry is always the first entry
-    read_from_block(cache, NGFS_ROOT_DATA_BLOCK, 0, root_dir, DENTRYSZ);
+    read_from_block(
+        cache, IDX_TO_ABS(NGFS_ROOT_DATA_BLOCK), 0, root_dir, DENTRYSZ);
 
     // well-formed fs
-    assert(strncmp(root_dir->name, ".", NGFS_MAX_FILENAME_LEN) == 0);
+    assert(strcmp(root_dir->name, ".") == 0);
     assert(root_dir->start_block == NGFS_ROOT_DATA_BLOCK);
     assert(root_dir->size % DENTRYSZ == 0);
 
@@ -204,7 +205,7 @@ int ngfs_open_file(struct ngfs * fs, const char * name, struct io ** ioptr) {
     struct ngfs_file * files_list = fs->files_list;
     trace("%s(%s,%p)", __func__, name, ioptr);
 
-    if (strncmp(name, root_dir->name, NGFS_MAX_FILENAME_LEN) == 0)
+    if (strcmp(name, root_dir->name) == 0)
         return -EACCESS;
 
     for(f = files_list; f != NULL; f = f->next) 

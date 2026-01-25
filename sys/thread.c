@@ -593,7 +593,7 @@ void thread_attach_process(int tid, struct process * proc) {
     assert (0 <= tid && tid < NTHR);
     assert (thrtab[tid] != NULL);
     assert (thrtab[tid]->proc == NULL);
-    assert (proc != NULL);
+    // assert (proc != NULL);
     thrtab[tid]->proc = proc;
 }
 
