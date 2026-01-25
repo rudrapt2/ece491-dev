@@ -114,7 +114,7 @@ clean:
 #
 
 mp2-kernel.elf: $(MP2_OBJS)
-	$(LD) $(LDFLAGS) -T kernel.ld -o $@ $^
+	$(LD) $(LDFLAGS) -T board/qemu-virt.ld -o $@ $^
 
 run-mp2: mp2-kernel.elf
 	$(QEMU) $(MP2_QEMUOPTS) -m 8M -kernel $<
@@ -129,7 +129,7 @@ mp2-%.o: %.c
 #
 
 mp3-kernel.elf: $(MP2_OBJS) mp3-main.o
-	$(LD) $(LDFLAGS) -T kernel.ld -o $@ $^
+	$(LD) $(LDFLAGS) -T board/qemu-virt.ld -o $@ $^
 
 run-mp3: mp3-kernel.elf
 	$(QEMU) $(MP2_QEMUOPTS) -m 8M -kernel $<

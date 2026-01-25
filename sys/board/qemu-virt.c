@@ -13,7 +13,7 @@
 //
 
 #define NUART 3
-#define RAM_SIZE_MB 8
+#define RAM_SIZE_MB (8-2)
 
 // QEMU constants
 //
