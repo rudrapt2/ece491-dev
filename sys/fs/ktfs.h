@@ -5,7 +5,11 @@
 */
 
 #include <stdint.h>
-#include "uioimpl.h"
+
+struct filesystem; // extern decl.
+struct io; // extern decl.
+
+extern int mount_ktfs(const char * mpname, struct io * bkgio);
 
 #define KTFS_BLKSZ              512
 #define KTFS_INOSZ              32
