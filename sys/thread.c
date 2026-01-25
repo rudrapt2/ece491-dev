@@ -274,7 +274,6 @@ int spawn_thread (
         return -EMTHR;
 
     child->parent = TP;
-    child->proc = TP->proc;
     set_thread_state(child, THREAD_READY);
     child->time_spawned = rdtime();
 
@@ -593,7 +592,12 @@ struct process * running_thread_process(void) {
 void thread_attach_process(int tid, struct process * proc) {
     assert (0 <= tid && tid < NTHR);
     assert (thrtab[tid] != NULL);
+<<<<<<< HEAD
     // assert (proc != NULL);
+=======
+    assert (thrtab[tid]->proc == NULL);
+    assert (proc != NULL);
+>>>>>>> main
     thrtab[tid]->proc = proc;
 }
 

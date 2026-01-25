@@ -43,6 +43,20 @@ static struct {
 static void handle_interrupt(unsigned int cause);
 static void handle_extern_interrupt(void);
 
+// Dispatches a supervisor-mode interrupt by cause code. The /cause/ argument is
+// a supervisor interrupt cause value as reported by the trap handler.
+//
+// On entry handle_interrupt() assumes:
+// - It is called with interrupts disabled from a trap context.
+//
+// On return handle_interrupt() guarantees:
+// - The appropriate subsystem interrupt handler is invoked for supported
+//   causes.
+// - The system panics for unsupported causes.
+//
+// * This function is called from an ISR.
+// * This function does not context-switch.
+
 // EXPORTED FUNCTION DEFINITIONS
 //
 

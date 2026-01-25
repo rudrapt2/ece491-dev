@@ -57,8 +57,8 @@ extern void timer_init(unsigned int freq);
 // - A timer interrupt will be generated at least /BOLT_FREQ/ times per second
 //   when interrupts are enabled.
 //
-// * This function must be called once at system initialization time before any
-//   other functions declared in timer.h.
+// * This function must be called once at system initialization time with
+//   interrupts disabled before any other functions declared in timer.h.
 //
 // See also: alarm_init().
 
@@ -84,8 +84,7 @@ extern void handle_timer_interrupt(void);
 // - [MP3cp3] The next timer interrupt is set to occur no more than N ticks from
 //   the current time, where N = timer_frequency / BOLT_FREQ.
 //
-// * This function should be called from an ISR in response to a timer
-//   interrupt.
+// * This function must be called from an ISR in response to a timer interrupt.
 
 
 // ONE-TIME ALARMS
