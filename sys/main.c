@@ -16,6 +16,11 @@
 #include "misc.h" // for halt()
 #include "heap.h"
 #include "io.h"
+#include "fs/ngfs.h"
+#include "fs/ktfs.h"
+#include "fs/tarfs.h"
+#include "filesys.h"
+#include "process.h"
 
 #ifndef MP2
 #define INITEXE "shell"
@@ -23,10 +28,8 @@
 #define CMNTNAME "c" // lffs
 #define DMNTNAME "d" // ktfs
 #define DEVMNTNAME "dev"
-#define CDEVNAME "vioblk"
-#define CDEVINST 1
-#define DDEVNAME "vioblk"
-#define DDEVINST 0
+#define CDEVNAME "vioblk1"
+#define DDEVNAME "vioblk0"
 
 #ifndef NUART // number of UARTs
 #define NUART 3
@@ -35,8 +38,8 @@
 
 #ifndef MP2
 static void exec_init();
-static void mount_cdrive(void); // mount primary storage device ("C drive")
-static void mount_ddrive(void); // mount secondary storage device ("D drive")
+static void mount_drive(char * mntname, char * devname,
+    int (*mount)(const char * mpname, struct io * bkgio));
 #else
 static void run_games(void);
 #endif // MP2
@@ -53,8 +56,8 @@ void main(void) {
 
 #ifndef MP2
     // MP3 stuff
-    mount_cdrive();
-    mount_ddrive();
+    mount_drive(CMNTNAME, CDEVNAME, mount_tarfs);
+    mount_drive(DMNTNAME, DDEVNAME, mount_tarfs);
 #endif
 
     attach_devices();
@@ -67,83 +70,32 @@ void main(void) {
 #endif
 }
 
-void mount_cdrive(void) {
-    struct storage * hd;
-    struct cache * cache;
+void mount_drive(char * mntname, char * devname, 
+    int (*mount)(const char * mpname, struct io * bkgio)) {
+    
+    struct io * hd;
     int result;
 
-    hd = find_storage(CDEVNAME, CDEVINST);
+    result = open_device(devname, &hd);
 
-    if (hd == NULL) {
-        kprintf("Storage device %s%d not found\n", CDEVNAME, CDEVINST);
+    if (result < 0) {
+        kprintf("Failed to open storage device %s: %s\n", 
+            devname, error_desc(result));
         halt();
     }
 
-    result = storage_open(hd);
+    result = mount(mntname, hd);
 
     if (result != 0) {
-        kprintf("storage_open failed on %s%d: %s\n",
-            CDEVNAME, CDEVINST, error_name(result));
-        halt();
-    }
-
-    result = create_cache(hd, &cache, LFFS_BLKSZ);
-
-    if (result != 0) {
-        kprintf("create_cache(%s%d) failed: %s\n",
-            CDEVNAME, CDEVINST, error_name(result));
-        halt();
-    }
-
-    result = mount_lffs(CMNTNAME, cache, storage_capacity(hd));
-
-    if (result != 0) {
-        kprintf("mount_lffs(%s, cache(%s%d)) failed: %s\n",
-            CMNTNAME, CDEVNAME, CDEVINST, error_name(result));
-        halt();
-    }
-}
-
-void mount_ddrive(void) {
-    struct storage * hd;
-    struct cache * cache;
-    int result;
-
-    hd = find_storage(DDEVNAME, DDEVINST);
-
-    if (hd == NULL) {
-        kprintf("Storage device %s%d not found\n", DDEVNAME, DDEVINST);
-        halt();
-    }
-
-    result = storage_open(hd);
-
-    if (result != 0) {
-        kprintf("storage_open failed on %s%d: %s\n",
-            DDEVNAME, DDEVINST, error_name(result));
-        halt();
-    }
-
-    result = create_cache(hd, &cache, KTFS_BLKSZ);
-
-    if (result != 0) {
-        kprintf("create_cache(%s%d) failed: %s\n",
-            DDEVNAME, DDEVINST, error_name(result));
-        halt();
-    }
-
-    result = mount_ktfs(DMNTNAME, cache);
-
-    if (result != 0) {
-        kprintf("mount_ktfs(%s, cache(%s%d)) failed: %s\n",
-            DMNTNAME, DDEVNAME, DDEVINST, error_name(result));
+        kprintf("mount_lffs(%s, bkgio(%s)) failed: %s\n",
+            mntname, devname, error_desc(result));
         halt();
     }
 }
 
 void exec_init() {
     char * argv[] = { NULL };
-    struct uio * initexe;
+    struct io * initexe;
     int result;
     
     result = open_file(CMNTNAME, INITEXE, &initexe);
@@ -155,7 +107,7 @@ void exec_init() {
 
     // Make descriptor 0 be a null uio object, which the shell will need
 
-    current_process()->uiotab[0] = create_null_uio();
+    current_process()->iotab[0] = create_nullio();
 
     process_exec(initexe, 0, argv);
 }
