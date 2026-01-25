@@ -15,7 +15,7 @@ void main (int argc, char** argv)
     while (--argc) {
         argv++;
     
-        result = _fscreate(argv[0]);
+        result = _create(argv[0]);
 
         if (result < 0) {
             printf("Could not create file %s: %s\n", argv[0], error_name(result));

@@ -43,7 +43,7 @@ static int handle_file_output(char* file) {
     _close(STDOUT);
     res = _open(STDOUT, file);
     if (res < 0) {
-        res = _fscreate(file);
+        res = _create(file);
         if (res < 0) {
             printf("Failed to create file %s (%s)\n", file, error_name(res));
             return res;
@@ -74,13 +74,13 @@ static int handle_pipe() {
     if (res) { // writer
         _close(rpipe);
         _close(STDOUT);
-        _uiodup(wpipe, STDOUT);
+        _iodup(wpipe, STDOUT);
         _close(wpipe);
     }
     else { // reader
         _close(wpipe);
         _close(STDIN);
-        _uiodup(rpipe, STDIN);
+        _iodup(rpipe, STDIN);
         _close(rpipe);
     }
 
@@ -194,9 +194,9 @@ void main()
 
 	_open(CONSOLEOUT, "/dev/uart1");    // console device
 	_close(STDIN);              	    // close any existing stdin
-	_uiodup(CONSOLEOUT, STDIN);         // stdin from console
+	_iodup(CONSOLEOUT, STDIN);         // stdin from console
 	_close(STDOUT);                     // close any existing stdout
-	_uiodup(CONSOLEOUT, STDOUT);        // stdout to console
+	_iodup(CONSOLEOUT, STDOUT);        // stdout to console
 
 	printf("Starting 391 Shell\n");
 

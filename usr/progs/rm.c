@@ -14,7 +14,7 @@ void main (int argc, char** argv)
     
     while (--argc) {
         argv++;
-        result = _fsdelete(argv[0]);
+        result = _delete(argv[0]);
 
         if (result < 0) {
             printf("Could not delete file %s: %s\n", argv[0], error_name(result));

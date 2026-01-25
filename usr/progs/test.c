@@ -74,7 +74,7 @@ void test_create(int argc, char * argv[]) {
     // testing create
     for (int i = 1; i <= num_files; i++) {
         snprintf(path, 26, "%s%d", mp, i);
-        result = _fscreate(path);
+        result = _create(path);
         if (result < 0) {
             printf("Failed to create %s: %s\n", path, error_name(result));
             return;
@@ -180,7 +180,7 @@ void test_delete(int argc, char * argv[]) {
     // testing delete
     for (int i = 1; i <= num_files; i++) {
         snprintf(path, 26, "%s%d", mp, i);
-        result = _fsdelete(path);
+        result = _delete(path);
         if (result < 0) {
             printf("Failed to delete %s: %s\n", path, error_name(result));
             return;
@@ -299,7 +299,7 @@ void test_set_end(int argc, char * argv[]) {
             printf("Failed to open %s: %s\n", path, error_name(fd));
             return;
         }
-        result = _fcntl(fd, FCNTL_SETEND, &end);
+        result = _ioctl(fd, FCNTL_SETEND, &end);
         if (result < 0) {
             printf("Failed to set end of %s: %s\n", path, error_name(result));
             return;
@@ -334,8 +334,8 @@ void test_write_multi(int argc, char * argv[]) {
         mp = argv[4];
 
     snprintf(path, 26, "%stestfile", mp);
-    _fsdelete(path);
-    result = _fscreate(path);
+    _delete(path);
+    result = _create(path);
     if (result < 0) {
         printf("Failed to create %s (%s)\n", path, error_name(result));
         return;
@@ -350,7 +350,7 @@ void test_write_multi(int argc, char * argv[]) {
     }
 
     for (int i = 1; i < num_uios; i++) {
-        fds[i] = _uiodup(fds[0], -1);
+        fds[i] = _iodup(fds[0], -1);
         if (fds[0] < 0) {
             printf("Failed dup %d (%s)\n", i, error_name(fds[i]));
             return;        
@@ -413,7 +413,7 @@ void test_read_multi(int argc, char * argv[]) {
     }
 
     for (int i = 1; i < num_uios; i++) {
-        fds[i] = _uiodup(fds[0], -1);
+        fds[i] = _iodup(fds[0], -1);
         if (fds[0] < 0) {
             printf("Failed dup %d (%s)\n", i, error_name(fds[i]));
             return;        
@@ -467,8 +467,8 @@ void test_race(int argc, char * argv[]) {
         mp = argv[3];
 
     snprintf(path, 26, "%stestfile", mp);
-    _fsdelete(path);
-    result = _fscreate(path);
+    _delete(path);
+    result = _create(path);
     if (result < 0) {
         printf("Failed to create %s (%s)\n", path, error_name(result));
         return;

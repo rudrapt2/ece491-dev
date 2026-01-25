@@ -6,8 +6,8 @@
 *.raw
 util/fs/mkfs_ktfs
 util/fs/unmkfs_ktfs
-util/fs/mkfs_lffs
-util/fs/unmkfs_lffs
+util/fs/mkfs_ngfs
+util/fs/unmkfs_ngfs
 .vscode
 .clang-format
 .clangd
@@ -24,8 +24,8 @@ mp2-*.c
 */*.raw
 */util/fs/mkfs_ktfs
 */util/fs/unmkfs_ktfs
-*/util/fs/mkfs_lffs
-*/util/fs/unmkfs_lffs
+*/util/fs/mkfs_ngfs
+*/util/fs/unmkfs_ngfs
 */.vscode
 */.clang-format
 */.clangd

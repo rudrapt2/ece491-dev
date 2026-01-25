@@ -87,7 +87,7 @@ CFLAGS += -I.
 
 # CFLAGS += -DCACHE_DEBUG -DCACHE_TRACE
 # CFLAGS += -DKTFS_DEBUG -DKTFS_TRACE
-# CFLAGS += -DLFFS_DEBUG -DLFFS_TRACE
+# CFLAGS += -DNGFS_DEBUG -DNGFS_TRACE
 
 # CFLAGS += -DMAIN_DEBUG -DMAIN_TRACE
 
@@ -110,9 +110,9 @@ MP3_QEMUOPTS = $(BASE_QEMUOPTS)
 MP3_QEMUOPTS += -serial pty
 MP3_QEMUOPTS += -serial pty
 MP3_QEMUOPTS += -device virtio-blk-device,drive=blk0
-MP3_QEMUOPTS += -drive file=ngfs.raw,id=blk0,if=none,format=raw,readonly=false
+MP3_QEMUOPTS += -drive file=fs/ngfs.raw,id=blk0,if=none,format=raw,readonly=false
 MP3_QEMUOPTS += -device virtio-blk-device,drive=blk1
-MP3_QEMUOPTS += -drive file=ktfs.raw,id=blk1,if=none,format=raw,readonly=false
+MP3_QEMUOPTS += -drive file=fs/ktfs.raw,id=blk1,if=none,format=raw,readonly=false
 
 MP3X_QEMUOPTS = $(MP3_QEMUOPTS)
 MP3X_QEMUOPTS += -device virtio-gpu-device -display gtk
@@ -144,10 +144,10 @@ mp3-kernel.elf: $(MP3_OBJS) main.o
 	$(LD) $(LDFLAGS) -T kernel.ld -o $@ $^
 
 run-mp3: mp3-kernel.elf
-	$(QEMU) $(MP2_QEMUOPTS) -m 8M -kernel $<
+	$(QEMU) $(MP3_QEMUOPTS) -m 8M -kernel $<
 
 debug-mp3: mp3-kernel.elf
-	$(QEMU) $(MP2_QEMUOPTS) -m 8M -kernel $< -S -s
+	$(QEMU) $(MP3_QEMUOPTS) -m 8M -kernel $< -S -s
 
 BLOB_OBJCOPY_FLAGS = \
 	--add-section .rodata.blob=blob.raw \

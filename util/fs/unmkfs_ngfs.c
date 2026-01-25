@@ -2,32 +2,32 @@
 #include <stdint.h>
 #include <string.h>
 #include <sys/stat.h>
-#include "../../sys/lffs.h"
+#include "../../sys/fs/ngfs.h"
 
 #define CEIL(n, k) (((n) + (k) - 1) / (k))
-#define DENTRIES_PER_BLOCK      (LFFS_BLKSZ / sizeof(struct lffs_dir_entry))
+#define DENTRIES_PER_BLOCK      (NGFS_BLKSZ / sizeof(struct ngfs_dir_entry))
 
 uint32_t num_fat_blocks;
-struct lffs_dir_entry root_dentry;
+struct ngfs_dir_entry root_dentry;
 
 void read_block(FILE *image, void *buffer, uint32_t block_num) {
-    fseek(image, block_num * LFFS_BLKSZ, SEEK_SET);
-    fread(buffer, LFFS_BLKSZ, 1, image);
+    fseek(image, block_num * NGFS_BLKSZ, SEEK_SET);
+    fread(buffer, NGFS_BLKSZ, 1, image);
 }
 
 uint32_t get_next_block(FILE *image, uint32_t block) {
-    uint32_t fat_index = block / LFFS_FAT_ENTRIES_PER_BLOCK;
-    uint32_t block_idx = block % LFFS_FAT_ENTRIES_PER_BLOCK;
+    uint32_t fat_index = block / NGFS_FAT_ENTRIES_PER_BLOCK;
+    uint32_t block_idx = block % NGFS_FAT_ENTRIES_PER_BLOCK;
 
     uint32_t next;
     
-    fseek(image, fat_index*LFFS_BLKSZ + block_idx*sizeof(uint32_t), SEEK_SET);
+    fseek(image, fat_index*NGFS_BLKSZ + block_idx*sizeof(uint32_t), SEEK_SET);
     fread(&next, sizeof(uint32_t), 1, image);
 
     return next;
 }
 
-void write_file(FILE *image, struct lffs_dir_entry *entry, const char *filename) {
+void write_file(FILE *image, struct ngfs_dir_entry *entry, const char *filename) {
     FILE *output = fopen(filename, "wb");
     if (!output) {
         perror("Error opening output file");
@@ -35,19 +35,19 @@ void write_file(FILE *image, struct lffs_dir_entry *entry, const char *filename)
     }
 
     uint32_t bytes_written = 0;
-    uint8_t buffer[LFFS_BLKSZ];
+    uint8_t buffer[NGFS_BLKSZ];
 
     for (uint32_t block = entry->start_block; bytes_written < entry->size; block = get_next_block(image, block)) {
-        if (block == LFFS_BLOCK_END) {
+        if (block == NGFS_BLOCK_END) {
             fprintf(stderr, "File %s block number and size do not match\n", entry->name);
             return;
         }
-        if (block == LFFS_BLOCK_FREE) {
+        if (block == NGFS_BLOCK_FREE) {
             fprintf(stderr, "File %s is not well-formed\n", entry->name);
             return;
         }
         read_block(image, buffer, num_fat_blocks + block);
-        uint32_t to_write = (entry->size - bytes_written < LFFS_BLKSZ) ? entry->size - bytes_written : LFFS_BLKSZ;
+        uint32_t to_write = (entry->size - bytes_written < NGFS_BLKSZ) ? entry->size - bytes_written : NGFS_BLKSZ;
         fwrite(buffer, 1, to_write, output);
         bytes_written += to_write;
     }
@@ -57,27 +57,27 @@ void write_file(FILE *image, struct lffs_dir_entry *entry, const char *filename)
     fclose(output);
 }
 
-void extract_directory(FILE *image, struct lffs_dir_entry * directory, const char *path) {
-    struct lffs_dir_entry dir_buf[DENTRIES_PER_BLOCK];
+void extract_directory(FILE *image, struct ngfs_dir_entry * directory, const char *path) {
+    struct ngfs_dir_entry dir_buf[DENTRIES_PER_BLOCK];
 
     uint32_t dentry_data_block = directory->start_block;
     read_block(image, (void*)dir_buf, num_fat_blocks + dentry_data_block);
 
     // i = 0 is dir info
-    for (uint32_t i = 1; i < directory->size / sizeof(struct lffs_dir_entry); i++) {
+    for (uint32_t i = 1; i < directory->size / sizeof(struct ngfs_dir_entry); i++) {
         if (i % DENTRIES_PER_BLOCK == 0) {
             dentry_data_block = get_next_block(image, dentry_data_block);
-            if (dentry_data_block == LFFS_BLOCK_END) {
+            if (dentry_data_block == NGFS_BLOCK_END) {
                 fprintf(stderr, "Root dentry size and num blocks disagree\n");
                 return;
             }
-            if (dentry_data_block == LFFS_BLOCK_FREE) {
+            if (dentry_data_block == NGFS_BLOCK_FREE) {
                 fprintf(stderr, "Root directory is not well-formed\n");
                 return;
             }
             read_block(image, (void*)dir_buf, num_fat_blocks + dentry_data_block);
         }
-        struct lffs_dir_entry *entry = &dir_buf[i % DENTRIES_PER_BLOCK];
+        struct ngfs_dir_entry *entry = &dir_buf[i % DENTRIES_PER_BLOCK];
 
         fprintf(stdout, "entry %d has filename: %s\n", i, entry->name);
 
@@ -105,13 +105,13 @@ int main(int argc, char *argv[]) {
     }
 
     fseek(image, 0L, SEEK_END);
-    num_fat_blocks = CEIL((ftell(image) / LFFS_BLKSZ), LFFS_FAT_ENTRIES_PER_BLOCK);
-    fseek(image, num_fat_blocks * LFFS_BLKSZ, SEEK_SET);
+    num_fat_blocks = CEIL((ftell(image) / NGFS_BLKSZ), NGFS_FAT_ENTRIES_PER_BLOCK);
+    fseek(image, num_fat_blocks * NGFS_BLKSZ, SEEK_SET);
     fread(&root_dentry, sizeof(root_dentry), 1, image);
 
-    if (strncmp(root_dentry.name, ".", LFFS_MAX_FILENAME_LEN) != 0 ||
+    if (strncmp(root_dentry.name, ".", NGFS_MAX_FILENAME_LEN) != 0 ||
         root_dentry.start_block != 0 ||
-        root_dentry.size % sizeof(struct lffs_dir_entry) != 0) {
+        root_dentry.size % sizeof(struct ngfs_dir_entry) != 0) {
             perror("Root dentry is not well formed");
             return -1;
         }

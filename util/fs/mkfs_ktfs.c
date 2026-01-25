@@ -6,7 +6,7 @@
 #include <math.h>
 #include <time.h>
 
-#include "../../sys/ktfs.h"
+#include "../../sys/fs/ktfs.h"
 
 // Change this to turn off randomizing data block indices. This is provided for debugging purposes only.
 // Your filesystem driver must be able to handle non-sequential data blocks.

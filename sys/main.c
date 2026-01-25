@@ -25,7 +25,7 @@
 #ifndef MP2
 #define INITEXE "shell"
 
-#define CMNTNAME "c" // lffs
+#define CMNTNAME "c" // ngfs
 #define DMNTNAME "d" // ktfs
 #define DEVMNTNAME "dev"
 #define CDEVNAME "vioblk1"
@@ -56,14 +56,14 @@ void main(void) {
 
 #ifndef MP2
     // MP3 stuff
-    mount_drive(CMNTNAME, CDEVNAME, mount_ngfs);
-    mount_drive(DMNTNAME, DDEVNAME, mount_ktfs);
 #endif
 
     attach_devices();
     enable_interrupts();
 
 #ifndef MP2
+    mount_drive(CMNTNAME, CDEVNAME, mount_ngfs);
+    mount_drive(DMNTNAME, DDEVNAME, mount_ktfs);
     exec_init();
 #else
     run_games();
@@ -87,7 +87,7 @@ void mount_drive(char * mntname, char * devname,
     result = mount(mntname, hd);
 
     if (result != 0) {
-        kprintf("mount_lffs(%s, bkgio(%s)) failed: %s\n",
+        kprintf("mount_ngfs(%s, bkgio(%s)) failed: %s\n",
             mntname, devname, error_desc(result));
         halt();
     }

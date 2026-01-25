@@ -56,14 +56,14 @@ extern int _usleep(unsigned long us);
 * @param path string path to file
 * @return 0 if successful else error code
 */
-extern int _fsdelete(char * path);
+extern int _delete(char * path);
 
 /**
 * @brief Creates a file at a specified path
 * @param path string path to file
 * @return 0 if successful else error code
 */
-extern int _fscreate(char * path);
+extern int _create(char * path);
 
 /**
 * @brief Opens a file at the specified file descriptor and returns error code on failure
@@ -99,13 +99,13 @@ extern long _read(int fd, void * buf, size_t bufsz);
 extern long _write(int fd, const void * buf, size_t len);
 
 /**
-* @brief Performs desired fcntl based on cmd
+* @brief Performs desired ioctl based on cmd
 * @param fd file descriptor number
-* @param cmd fcntl command
+* @param cmd ioctl command
 * @param arg pointer to arguments
-* @return fcntl result
+* @return ioctl result
 */
-extern int _fcntl(int fd, const int cmd, void * arg);
+extern int _ioctl(int fd, const int cmd, void * arg);
 
 /**
 * @brief Opens a pipe at the specified file descriptor and returns error code on failure
@@ -121,6 +121,6 @@ extern int _pipe(int * wfdptr, int * rfdptr);
 * @param newfd new fd to allocate
 * @return fd number if sucessful else return error that occured -EMFILE or -EBADFD
 */
-extern int _uiodup(int oldfd, int newfd);
+extern int _iodup(int oldfd, int newfd);
 
 #endif // _SYSCALL_H_

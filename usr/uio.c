@@ -50,7 +50,7 @@ static long uioterm_write(struct uio * uio, const void * buf, unsigned long len)
  * @param uio The Uniform I/O abstraction to interact with
  * @param cmd Operation to perform
  * @param arg Additional argument for operation (if needed)
- * @return Output of _fcntl_ if successfully called, negative error code otherwise 
+ * @return Output of _ioctl_ if successfully called, negative error code otherwise 
  */
 static int uioterm_cntl(struct uio * uio, int cmd, void * arg);
 

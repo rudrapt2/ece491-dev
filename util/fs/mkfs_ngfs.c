@@ -7,7 +7,7 @@
 #include <sys/types.h>
 #include <time.h>
 
-#include "../../sys/lffs.h"
+#include "../../sys/fs/ngfs.h"
 
 // Change this to turn off randomizing data block indices. This is provided for debugging purposes only.
 // Your filesystem driver must be able to handle non-sequential data blocks.
@@ -16,7 +16,7 @@ char RANDOMIZE_ON = 0;
 #define MAX_DATA_BLOCKS_PER_FILE ((1 << 30) - 1)
 #define MAX_DISK_SIZE (1 << 30)
 
-struct lffs_dir_entry root_dir = {0};
+struct ngfs_dir_entry root_dir = {0};
 uint32_t num_fat_blocks;
 
 // Forward declarations
@@ -69,8 +69,8 @@ uint32_t parse_size(const char* size_str) {
             exit(1);
     }
 
-    if (size % LFFS_BLKSZ != 0) {
-        fprintf(stderr, "Disk size must be a multiple of %lu bytes\n", LFFS_BLKSZ);
+    if (size % NGFS_BLKSZ != 0) {
+        fprintf(stderr, "Disk size must be a multiple of %lu bytes\n", NGFS_BLKSZ);
         exit(1);
     }
 
@@ -84,9 +84,9 @@ uint32_t parse_size(const char* size_str) {
 
 static uint32_t get_next_block(FILE* fp, uint32_t current_block) {
     uint32_t next_block;
-    uint32_t table_no = current_block / LFFS_FAT_ENTRIES_PER_BLOCK;
-    uint32_t table_offset = current_block % LFFS_FAT_ENTRIES_PER_BLOCK;
-    uint64_t file_offset = table_no * LFFS_BLKSZ + table_offset * sizeof(uint32_t);
+    uint32_t table_no = current_block / NGFS_FAT_ENTRIES_PER_BLOCK;
+    uint32_t table_offset = current_block % NGFS_FAT_ENTRIES_PER_BLOCK;
+    uint64_t file_offset = table_no * NGFS_BLKSZ + table_offset * sizeof(uint32_t);
 
     fseek(fp, file_offset, SEEK_SET);
     fread(&next_block, sizeof(uint32_t), 1, fp);
@@ -95,20 +95,20 @@ static uint32_t get_next_block(FILE* fp, uint32_t current_block) {
 }
 
 static void set_next_block(FILE* fp, uint32_t current_block, uint32_t next_block) {
-    uint32_t table_no = current_block / LFFS_FAT_ENTRIES_PER_BLOCK;
-    uint32_t table_offset = current_block % LFFS_FAT_ENTRIES_PER_BLOCK;
-    uint64_t file_offset = table_no * LFFS_BLKSZ + table_offset * sizeof(uint32_t);
+    uint32_t table_no = current_block / NGFS_FAT_ENTRIES_PER_BLOCK;
+    uint32_t table_offset = current_block % NGFS_FAT_ENTRIES_PER_BLOCK;
+    uint64_t file_offset = table_no * NGFS_BLKSZ + table_offset * sizeof(uint32_t);
 
     fseek(fp, file_offset, SEEK_SET);
     fwrite(&next_block, sizeof(uint32_t), 1, fp);
 }
 
 static uint32_t get_last_block(FILE* fp, uint32_t start_block) {
-    if (start_block == LFFS_BLOCK_END) return LFFS_BLOCK_END;
+    if (start_block == NGFS_BLOCK_END) return NGFS_BLOCK_END;
     uint32_t current_block = start_block;
     uint32_t next_block = get_next_block(fp, start_block);
 
-    while (next_block != LFFS_BLOCK_END) {
+    while (next_block != NGFS_BLOCK_END) {
         current_block = next_block;
         next_block = get_next_block(fp, current_block);
     }
@@ -122,7 +122,7 @@ static uint32_t alloc_block(FILE* fp) {
         exit(1);
     }
     uint32_t idx = data_block_order[data_block_order_pos++];
-    set_next_block(fp, idx, LFFS_BLOCK_END);
+    set_next_block(fp, idx, NGFS_BLOCK_END);
     return idx;
 }
 
@@ -132,7 +132,7 @@ static uint32_t append_to_block(FILE* fp, uint32_t block) {
     return new_block;
 }
 
-static uint32_t set_start_block(FILE* fp, struct lffs_dir_entry* entry) {
+static uint32_t set_start_block(FILE* fp, struct ngfs_dir_entry* entry) {
     uint32_t new_block = alloc_block(fp);
     entry->start_block = new_block;
     return new_block;
@@ -140,7 +140,7 @@ static uint32_t set_start_block(FILE* fp, struct lffs_dir_entry* entry) {
 
 // Generic writer that appends 'size' bytes from 'data' into the given file.
 // It allocates data and pointer blocks as needed and writes data to disk.
-static void wdata_to_file(FILE* fp, struct lffs_dir_entry* dir_entry, const uint8_t* data, uint32_t size) {
+static void wdata_to_file(FILE* fp, struct ngfs_dir_entry* dir_entry, const uint8_t* data, uint32_t size) {
     if (size == 0) return;
     uint32_t written = 0;
 
@@ -148,17 +148,17 @@ static void wdata_to_file(FILE* fp, struct lffs_dir_entry* dir_entry, const uint
     
     while (written < size) {
         uint32_t cur_off = dir_entry->size;
-        uint32_t off_in_blk = cur_off % LFFS_BLKSZ;
+        uint32_t off_in_blk = cur_off % NGFS_BLKSZ;
         if (off_in_blk == 0) 
-            last_block = (last_block == LFFS_BLOCK_END) ? 
+            last_block = (last_block == NGFS_BLOCK_END) ? 
                 set_start_block(fp, dir_entry) :
                 append_to_block(fp, last_block);
 
-        uint32_t can_write = LFFS_BLKSZ - off_in_blk;
+        uint32_t can_write = NGFS_BLKSZ - off_in_blk;
         uint32_t remain = size - written;
         uint32_t chunk = (remain < can_write) ? remain : can_write;
 
-        fseek(fp, (num_fat_blocks + last_block) * LFFS_BLKSZ + off_in_blk, SEEK_SET);
+        fseek(fp, (num_fat_blocks + last_block) * NGFS_BLKSZ + off_in_blk, SEEK_SET);
         fwrite(data + written, 1, chunk, fp);
 
         written += chunk;
@@ -166,15 +166,15 @@ static void wdata_to_file(FILE* fp, struct lffs_dir_entry* dir_entry, const uint
     }
 }
 
-int write_dentry(FILE* fp, struct lffs_dir_entry* dentry) {
-    wdata_to_file(fp, &root_dir, (const uint8_t*)dentry, sizeof(struct lffs_dir_entry));
+int write_dentry(FILE* fp, struct ngfs_dir_entry* dentry) {
+    wdata_to_file(fp, &root_dir, (const uint8_t*)dentry, sizeof(struct ngfs_dir_entry));
     fflush(fp);
     return 0;
 }
 
 static void update_root_dentry(FILE* fp) {
     // root dentry is always the first dentry
-    fseek(fp, num_fat_blocks * LFFS_BLKSZ, SEEK_SET);
+    fseek(fp, num_fat_blocks * NGFS_BLKSZ, SEEK_SET);
     fwrite((const uint8_t*)&root_dir, sizeof(root_dir), 1, fp);
     fflush(fp);
 }
@@ -205,17 +205,17 @@ void load_binary(FILE* fp, const char* binary_path) {
         return;
     }
 
-    struct lffs_dir_entry dentry = {0};
-    dentry.start_block = LFFS_BLOCK_END;
+    struct ngfs_dir_entry dentry = {0};
+    dentry.start_block = NGFS_BLOCK_END;
 
-    memset(dentry.name, 0, LFFS_MAX_FILENAME_LEN);
-    strncpy(dentry.name, get_filename(binary_path), LFFS_MAX_FILENAME_LEN);
+    memset(dentry.name, 0, NGFS_MAX_FILENAME_LEN);
+    strncpy(dentry.name, get_filename(binary_path), NGFS_MAX_FILENAME_LEN);
 
-    // Stream the binary in LFFS_BLKSZ increments to avoid full-file buffering
-    uint8_t buffer[LFFS_BLKSZ];
+    // Stream the binary in NGFS_BLKSZ increments to avoid full-file buffering
+    uint8_t buffer[NGFS_BLKSZ];
     uint32_t total_written = 0;
     while (total_written < file_size) {
-        size_t n = fread(buffer, 1, LFFS_BLKSZ, binary_fp);
+        size_t n = fread(buffer, 1, NGFS_BLKSZ, binary_fp);
         if (n > 0) {
             wdata_to_file(fp, &dentry, buffer, (uint32_t)n);
             total_written += (uint32_t)n;
@@ -232,7 +232,7 @@ void load_binary(FILE* fp, const char* binary_path) {
     fprintf(stdout, "Added file %s\n", binary_path);
     fprintf(stdout, "File size: %d bytes\n", file_size);
     fprintf(stdout, "File start data block index: %d\n", dentry.start_block);
-    fprintf(stdout, "File start address: %lu\n", (num_fat_blocks + dentry.start_block) * LFFS_BLKSZ);
+    fprintf(stdout, "File start address: %lu\n", (num_fat_blocks + dentry.start_block) * NGFS_BLKSZ);
 }
 
 int main(int argc, char *argv[]) {
@@ -251,9 +251,9 @@ int main(int argc, char *argv[]) {
 
     const char *output_file = argv[1];
     uint32_t disk_size = parse_size(argv[2]);
-    uint32_t block_count = disk_size / LFFS_BLKSZ;
+    uint32_t block_count = disk_size / NGFS_BLKSZ;
 
-    num_fat_blocks = (block_count + LFFS_FAT_ENTRIES_PER_BLOCK - 1) / LFFS_FAT_ENTRIES_PER_BLOCK;
+    num_fat_blocks = (block_count + NGFS_FAT_ENTRIES_PER_BLOCK - 1) / NGFS_FAT_ENTRIES_PER_BLOCK;
 
     FILE *fp = fopen(output_file, "w+b");
     if (!fp) {
@@ -268,18 +268,18 @@ int main(int argc, char *argv[]) {
     // Write 0s to the FAT
     fseek(fp, 0, SEEK_SET);
     for (int i = 0; i < num_fat_blocks; i++) {
-        uint8_t buffer[LFFS_BLKSZ] = {0};
-        fwrite(buffer, LFFS_BLKSZ, 1, fp);
+        uint8_t buffer[NGFS_BLKSZ] = {0};
+        fwrite(buffer, NGFS_BLKSZ, 1, fp);
     }
 
     // Indicate out-of-scope entries in FAT
     fseek(fp, (block_count - num_fat_blocks) * sizeof(uint32_t), SEEK_SET);
     for (int i = block_count - num_fat_blocks; i < num_fat_blocks; i++) {
-        uint32_t buffer = LFFS_BLOCK_END;
+        uint32_t buffer = NGFS_BLOCK_END;
         fwrite(&buffer, sizeof(buffer), 1, fp);
     }
 
-    remaining_disk_size = disk_size - (num_fat_blocks * LFFS_BLKSZ);
+    remaining_disk_size = disk_size - (num_fat_blocks * NGFS_BLKSZ);
 
     // Initialize random seed and allocators
     srand(time(NULL));
@@ -287,7 +287,7 @@ int main(int argc, char *argv[]) {
 
     // Write the root dir entry
     root_dir.name[0] = '.'; // "." for self
-    root_dir.start_block = LFFS_BLOCK_END;
+    root_dir.start_block = NGFS_BLOCK_END;
     write_dentry(fp, &root_dir);
 
     // Load each file given
