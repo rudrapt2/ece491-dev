@@ -14,6 +14,9 @@
         .section        .text.start, "xa", @progbits
         .balign         4
 
+# On entry, a0 contains the hart id and a1 contains a pointer to the DTB. Do not
+# touch these registers so they get passed through to main().
+
 smode_start:
 
         # Set trap handler for S mode (defined in trap.s)
