@@ -56,8 +56,10 @@ MP3_OBJS = \
 	cache.o \
 	timer.o \
 	device.o \
-	ngfs.o \
-	ktfs.o
+	io.o \
+	syscall.o \
+	fs/ngfs.o \
+	fs/ktfs.o 
 
 CFLAGS = -Wall -Werror=implicit-function-declaration -Wno-unused-function
 CFLAGS += -fno-omit-frame-pointer -ggdb3 -gdwarf-2
@@ -138,7 +140,7 @@ mp2-%.o: %.c
 # MP3
 #
 
-mp3-kernel.elf: $(MP2_OBJS) mp3-main.o
+mp3-kernel.elf: $(MP3_OBJS) main.o
 	$(LD) $(LDFLAGS) -T kernel.ld -o $@ $^
 
 run-mp3: mp3-kernel.elf

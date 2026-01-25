@@ -134,7 +134,7 @@ int elf_load(struct io * io, void (**eptr)(void)) {
 
     // Get ELF file length
 
-    result = ioctl(io, FCNTL_GETEND, &size);
+    result = ioctl(io, IOC_GETEND, &size);
 
     if (result != 0)
         return result;

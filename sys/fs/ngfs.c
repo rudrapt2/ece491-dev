@@ -136,7 +136,6 @@ static const struct iointf ngfs_listing_io_intf = {
 int mount_ngfs(const char * name, struct io * bkgio) {
     int result;
     struct ngfs * ngfs;
-    uint32_t num_files;
     struct cache * cache;
     struct ngfs_file * f;
     struct ngfs_dir_entry * root_dir;
@@ -169,9 +168,7 @@ int mount_ngfs(const char * name, struct io * bkgio) {
     assert(root_dir->start_block == NGFS_ROOT_DATA_BLOCK);
     assert(root_dir->size % DENTRYSZ == 0);
 
-    num_files = root_dir->size / DENTRYSZ;
-
-    debug("Starting with %d files\n", num_files);
+    debug("Starting with %d files\n", root_dir->size / DENTRYSZ);
 
     for (uint32_t idx = 1; 
         iterate_dentry(ngfs, &idx, &block, &dentry, CACHE_CLEAN);) 
@@ -203,7 +200,6 @@ int ngfs_open(struct filesystem * fs, const char * name, struct io ** ioptr) {
 int ngfs_open_file(struct ngfs * fs, const char * name, struct io ** ioptr) {
     struct ngfs_io * fio;
     struct ngfs_file * f;
-    struct ngfs_dir_entry * dentry;
     struct ngfs_dir_entry * root_dir = &fs->root_dir;
     struct ngfs_file * files_list = fs->files_list;
     trace("%s(%s,%p)", __func__, name, ioptr);
@@ -291,8 +287,7 @@ long ngfs_store(
     struct cache * cache = ngfs->cache;
     uint32_t new_blockno = pos / NGFS_BLKSZ;
     uint32_t bytes_written = 0;
-    uint32_t block, start_block;
-    uint32_t offset, remaining_len, write_len;
+    uint32_t block, offset, remaining_len, write_len;
     
     // extend file size of necessary
     if (f->dentry.size - pos < len) {
@@ -376,7 +371,6 @@ int ngfs_delete(struct filesystem * fs, const char * name) {
     struct cache * cache = ngfs->cache;
     struct ngfs_dir_entry * root_dir = &ngfs->root_dir;
     struct ngfs_file * files_list = ngfs->files_list;
-    uint32_t num_files = root_dir->size / DENTRYSZ;
     struct ngfs_dir_entry * dentry;
 
     if (strcmp(name, root_dir->name) == 0)
@@ -477,7 +471,6 @@ void ngfs_flush(struct filesystem * fs) {
     struct ngfs * ngfs = (void *)fs;
     struct cache * cache = ngfs->cache;
     struct ngfs_dir_entry * dentry;
-    uint32_t num_files = ngfs->root_dir.size / DENTRYSZ;
     struct ngfs_file * f = ngfs->files_list;
     uint32_t block;
     

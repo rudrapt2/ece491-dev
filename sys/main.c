@@ -56,8 +56,8 @@ void main(void) {
 
 #ifndef MP2
     // MP3 stuff
-    mount_drive(CMNTNAME, CDEVNAME, mount_tarfs);
-    mount_drive(DMNTNAME, DDEVNAME, mount_tarfs);
+    mount_drive(CMNTNAME, CDEVNAME, mount_ngfs);
+    mount_drive(DMNTNAME, DDEVNAME, mount_ktfs);
 #endif
 
     attach_devices();
