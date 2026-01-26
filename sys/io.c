@@ -66,7 +66,7 @@ long ioread(struct io * io, void * buf, long bufsz) {
     if (bufsz != 0 && bufsz < io->blksz)
         return -EINVAL;
     
-    return io->intf->read(io, buf, bufsz);
+    return io->intf->read(io, buf, ROUND_DOWN(bufsz, io->blksz));
 }
 
 long iofill(struct io * io, void * buf, long bufsz) {
@@ -76,78 +76,84 @@ long iofill(struct io * io, void * buf, long bufsz) {
     panic("Not implemented"); // FIXME
 }
 
-long iowrite(struct io * io, const void * buf, long len) {
+long iowrite(struct io * io, const void * buf, long buflen) {
     assert (io != NULL);
-    assert (buf != NULL || len == 0);
+    assert (buf != NULL || buflen == 0);
 
     if (io->intf->write == NULL)
         return -ENOTSUP;
     
-    if (len < 0)
+    if (buflen < 0)
         return -EINVAL;
     
-    if (len != 0 && len < io->blksz)
+    if (buflen != 0 && buflen < io->blksz)
         return -EINVAL;
     
-    return io->intf->write(io, buf, len);
+    return io->intf->write(io, buf, ROUND_DOWN(buflen, io->blksz));
 }
 
-long iofetch(struct io * io, unsigned long long pos, void * buf, long len) {
+long iofetch(struct io * io, unsigned long long pos, void * buf, long buflen) {
     assert (io != NULL);
     assert (io->refcnt != 0);
-    assert (buf != NULL || len == 0);
+    assert (buf != NULL || buflen == 0);
 
     if (io->intf->fetch == NULL)
         return -ENOTSUP;
     
-    if (len < 0)
+    if (buflen < 0)
         return -EINVAL;
     
-    if (len != 0 && len < io->blksz)
+    if (buflen != 0 && buflen < io->blksz)
         return -EINVAL;
     
-    if (pos % io->blksz != 0 || len % io->blksz != 0)
+    if (pos % io->blksz != 0 || buflen % io->blksz != 0)
         return -EINVAL;
     
-    return io->intf->fetch(io, pos, buf, len);
+    return io->intf->fetch(io, pos, buf, buflen);
 }
 
-long iostore(struct io * io, unsigned long long pos, const void * buf, long len) {
+long iostore(struct io * io, unsigned long long pos, const void * buf, long buflen) {
     assert (io != NULL);
     assert (io->refcnt != 0);
-    assert (buf != NULL || len == 0);
+    assert (buf != NULL || buflen == 0);
 
     if (io->intf->fetch == NULL)
         return -ENOTSUP;
     
-    if (len < 0)
+    if (buflen < 0)
         return -EINVAL;
     
-    if (len != 0 && len < io->blksz)
+    if (buflen != 0 && buflen < io->blksz)
         return -EINVAL;
     
-    if (pos % io->blksz != 0 || len % io->blksz != 0)
+    if (pos % io->blksz != 0 || buflen % io->blksz != 0)
         return -EINVAL;
     
-    return io->intf->store(io, pos, buf, len);
+    return io->intf->store(io, pos, buf, buflen);
 }
 
 int ioctl(struct io * io, int op, void * arg) {
     assert (io != NULL);
     assert (io->refcnt != 0);
 
+    if (op == IOC_GETBLKSZ)
+        return io->blksz;
+    
     if (io->intf->ioctl != NULL)
         return io->intf->ioctl(io, op, arg);
     else
         return -ENOTSUP;
 }
 
-int ioctl_u(struct io * io, int u_op, uintptr_t u_arg) {
+int ioctl_u(struct io * io, int op, uintptr_t u_arg) {
     assert (io != NULL);
     assert (io->refcnt != 0);
 
+    if (op == IOC_GETBLKSZ)
+        return io->blksz;
+    
     if (io->intf->ioctl_u != NULL)
-        return io->intf->ioctl_u(io, u_op, u_arg);
+        return io->intf->ioctl_u(io, op, u_arg);
     else
         return -ENOTSUP;
 }
@@ -229,12 +235,6 @@ int seekio_ioctl(struct io * io, int op, void * arg) {
         *ullarg = sio->end;
         return 0;
     
-    case IOC_SETEND:
-        if (*ullarg % io->blksz != 0)
-            return -EINVAL;
-        sio->end = *ullarg;
-        return 0;
-    
     case IOC_GETPOS:
         *ullarg = sio->pos;
         return 0;
@@ -250,6 +250,10 @@ int seekio_ioctl(struct io * io, int op, void * arg) {
     default:
         return -ENOTSUP;
     }
+}
+
+void seekio_resize(struct seekio * sio, unsigned long long endpos) {
+    sio->end = endpos;
 }
 
 
@@ -335,7 +339,6 @@ struct memio {
 static void memio_reclaim(struct io * io);
 static long memio_fetch(struct io * io, unsigned long long pos, void * buf, long len);
 static long memio_store(struct io * io, unsigned long long pos, const void * buf, long len);
-static int memio_ioctl(struct io * io, int op, void * arg);
 
 // MEMIO INTERNAL CONSTANT DEFINITIONS
 //
@@ -347,7 +350,7 @@ static const struct iointf memio_intf = {
     .write = &seekio_write,
     .fetch = &memio_fetch,
     .store = &memio_store,
-    .ioctl = &memio_ioctl
+    .ioctl = &seekio_ioctl
 };
 
 // MEMIO EXPORTED FUNCTION DEFINITIONS
@@ -410,21 +413,8 @@ long memio_store(struct io * io, unsigned long long pos, const void * buf, long 
     memcpy(mio->buf + pos, buf, len);
     return len;
 }
-
-int memio_ioctl(struct io * io, int op, void * arg) {
-    assert (io != NULL);
-    
-    switch (op) {
-    case IOC_GETEND:
-    case IOC_GETPOS:
-    case IOC_SETPOS:
-        return seekio_ioctl(io, op, arg);
-    default:
-        return -ENOTSUP;
-    }
-}
-
 #ifndef MP2
+
 
 // IOPIPE INTERNAL TYPE DEFINITIONS
 //
