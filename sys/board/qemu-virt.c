@@ -13,7 +13,7 @@
 //
 
 #define NUART 3
-#define RAM_SIZE_MB 8
+#define RAM_SIZE_MB (8-2)
 
 // QEMU constants
 //
@@ -61,7 +61,7 @@ extern void attach_uart(void * mmio_base, int irqno); // dev/uart.c
 extern void attach_virtio(void * mmio_base, int irqno); // dev/virtio.c
 extern void attach_rtc(void * mmio_base); // dev/rtc.c
 
-void board_init(void) {    
+void board_init(unsigned int hartid, void * dtb) {    
     console_init();
     plic_init((void*)PLIC_MMIO_BASE);
     timer_init(TIMER_FREQ);

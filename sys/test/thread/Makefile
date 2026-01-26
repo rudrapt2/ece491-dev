@@ -64,31 +64,31 @@ run-all: \
 	run-yield-once
 
 thread-returns.elf: $(OBJS) thread-returns.o ../fake-memory.o ../fake-timer.o
-	$(LD) $(LDFLAGS) -T ../../kernel.ld -o $@ $^
+	$(LD) $(LDFLAGS) -T ../../board/qemu-virt.ld -o $@ $^
 
 run-thread-returns: thread-returns.elf
 	timeout --foreground 5s $(QEMU) $(QEMUOPTS) -m 8M -kernel $<
 
 yield-once.elf: $(OBJS) yield-once.o ../fake-memory.o ../fake-timer.o
-	$(LD) $(LDFLAGS) -T ../../kernel.ld -o $@ $^
+	$(LD) $(LDFLAGS) -T ../../board/qemu-virt.ld -o $@ $^
 
 run-yield-once: yield-once.elf
 	timeout --foreground 5s $(QEMU) $(QEMUOPTS) -m 8M -kernel $<
 
 yield-twice.elf: $(OBJS) yield-twice.o ../fake-memory.o ../fake-timer.o
-	$(LD) $(LDFLAGS) -T ../../kernel.ld -o $@ $^
+	$(LD) $(LDFLAGS) -T ../../board/qemu-virt.ld -o $@ $^
 
 run-yield-twice: yield-twice.elf
 	timeout --foreground 5s $(QEMU) $(QEMUOPTS) -m 8M -kernel $<
 
 yield-hotpotato.elf: $(OBJS) yield-hotpotato.o ../fake-memory.o ../fake-timer.o
-	$(LD) $(LDFLAGS) -T ../../kernel.ld -o $@ $^
+	$(LD) $(LDFLAGS) -T ../../board/qemu-virt.ld -o $@ $^
 
 run-yield-hotpotato: yield-hotpotato.elf
 	timeout --foreground 5s $(QEMU) $(QEMUOPTS) -m 8M -kernel $<
 
 correct-tids.elf: $(OBJS) correct-tids.o ../fake-memory.o ../fake-timer.o
-	$(LD) $(LDFLAGS) -T ../../kernel.ld -o $@ $^
+	$(LD) $(LDFLAGS) -T ../../board/qemu-virt.ld -o $@ $^
 
 correct-tids: correct-tids.elf
 	timeout --foreground 5s $(QEMU) $(QEMUOPTS) -m 8M -kernel $<

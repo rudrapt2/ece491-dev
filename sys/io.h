@@ -32,6 +32,7 @@ extern unsigned int ioblksz(const struct io * io);
 //
 // On return ioblksz() guarantees:
 // - The returned block size is greater than or equal to 1.
+// - The returned block size is not greater than INT_MAX.
 //
 // * This function may be called from an ISR.
 //
@@ -142,7 +143,7 @@ extern long iofetch(struct io * io, unsigned long long pos, void * buf, long len
 // * This function may switch to another thread context.
 // * This function must _not_ be called from an ISR.
 //
-// See also:
+// See also: iostore().
 
 
 extern long iostore(struct io * io, unsigned long long pos, const void * buf, long len);
@@ -154,16 +155,18 @@ extern long iostore(struct io * io, unsigned long long pos, const void * buf, lo
 // * This function may switch to another thread context.
 // * This function must _not_ be called from an ISR.
 //
-// See also: iofetch()
+// See also: iofetch().
 
 
 int ioctl(struct io * io, int op, void * arg);
 int ioctl_u(struct io * io, int u_op, uintptr_t u_arg);
 
-#define IOC_GETEND 1
-#define IOC_SETEND 2
-#define IOC_GETPOS 3
-#define IOC_SETPOS 4
+#define IOC_GETBLKSZ 0 // no arg, return value is block size
+
+#define IOC_GETEND 4 // arg is unsigned long long *
+#define IOC_SETEND 5 // arg is const unsigned long long *
+#define IOC_GETPOS 6 // arg is unsigned long long *
+#define IOC_SETPOS 7 // arg is const unsigned long long *
 
 // Performs a special operation on an I/O object. The /op/ parameter specifies
 // the operation, one of the IOC-prefixed constants defined above. The operation
@@ -189,39 +192,46 @@ int ioctl_u(struct io * io, int u_op, uintptr_t u_arg);
 //
 // The following list describes specific system-defined ioctl() operations.
 //
-// - unsigned long long endpos; ioctl(io, IOC_GETEND, &endpos);
-//   Gets size/capacity of a storage I/O object. The size/capacity in bytes is
-//   equal to the last valid byte position within the object, which is the
-//   position just after the last byte. The size is written as an integer of
-//   unsigned long long type to the address given by /arg/. The /arg/ argument
-//   must be a properly-aligned pointer to a region of memory large enough to
-//   hold a variable of type unsigned long long. All I/O objects implementing
-//   either the _fetch_ or _store_ operations must also support the IOC_GETEND
-//   operation.
+// - int blksz = ioctl(io, IOC_GETBLKSZ, NULL);
+//   Gets the block size of an I/O object. All I/O operations on the object must
+//   be in multiples of the block size. The size is returned via the return
+//   value, _not_ via a pointer output argument like IOC_GETEND, etc. The
+//   returned block size may also be obtained using ioblksz(). This operation is
+//   supported by all I/O objects. The block size is at least 1, so the return
+//   value is never 0.
 //
-// - unsigned long long endpos; ioctl(io, IOC_SETEND, &endpos);
-//   Resized a storage I/O object. The size/capacity in bytes is equal to the
-//   last valid byte position within the object, which is the position just
-//   after the last byte. /arg/ must point to an unsigned long long typed
-//   integer containing the request size. Not all storage I/O objects support
-//   this operation. The /arg/ argument must be a properly-aligned pointer.
-//
-// - unsigned long long pos; ioctl(io, IOC_GETPOS, &pos);
-//   Gets the byte position at which the next _read_ or _write_ operation would
-//   occur in a storage I/O object. This position is known as the _current
-//   position_ in a storage I/O object that supports either _read_ or _write_
-//   operations. The current byte position is written as an integer of unsigned
+// - unsigned long long endpos; ioctl(io, IOC_GETEND, &endpos); Gets
+//   size/capacity of a storage I/O object. The size/capacity in bytes is equal
+//   to the last valid byte position within the object, which is the position
+//   just after the last byte. The size is written as an integer of unsigned
 //   long long type to the address given by /arg/. The /arg/ argument must be a
 //   properly-aligned pointer to a region of memory large enough to hold a
-//   variable of type unsigned long long.
+//   variable of type unsigned long long. All I/O objects implementing either
+//   the _fetch_ or _store_ operations must also support the IOC_GETEND
+//   operation.
 //
-// - unsigned long long pos; ioctl(io, IOC_SETPOS, &pos);
-//   Sets the byte position at which the next /read/ or /write/ operation would
-//   occur in a storage I/O object. This position is known as the _current
-//   position_ in a storage I/O object that supports either _read_ or _write_
-//   operations. /arg/ must point to an integer of type unsigned long long
-//   containing the new position. The /arg/ argument must be a properly-aligned
-//   pointer.
+// - unsigned long long endpos; ioctl(io, IOC_SETEND, &endpos); Resized a
+//   storage I/O object. The size/capacity in bytes is equal to the last valid
+//   byte position within the object, which is the position just after the last
+//   byte. /arg/ must point to an unsigned long long typed integer containing
+//   the request size. Not all storage I/O objects support this operation. The
+//   /arg/ argument must be a properly-aligned pointer.
+//
+// - unsigned long long pos; ioctl(io, IOC_GETPOS, &pos); Gets the byte position
+//   at which the next _read_ or _write_ operation would occur in a storage I/O
+//   object. This position is known as the _current position_ in a storage I/O
+//   object that supports either _read_ or _write_ operations. The current byte
+//   position is written as an integer of unsigned long long type to the address
+//   given by /arg/. The /arg/ argument must be a properly-aligned pointer to a
+//   region of memory large enough to hold a variable of type unsigned long
+//   long.
+//
+// - unsigned long long pos; ioctl(io, IOC_SETPOS, &pos); Sets the byte position
+//   at which the next /read/ or /write/ operation would occur in a storage I/O
+//   object. This position is known as the _current position_ in a storage I/O
+//   object that supports either _read_ or _write_ operations. /arg/ must point
+//   to an integer of type unsigned long long containing the new position. The
+//   /arg/ argument must be a properly-aligned pointer.
 
 // SPECIAL IO OBJECTS
 //
