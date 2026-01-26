@@ -156,53 +156,89 @@ extern void plic_finish_interrupt(int irqno) {
 //
 
 static inline void plic_set_source_priority(uint_fast32_t srcno, uint_fast32_t level) {
+#ifdef STUDENT
+	// YOUR CODE HERE
+#else
 	plic->priority[srcno] = level;
+#endif
 }
 
 static inline int plic_source_pending(uint_fast32_t srcno) {
+#ifdef STUDENT
+	// YOUR CODE HERE
+#else
 	const int i = srcno / 32; // in uint32_t units
 	const int j = srcno % 32; // bit index inside uint32_t
 
 	return ((plic->pending[i] >> j) & 1);
+#endif
 }
 
 static inline void plic_enable_source_for_context(uint_fast32_t ctxno, uint_fast32_t srcno) {
+#ifdef STUDENT
+	// YOUR CODE HERE
+#else
 	const int i = srcno / 32; // in uint32_t units
 	const int j = srcno % 32; // bit index inside uint32_t
 	volatile uint32_t * const ptr = plic->enable[ctxno]+i;
 	__atomic_or_fetch(ptr, UINT32_C(1) << j, __ATOMIC_RELAXED);
+#endif
 }
 
-static inline void plic_disable_source_for_context(uint_fast32_t ctxno, uint_fast32_t srcid) {
-	const int i = srcid / 32; // in uint32_t units
-	const int j = srcid % 32; // bit index in uint32_t
+static inline void plic_disable_source_for_context(uint_fast32_t ctxno, uint_fast32_t srcno) {
+#ifdef STUDENT
+	// YOUR CODE HERE
+#else
+	const int i = srcno / 32; // in uint32_t units
+	const int j = srcno % 32; // bit index in uint32_t
 	volatile uint32_t * const ptr = plic->enable[ctxno]+i;
 
 	__atomic_or_fetch(ptr, ~(UINT32_C(1) << j), __ATOMIC_RELAXED);
+#endif
 }
 
 static inline void plic_set_context_threshold(uint_fast32_t ctxno, uint_fast32_t level) {
+#ifdef STUDENT
+	// YOUR CODE HERE
+#else
 	plic->ctx[ctxno].threshold = level;
+#endif
 }
 
 static inline uint_fast32_t plic_claim_context_interrupt(uint_fast32_t ctxno) {
+#ifdef STUDENT
+	// YOUR CODE HERE
+#else
 	return plic->ctx[ctxno].claim;
+#endif
 }
 
 static inline void plic_complete_context_interrupt(uint_fast32_t ctxno, uint_fast32_t srcno) {
+#ifdef STUDENT
+	// YOUR CODE HERE
+#else
 	plic->ctx[ctxno].claim = srcno;
+#endif
 }
 
 static void plic_enable_all_sources_for_context(uint_fast32_t ctxno) {
+#ifdef STUDENT
+	// YOUR CODE HERE
+#else
 	int i;
 
 	for (i = 0; i < PLIC_SRC_CNT/32; i++)
 		plic->enable[ctxno][i] = ~UINT32_C(0);
+#endif
 }
 
 static void plic_disable_all_sources_for_context(uint_fast32_t ctxno) {
+#ifdef STUDENT
+	// YOUR CODE HERE
+#else
 	int i;
 
 	for (i = 0; i < PLIC_SRC_CNT/32; i++)
 		plic->enable[ctxno][i] = UINT32_C(0);
+#endif
 }

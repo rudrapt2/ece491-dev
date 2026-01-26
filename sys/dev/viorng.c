@@ -19,8 +19,12 @@
 // INTERNAL CONSTANT DEFINITIONS
 //
 
-#ifndef VIORNG_BUFSZ
-#define VIORNG_BUFSZ 256
+#ifdef STUDENT
+
+#else
+    #ifndef VIORNG_BUFSZ
+    #define VIORNG_BUFSZ 256
+    #endif
 #endif
 
 #ifndef VIORNG_NAME
@@ -35,6 +39,9 @@
 //
 
 struct viorng_device {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     volatile struct virtio_mmio_regs * regs;
     int irqno;
 
@@ -66,6 +73,7 @@ struct viorng_device {
 
     unsigned int bufcnt;
     char buf[VIORNG_BUFSZ];
+#endif
 };
 
 // INTERNAL FUNCTION DECLARATIONS
@@ -95,6 +103,9 @@ static const struct iointf viorng_intf = {
 // virtio.c when a VirtIO RNG device is found.
 
 void viorng_attach(volatile struct virtio_mmio_regs * regs, int irqno) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     static unsigned short instcnt = 0; // number of viorng devices
     virtio_featset_t enabled_features, wanted_features, needed_features;
     struct viorng_device * vrng;
@@ -150,9 +161,13 @@ void viorng_attach(volatile struct virtio_mmio_regs * regs, int irqno) {
 
     register_device(VIORNG_NAME, instcnt++, &viorng_open, vrng);
     ioinit(&vrng->io, &viorng_intf, 1, 0);
+#endif
 }
 
 int viorng_open(struct io ** ioptr, void * aux) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     struct viorng_device * vrng = aux;
 
     vrng->regs->status |= VIRTIO_STAT_ACKNOWLEDGE;
@@ -163,17 +178,25 @@ int viorng_open(struct io ** ioptr, void * aux) {
     *ioptr = ioaddref(&vrng->io);
 
     return 0;
+#endif
 }
 
 void viorng_reclaim(struct io * io) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     struct viorng_device * const vrng = 
         (void*)io - offsetof(struct viorng_device, io);
     
     virtio_reset_virtq(vrng->regs, 0);
     disable_intr_source(vrng->irqno);
+#endif
 }
 
 long viorng_read(struct io * io, void * buf, long bufsz) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     struct viorng_device * const vrng = 
         (void*)io - offsetof(struct viorng_device, io);
     long rcnt;
@@ -198,9 +221,13 @@ long viorng_read(struct io * io, void * buf, long bufsz) {
     memcpy(buf, vrng->buf + vrng->bufcnt - rcnt, rcnt);
     vrng->bufcnt -= rcnt;
     return rcnt;
+#endif
 }
 
 void viorng_isr(int irqno, void * aux) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     struct viorng_device * vrng = aux;
     uint32_t intr_status;
 
@@ -220,4 +247,5 @@ void viorng_isr(int irqno, void * aux) {
     }
 
     condition_broadcast(&vrng->bufupd);
+#endif
 }

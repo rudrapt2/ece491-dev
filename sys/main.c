@@ -44,12 +44,11 @@ static void mount_drive(char * mntname, char * devname,
 static void run_games(void);
 #endif // MP2
 
-
-extern void board_init(void); // from board/xxx.c
+extern void board_init(unsigned int hartid, void * dtb); // from board/xxx.c
 extern void attach_devices(void); // from board/xxx.c
 
-void main(void) {
-    board_init();
+void main(unsigned int hartid, void * dtb) {
+    board_init(hartid, dtb);
     intrmgr_init();
     devmgr_init();
     thrmgr_init();
