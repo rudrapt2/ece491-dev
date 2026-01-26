@@ -257,7 +257,7 @@ int spawn_thread (
     ...)
 {
 #ifdef STUDENT
-    // (your MP2cp3 code here)
+    // YOUR CODE HERE
 #else
     struct thread * child;
     va_list ap;
@@ -324,7 +324,7 @@ void exit_running_thread(void) {
     set_thread_state(TP, THREAD_EXITED);
 
 #ifdef STUDENT
-    // (your MP3cp3 code here)
+    // YOUR CODE HERE
 #else
     // Signal parent (if we have one) in case it is waiting for us to exit
 
@@ -357,7 +357,7 @@ void exit_running_thread(void) {
 #ifndef MP2
 void submit_running_thread(void) {
 #ifdef STUDENT
-    // (your MP3cp3 code here)
+    // YOUR CODE HERE
 #else
     unsigned long long time_must_suspend; // time thread must suspend
     unsigned long long time_now;
@@ -387,7 +387,7 @@ void yield_running_thread(void) {
     assert (!tlempty(&ready_list));
 
 #ifdef STUDENT
-    // (your MP2cp3 code here)
+    // YOUR CODE HERE
 #else
     susp_thread = TP;
 
@@ -491,7 +491,7 @@ void yield_running_thread(void) {
 
 void finish_thread_switch(struct thread * susp_thread) {
 #ifdef STUDENT
-    // (your MP2cp3 code here)
+    // YOUR CODE HERE
 #else
     unsigned long long time_now;
     unsigned int ticks_used;
@@ -531,7 +531,7 @@ int join_thread(int u_tid) {
     trace("%s(%d) in <%s:%d>", __func__, u_tid, TP->name, TP->id);
 
 #ifdef STUDENT
-    // (your MP2cp3 code here)
+    // YOUR CODE HERE
 #else
     if (u_tid < 0 || NTHR <= u_tid)
         return -ECHILD;
@@ -623,7 +623,7 @@ void condition_wait(struct condition * cond) {
     assert(TP->state == THREAD_RUNNING);
 
 #ifdef STUDENT
-    // (your MP2cp3 code here)
+    // YOUR CODE HERE
 #else
     // Insert current thread into condition wait list
     
@@ -653,7 +653,7 @@ void condition_broadcast(struct condition * cond) {
         return;
 
 #ifdef STUDENT
-    // (your MP2cp3 code here)
+    // YOUR CODE HERE
 #else
     // Copy wait list and clear the one in the condition itself. Once we save
     // the wait list in the /list/ variable and clear the wait list in the
@@ -711,7 +711,7 @@ void condition_broadcast(struct condition * cond) {
 
 void rwlock_init(struct rwlock * rwlk, const char * name) {
 #ifdef STUDENT
-    // (your MP2cp3 code here)
+    // YOUR CODE HERE
 #else
     memset(rwlk, 0, sizeof(*rwlk));
     condition_init(&rwlk->released, "rwlock.released");
@@ -727,7 +727,7 @@ void rwlock_acquire(struct rwlock * rwlk, int exclusive) {
     trace("%s(<%s>,%d)", __func__, rwlk->name, exclusive);
 
 #ifdef STUDENT
-    // (your MP2cp3 code here)
+    // YOUR CODE HERE
 #else
     if (exclusive) {
         if (rwlk->owner != TP) {
@@ -751,7 +751,7 @@ void rwlock_release(struct rwlock * rwlk) {
     trace("%s(<%s>)", __func__, rwlk->name);
 
 #ifdef STUDENT
-    // (your MP2cp3 code here)
+    // YOUR CODE HERE
 #else
     assert (rwlk->cnt > 0);
     rwlk->cnt -= 1;

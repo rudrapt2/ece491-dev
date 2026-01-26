@@ -101,7 +101,7 @@ void handle_smode_interrupt(unsigned int cause) {
 
 void handle_umode_interrupt(unsigned int cause) {
 #ifdef STUDENT
-    // (your MP3cp2 code here)
+    // YOUR CODE HERE
 #else
     // called from trap.s
     handle_interrupt(cause);
@@ -136,6 +136,9 @@ extern int interrupts_disabled(void) {
 //
 
 void handle_interrupt(unsigned int cause) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     switch (cause) {
         case RISCV_SCAUSE_STI:
             handle_timer_interrupt();
@@ -147,9 +150,13 @@ void handle_interrupt(unsigned int cause) {
             panic(NULL);
             break;
     }
+#endif
 }
 
 void handle_extern_interrupt(void) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     int srcno;
 
     srcno = plic_claim_interrupt();
@@ -164,4 +171,5 @@ void handle_extern_interrupt(void) {
     isrtab[srcno].isr(srcno, isrtab[srcno].israux);
 
     plic_finish_interrupt(srcno);
+#endif
 }

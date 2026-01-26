@@ -360,6 +360,9 @@ struct io * create_memio (
     void * buf, size_t size,
     void(*reclfn)(void*,size_t))
 {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     struct memio * mio;
     
     assert (buf != NULL || size == 0);
@@ -370,21 +373,29 @@ struct io * create_memio (
     return seekio_init (
         &mio->base, &memio_intf, size,
         /* blksz */ 1, /* refcnt */ 1);
+#endif
 }
 
 // MEMIO INTERNAL FUNCTION DEFINITIONS
 //
 
 void memio_reclaim(struct io * io) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     struct memio * const mio = (struct memio*)io;
 
     if (mio->reclfn != NULL)
         mio->reclfn(mio->buf, mio->base.end);
     
     kfree(mio);
+#endif
 }
 
 long memio_fetch(struct io * io, unsigned long long pos, void * buf, long len) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     struct memio * const mio = (struct memio*)io;
 
     assert (io != NULL);
@@ -397,9 +408,13 @@ long memio_fetch(struct io * io, unsigned long long pos, void * buf, long len) {
     
     memcpy(buf, mio->buf + pos, len);
     return len;
+#endif
 }
 
 long memio_store(struct io * io, unsigned long long pos, const void * buf, long len) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     struct memio * const mio = (struct memio*)io;
 
     assert (io != NULL);
@@ -412,6 +427,7 @@ long memio_store(struct io * io, unsigned long long pos, const void * buf, long 
     
     memcpy(mio->buf + pos, buf, len);
     return len;
+#endif
 }
 #ifndef MP2
 
