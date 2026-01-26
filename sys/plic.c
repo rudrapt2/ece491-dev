@@ -185,12 +185,12 @@ static inline void plic_enable_source_for_context(uint_fast32_t ctxno, uint_fast
 #endif
 }
 
-static inline void plic_disable_source_for_context(uint_fast32_t ctxno, uint_fast32_t srcid) {
+static inline void plic_disable_source_for_context(uint_fast32_t ctxno, uint_fast32_t srcno) {
 #ifdef STUDENT
 	// YOUR CODE HERE
 #else
-	const int i = srcid / 32; // in uint32_t units
-	const int j = srcid % 32; // bit index in uint32_t
+	const int i = srcno / 32; // in uint32_t units
+	const int j = srcno % 32; // bit index in uint32_t
 	volatile uint32_t * const ptr = plic->enable[ctxno]+i;
 
 	__atomic_or_fetch(ptr, ~(UINT32_C(1) << j), __ATOMIC_RELAXED);
