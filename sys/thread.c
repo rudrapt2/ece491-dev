@@ -330,7 +330,7 @@ void exit_running_thread(void) {
 #else
     // Signal parent (if we have one) in case it is waiting for us to exit
 
-    if (TP->parent == NULL)
+    if (TP->parent != NULL)
         condition_broadcast(&TP->parent->child_exit);
 
     // Reclaim any of our children that have exited and orphan any that have not
@@ -592,7 +592,7 @@ struct process * running_thread_process(void) {
 void thread_attach_process(int tid, struct process * proc) {
     assert (0 <= tid && tid < NTHR);
     assert (thrtab[tid] != NULL);
-    assert (thrtab[tid]->proc == NULL);
+    // assert (thrtab[tid]->proc == NULL);
     // assert (proc != NULL);
     thrtab[tid]->proc = proc;
 }

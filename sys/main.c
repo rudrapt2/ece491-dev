@@ -65,6 +65,7 @@ void main(void) {
     enable_interrupts();
 
 #ifndef MP2
+    mount_devfs(DEVMNTNAME);
     mount_drive(CMNTNAME, CDEVNAME, mount_ngfs);
     mount_drive(DMNTNAME, DDEVNAME, mount_ktfs);
     exec_init();

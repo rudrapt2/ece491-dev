@@ -121,7 +121,7 @@ int open_file(const char * mpname, const char * flname, struct io ** ioptr) {
     trace("%s(\"%s\",\"%s\")", __func__, mpname, flname);
     assert (ioptr != NULL);
 
-    if (mpname == NULL) {
+    if (mpname == NULL || *mpname == '\0') {
         assert (flname == NULL);
         return open_root_listing(ioptr);
     }
@@ -183,8 +183,8 @@ void parse_path(char * path, char ** mpnameptr, char ** flnameptr) {
     assert (flnameptr != NULL);
     char * ss; // slash in path
 
-    // ignore leading slash
-    if (*path == '/')
+    // ignore leading slashes
+    while (*path == '/')
         path += 1;
 
     ss = strchr(path, '/');

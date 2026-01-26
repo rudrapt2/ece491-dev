@@ -306,18 +306,14 @@ int sysopen(int fd, const char * path) {
 
     pathlen = strlen(path);
 
-    if (pathlen == 0 || PATH_MAX < pathlen)
+    if (PATH_MAX < pathlen)
         return -EINVAL;
     
-    pathbuf = kmalloc(pathlen+1);
+    pathbuf = kcalloc(pathlen+1, 1);
     memcpy(pathbuf, path, pathlen+1);
     parse_path(pathbuf, &mpname, &flname);
 
-    if (*mpname == '\0')
-        result = -EINVAL;
-
-    if (result == 0)
-        result = open_file(mpname, flname, &io);
+    result = open_file(mpname, flname, &io);
 
     if (result == 0)
         self->iotab[fd] = io;

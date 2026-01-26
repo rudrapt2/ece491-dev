@@ -23,7 +23,6 @@
 #include "../heap.h"
 #include "../misc.h"
 #include "../string.h"
-#include "../thread.h"
 #include "../ioimpl.h"
 
 // INTERNAL TYPE DEFINITIONS
@@ -36,13 +35,6 @@
 
 #define CACHE_CLEAN 0
 #define CACHE_DIRTY 1
-
-#define RM_FILE(file)                                   \
-    do {                                                \
-        if (file->next) file->next->prev = file->prev;  \
-        if (file->prev) file->prev->next = file->next;  \
-        if (file == files_list) files_list = file->next;\
-    } while (0)
 
 // TODO: add locks
 struct ngfs_file {
@@ -101,7 +93,7 @@ static void set_next_data_block(struct cache * cache, uint32_t block, uint32_t n
 static uint32_t get_next_data_block(struct cache * cache, uint32_t block);
 static void free_blocks(struct cache * cache, uint32_t start);
 static void * get_cache_from_block(struct cache * cache, uint32_t block);
-static uint32_t get_nth_data_block(struct cache * cache, struct ngfs_dir_entry * file, unsigned int n);
+static uint32_t blockno_to_block(struct cache * cache, struct ngfs_dir_entry * file, unsigned int blockno);
 static inline long update_root_dir(struct ngfs * ngfs);
 static int iterate_dentry(struct ngfs * ngfs, uint32_t * idx, uint32_t * block, struct ngfs_dir_entry ** dentry, int dirty);
 static int free_associated_cache_block(struct cache * cache, struct ngfs_dir_entry * entry, int dirty);
@@ -158,7 +150,7 @@ int mount_ngfs(const char * name, struct io * bkgio) {
         CEIL(ngfs->size / NGFS_BLKSZ, NGFS_FAT_ENTRIES_PER_BLOCK);
 
     debug("Mounting filesystem with %d FAT blocks, %d total blocks\n", 
-        ngfs->num_fat_blocks, size / NGFS_BLKSZ);
+        ngfs->num_fat_blocks, ngfs->size / NGFS_BLKSZ);
 
     // root entry is always the first entry
     read_from_block(
@@ -239,7 +231,7 @@ void ngfs_reclaim(struct io * io) {
 long ngfs_fetch(
     struct io * io, unsigned long long pos, void * buf, long bufsz) 
 {
-    trace("%s(%p,%ld)", __func__, buf, len);
+    trace("%s(%p,%ld)", __func__, buf, bufsz);
     struct ngfs_io * fio = (void*)io;
     struct ngfs_file * f = fio->file;
     struct ngfs * ngfs = f->fs;
@@ -255,7 +247,7 @@ long ngfs_fetch(
             block = get_next_data_block(cache, block);
     }
     else if (new_blockno < fio->blockno) {
-        block = get_nth_data_block(cache, &f->dentry, new_blockno);
+        block = blockno_to_block(cache, &f->dentry, new_blockno);
     }
 
     for (remaining_len = bufsz; remaining_len > 0; 
@@ -303,14 +295,14 @@ long ngfs_store(
             block = get_next_data_block(cache, block);
     }
     else if (new_blockno < fio->blockno) {
-        block = get_nth_data_block(cache, &f->dentry, new_blockno);
+        block = blockno_to_block(cache, &f->dentry, new_blockno);
     }
     
     remaining_len = len;
 
     for (remaining_len = len; remaining_len > 0; 
-        block = get_next_data_block(cache, block)) {
-        
+        block = get_next_data_block(cache, block)) 
+    {
         offset = pos % NGFS_BLKSZ;
         write_len = MIN(remaining_len, NGFS_BLKSZ - offset);
         write_to_block(cache, IDX_TO_ABS(block), offset, 
@@ -328,7 +320,9 @@ long ngfs_store(
 }
 
 int ngfs_create(struct filesystem * fs, const char * name) {
+    trace("%s(%s)", __func__, name);
     uint32_t file_idx;
+    struct ngfs_file * f;
     struct ngfs_dir_entry * root_entries;
     struct ngfs * ngfs = (void *)fs;
     struct cache * cache = ngfs->cache;
@@ -339,7 +333,7 @@ int ngfs_create(struct filesystem * fs, const char * name) {
         return -EINVAL;
 
     // Check if the file already exists
-    for (struct ngfs_file * f = ngfs->files_list; f != NULL; f = f->next)
+    for (f = ngfs->files_list; f != NULL; f = f->next)
         if (strcmp(name, f->dentry.name) == 0)
             return -EEXIST;
 
@@ -348,14 +342,27 @@ int ngfs_create(struct filesystem * fs, const char * name) {
     if (update_size(ngfs, root_dir, curr_size + DENTRYSZ))
         return -ENOMEM;
 
-    root_entries = (struct ngfs_dir_entry *)get_cache_from_block(cache, 
-        get_nth_data_block(cache, root_dir, curr_size / NGFS_BLKSZ));
+    debug("Creating file %s at index %d", name, curr_size / DENTRYSZ);
+
+    root_entries = 
+        get_cache_from_block(cache, 
+        IDX_TO_ABS(blockno_to_block(cache, 
+        root_dir, curr_size / NGFS_BLKSZ)));
 
     // Add to root directory
     root_entries[file_idx].size = 0;
     root_entries[file_idx].start_block = NGFS_BLOCK_END;
     strncpy(root_entries[file_idx].name, name, NGFS_MAX_FILENAME_LEN);
+
+    // Add to fslist
+    f = kcalloc(1, sizeof(struct ngfs_file));
+    memcpy(&f->dentry, &root_entries[file_idx], DENTRYSZ);
     cache_release(cache, (void *)root_entries, CACHE_DIRTY);
+
+    f->fs = ngfs;
+    f->next = ngfs->files_list;
+    if (f->next) f->next->prev = f;
+    ngfs->files_list = f;
 
     update_root_dir(ngfs);
 
@@ -371,17 +378,19 @@ int ngfs_delete(struct filesystem * fs, const char * name) {
     struct ngfs * ngfs = (void *)fs;
     struct cache * cache = ngfs->cache;
     struct ngfs_dir_entry * root_dir = &ngfs->root_dir;
-    struct ngfs_file * files_list = ngfs->files_list;
     struct ngfs_dir_entry * dentry;
 
     if (strcmp(name, root_dir->name) == 0)
         return -EACCESS;
 
     // Remove from files list
-    for (f = files_list; f != NULL; f = f->next) {
+    for (f = ngfs->files_list; f != NULL; f = f->next) {
         if (strcmp(name, f->dentry.name) == 0) {
             if (f->refcnt > 0) return -EBUSY;
-            RM_FILE(f);
+
+            if (f->next) f->next->prev = f->prev;  
+            if (f->prev) f->prev->next = f->next;  
+            if (f == ngfs->files_list) ngfs->files_list = f->next;
             break;
         }
     }
@@ -395,7 +404,7 @@ int ngfs_delete(struct filesystem * fs, const char * name) {
     // Get the last dentry 
     // we do this before entry checking to avoid cache conflicts
     new_size = root_dir->size - DENTRYSZ;
-    last_block = get_nth_data_block(cache, root_dir, new_size / NGFS_BLKSZ);
+    last_block = blockno_to_block(cache, root_dir, new_size / NGFS_BLKSZ);
     last_offset = new_size % NGFS_BLKSZ;
     read_from_block(
         cache, IDX_TO_ABS(last_block), last_offset, &last_dentry, DENTRYSZ);
@@ -445,14 +454,19 @@ int ngfs_ioctl(struct io * io, int op, void * arg) {
     }
 }
 
-int update_size(struct ngfs * ngfs, struct ngfs_dir_entry * dentry, uint32_t end) {
-    uint32_t num_new_blocks, new_block;
+int update_size(
+    struct ngfs * ngfs, 
+    struct ngfs_dir_entry * dentry, 
+    uint32_t end) 
+{
+    uint32_t new_blocks, new_block;
     struct cache * cache = ngfs->cache;
-    uint32_t block = get_nth_data_block(cache, dentry, dentry->size);
+    uint32_t block = 
+        blockno_to_block(cache, dentry, dentry->size / NGFS_BLKSZ);
 
     if (end > dentry->size) { // extend
-        num_new_blocks = CEIL(end, NGFS_BLKSZ) - CEIL(dentry->size, NGFS_BLKSZ);
-        while (num_new_blocks-- > 0) {
+        new_blocks = CEIL(end, NGFS_BLKSZ) - CEIL(dentry->size, NGFS_BLKSZ);
+        while (new_blocks-- > 0) {
             new_block = get_free_data_block(ngfs);
             if (new_block == NGFS_BLOCK_END) return -ENOMEM;
             if (dentry->size == 0) dentry->start_block = new_block;
@@ -469,6 +483,7 @@ int update_size(struct ngfs * ngfs, struct ngfs_dir_entry * dentry, uint32_t end
 }
 
 void ngfs_flush(struct filesystem * fs) {
+    trace("%s()", __func__);
     struct ngfs * ngfs = (void *)fs;
     struct cache * cache = ngfs->cache;
     struct ngfs_dir_entry * dentry;
@@ -514,7 +529,7 @@ long ngfs_listing_read(struct io * io, void * buf, long bufsz) {
 
     offset = ls->dir_idx % DENTRIES_PER_BLOCK;
     offset_bytes = offset * DENTRYSZ + offsetof(struct ngfs_dir_entry, name);
-    block = get_nth_data_block(
+    block = blockno_to_block(
         cache, root_dir, ls->dir_idx / DENTRIES_PER_BLOCK);
 
     read_from_block(cache, IDX_TO_ABS(block), offset_bytes, buf, len);
@@ -642,16 +657,20 @@ void * get_cache_from_block(struct cache * cache, uint32_t block) {
     return ptr;
 }
 
-uint32_t get_nth_data_block(struct cache * cache, struct ngfs_dir_entry * file, unsigned int n) {
+uint32_t blockno_to_block(
+    struct cache * cache, 
+    struct ngfs_dir_entry * file, 
+    unsigned int blockno) 
+{
     uint32_t total_blocks, block;
 
     total_blocks = file->size / NGFS_BLKSZ;
 
     // n too large -> get last block
-    n = MIN(n, total_blocks);
+    blockno = MIN(blockno, total_blocks);
 
     block = file->start_block;
-    for (int bno = 0; bno < n; bno++) 
+    for (int bno = 0; bno < blockno; bno++) 
         block = get_next_data_block(cache, block);
 
     return block;
