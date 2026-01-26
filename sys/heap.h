@@ -47,6 +47,10 @@
 // heap-allocated while discouraging use of the heap for very large buffers.
 #define HEAP_ALLOC_MAX 4032
 
+#ifndef PAGE_SIZE
+#define PAGE_SIZE 4096
+#endif
+
 // Heap statistics snapshot.
 //
 // These fields are intended for introspection.
