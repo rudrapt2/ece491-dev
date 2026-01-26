@@ -8,7 +8,7 @@
 # Set this to the path to your glycine max repo
 SRC_DIR     := /home/rudrapt2/sp26_ece391/glycine-max
 # this is the directory in which the output files will be generated
-TARGET_DIR  := /home/rudrapt2/tmp/mp2-sp26-release
+TARGET_DIR  := /home/rudrapt2/sp26_ece391/mp2-sp26/release
 
 # Space-separated list of file names (no paths)
 FILE_LIST   := \
