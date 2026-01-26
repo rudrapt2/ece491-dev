@@ -11,7 +11,6 @@ util/fs/unmkfs_ktfs
 .clangd
 *.log
 usr/bin
-mp2-*.c
 
 */.gdbhist
 */.gdb_history
