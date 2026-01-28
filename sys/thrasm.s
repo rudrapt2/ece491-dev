@@ -78,7 +78,7 @@ switch_running_thread:
 start_thread:
 
 #ifdef STUDENT
-        // YOUR CODE HERE
+        # YOUR CODE HERE
 #else
 
 # Code fragment used to start a new thread. When a thread is spawned, it is
