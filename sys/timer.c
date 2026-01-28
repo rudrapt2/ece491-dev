@@ -80,7 +80,7 @@ void timer_init(unsigned int freq) {
     timer_frequency = freq;
 
 #ifdef STUDENT
-    // (your MP3cp3 code here)
+    // YOUR CODE HERE
 #else
     bolt_period = freq / BOLT_FREQ;
     timer_initialized = 1;
@@ -91,7 +91,7 @@ void timer_init(unsigned int freq) {
 
 void alarm_sleep_until(unsigned long long twake) {
 #ifdef STUDENT
-    // (your MP2cp3 code here)
+    // YOUR CODE HERE
 #else
     struct timer_alarm alarm;
     unsigned long long tnow;
@@ -160,7 +160,7 @@ void handle_timer_interrupt(void) {
     trace("[%lu] %s()", tnow, __func__);
 
 #ifdef STUDENT
-    // (your MP2cp3 code here)
+    // YOUR CODE HERE
 #else
     while (head != NULL && head->twake <= tnow) {
         debug("[%lu] Waking threads sleeping on <%p>", tnow, head);
