@@ -76,12 +76,12 @@ static void disable_timer_interrupts(void); // clears sie.STIE
 //
 
 void timer_init(unsigned int freq) {
-    assert (freq > 0);
-    timer_frequency = freq;
-
 #ifdef STUDENT
     // YOUR CODE HERE
 #else
+    assert (freq > 0);
+    timer_frequency = freq;
+
     bolt_period = freq / BOLT_FREQ;
     timer_initialized = 1;
     sbi_set_timer(0); // interrupt immediately
