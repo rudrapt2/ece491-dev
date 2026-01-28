@@ -317,6 +317,6 @@ extern long seekio_read(struct io * io, void * buf, long blkcap);
 extern long seekio_write(struct io * io, const void * buf, long blkcnt);
 extern int seekio_ioctl(struct io * io, int op, void * arg);
 
-extern void seekio_resize(struct seekio * sio, unsigned long long endpos);
+extern void seekio_resized(struct seekio * sio, unsigned long long endpos);
 
 #endif // _IOIMPL_H_
