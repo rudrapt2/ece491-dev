@@ -252,7 +252,7 @@ int seekio_ioctl(struct io * io, int op, void * arg) {
     }
 }
 
-void seekio_resize(struct seekio * sio, unsigned long long endpos) {
+void seekio_resized(struct seekio * sio, unsigned long long endpos) {
     sio->end = endpos;
 }
 
