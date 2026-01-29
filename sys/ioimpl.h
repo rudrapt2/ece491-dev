@@ -314,9 +314,63 @@ extern struct io * seekio_init (
 );
 
 extern long seekio_read(struct io * io, void * buf, long blkcap);
+
+// Reads from a seek-io object into a buffer at its internal position.
+// Equivalent to iofetch, with internal position set to /pos/.
+//
+// * This function may call functions that allocate memory from the heap.
+// * this function may call functions that allocate physical memory pages.
+// * This function may switch to another thread context.
+// * This function must _not_ be called from an ISR.
+
 extern long seekio_write(struct io * io, const void * buf, long blkcnt);
+
+// Writes from a buffer to a seek-io object to its internal position.
+// Equivalent to iostore, with internal position set to /pos/.
+//
+// This function will also call the io's SETEND ioctl if it attempts to write
+// past the end of the buffer. If SETEND succeeds, it will write as normal.
+// If SETEND fails, it will return the number of bytes successfully written.
+//
+// * This function may call functions that allocate memory from the heap.
+// * this function may call functions that allocate physical memory pages.
+// * This function may switch to another thread context.
+// * This function must _not_ be called from an ISR.
+
 extern int seekio_ioctl(struct io * io, int op, void * arg);
 
+// Performs a special operation on a seek-io object. See ioctl() for more 
+// details on return codes.
+//
+// On entry seekio_ioctl() assumes:
+// - /io/ points to a valid I/O object with a non-zero reference count.
+//
+// The following list describes specific system-defined ioctl() operations.
+// supported by seekio_ioctl().
+//
+// - unsigned long long endpos; ioctl(io, IOC_GETEND, &endpos); Gets the 
+//   /end/ of a seek-io object. The size is written as an integer of 
+//   unsigned long long type to the address given by /arg/. The /arg/ argument
+//   must be a properly-aligned pointer to a region of memory large enough to
+//   hold a variable of type unsigned long long.
+//
+// - unsigned long long pos; ioctl(io, IOC_GETPOS, &pos); Gets the /pos/ of a
+//   seek-io object. The current byte position is written as an integer of 
+//   unsigned long long type to the address given by /arg/. The /arg/ argument 
+//   must be a properly-aligned pointer to a region of memory large enough to
+//   hold a variable of type unsigned long long.
+//
+// - unsigned long long pos; ioctl(io, IOC_SETPOS, &pos); Sets the /pos/ of a
+//   seek-io object. /arg/ must point to an integer of type unsigned long long 
+//   containing the new position. The /arg/ argument must be a properly-aligned 
+//   pointer.
+
 extern void seekio_resized(struct seekio * sio, unsigned long long endpos);
+
+// Updates the /end/ of a seek-io object. Should be called by the base io
+// object upon resizing, if supported.
+//
+// On entry seekio_ioctl() assumes:
+// - /sio/ points to a valid seek-io object with a non-zero reference count.
 
 #endif // _IOIMPL_H_
