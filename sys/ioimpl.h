@@ -276,8 +276,8 @@ extern struct io * ioinit (
 //
 // The seek-io object allows a storage I/O object to provide _read_ and _write_
 // operations with minimal additional code. A storage I/O object, instead of
-// containing an /io/ structure, should use a /seekio/ structure. The
-// memory-based I/O object returned by create_memio(), for example, is defined:
+// containing an /io/ structure, should use a /seekio/ structure. The memory-
+// based I/O object returned by create_memio(), for example, is defined:
 //
 //     struct memio {
 //         struct seekio base; // instead of `struct io`

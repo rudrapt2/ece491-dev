@@ -30,9 +30,6 @@ switch_running_thread:
 #     };
 #
 
-#ifdef STUDENT
-        # YOUR CODE HERE
-#else
         sd      s0, 0*8(tp)
         sd      s1, 1*8(tp)
         sd      s2, 2*8(tp)
@@ -69,22 +66,19 @@ switch_running_thread:
                 
         j       finish_thread_switch
 
-#endif
-
-
         .global start_thread
         .type   start_thread, @function
 
 start_thread:
 
-#ifdef STUDENT
+.ifdef STUDENT
         # YOUR CODE HERE
-#else
+.else
 
 # Code fragment used to start a new thread. When a thread is spawned, it is
 # placed on the ready list and the s-registers in its saved context are
 # populated with the arguments to the thread function where execution of the new
-# thread should start. This fragment populated the a0-a7 argument registers with
+# thread should start. This fragment populates the a0-a7 argument registers with
 # the contents of s0-s7, and initializes the /fp/ and /ra/ registers from s10
 # and s11. The address of the thread function is in s8.
 
@@ -100,7 +94,7 @@ start_thread:
         mv      ra, s11
         jr      s8
 
-#endif
+.endif
 
 # Statically allocated stack for the idle thread.
 
