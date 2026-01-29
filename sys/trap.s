@@ -26,7 +26,7 @@
         #       void * sepc;
         #   };
 
-        # We define a macro for each member's offset within the trap frame and a
+        # We define a macro for the offset of each member within the trap frame and a
         # macro for the trap frame size. Do not confuse `A5`, a constant defined
         # below, with the _a5_ register.
 
@@ -83,8 +83,8 @@
 _smode_trap_entry:
 
 .ifndef MP2
-        # Swap _sp_ and _sscratch_. When we're in U mode, sscratch contains a
-        # pointer to a trap frame at the base of the kernel stack. When we're in
+        # Swap _sp_ and _sscratch_. When we are in U mode, sscratch contains a
+        # pointer to a trap frame at the base of the kernel stack. When we are in
         # S mode, _sscratch_ is zero.
 
         csrrw   sp, sscratch, sp
@@ -92,7 +92,7 @@ _smode_trap_entry:
 
 smode_trap_entry_from_umode:
 
-        # When we're in U mode, sscratch contains a pointer to a trap frame at
+        # When we are in U mode, sscratch contains a pointer to a trap frame at
         # the base of the kernel stack. This pointer, now in _sp_, is our kernel
         # stack pointer.
         
@@ -166,7 +166,7 @@ smode_trap_entry_from_umode:
         # rest after disabling interrupts (_late_).
         
         # The _early_ restore registers are those whose exact value is not
-        # critical if an interrupt should occur while we're restoring them. The
+        # critical if an interrupt should occur while we are restoring them. The
         # _late_ registers are _gp_, _tp_, and _sp_, plus the temporary _t6_. We
         # are still in S mode (and will be until we the sret instruction), so
         # _gp_, _tp_, and _sp_ must have their correct kernel values if we take
@@ -239,7 +239,7 @@ smode_trap_entry_from_umode:
 
 smode_trap_entry_from_smode:
 
-        # When we're in S mode, we continue using the kernel _sp_, _tp_, and
+        # When we are in S mode, we continue using the kernel _sp_, _tp_, and
         # _gp_. First, recover _sp_ from sscratch and write zero to scratch to
         # indicate that we are now in S mode.
 

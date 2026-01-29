@@ -33,13 +33,15 @@
 // INTERNAL TYPE DEFINITIONS
 //
 
-#ifndef STUDENT
 struct timer_alarm {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else    
     struct timer_alarm * next;
     struct condition woken;
     unsigned long long twake;
-};
 #endif
+};
 
 // EXPORTED GLOBAL VARIABLES
 //

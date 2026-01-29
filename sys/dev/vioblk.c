@@ -370,7 +370,7 @@ long vioblk_fetch (
 }
 
 
-static long vioblk_store (
+long vioblk_store (
     struct io * io,
     unsigned long long bytepos,
     const void * buf,
