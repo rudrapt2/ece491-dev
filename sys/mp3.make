@@ -42,7 +42,7 @@ OBJS = \
 	timer.o \
 	device.o \
 	sbi.o \
-	ngfs.o
+	fs/ngfs.o
 
 CFLAGS = -Wall -Werror=implicit-function-declaration -Wno-unused-function
 CFLAGS += -fno-omit-frame-pointer -ggdb3 -gdwarf-2

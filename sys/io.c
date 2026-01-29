@@ -70,10 +70,14 @@ long ioread(struct io * io, void * buf, long bufsz) {
 }
 
 long iofill(struct io * io, void * buf, long bufsz) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     (void)io;
     (void)buf;
     (void)bufsz;
     panic("Not implemented"); // FIXME
+#endif
 }
 
 long iowrite(struct io * io, const void * buf, long buflen) {
@@ -380,16 +384,12 @@ struct io * create_memio (
 //
 
 void memio_reclaim(struct io * io) {
-#ifdef STUDENT
-    // YOUR CODE HERE
-#else
     struct memio * const mio = (struct memio*)io;
 
     if (mio->reclfn != NULL)
         mio->reclfn(mio->buf, mio->base.end);
     
     kfree(mio);
-#endif
 }
 
 long memio_fetch(struct io * io, unsigned long long pos, void * buf, long len) {

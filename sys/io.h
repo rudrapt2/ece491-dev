@@ -1,4 +1,4 @@
-// io.h - Generic I/O objects
+// io.h - I/O Objects
 //
 // Copyright (c) 2026 University of Illinois
 // SPDX-License-identifier: NCSA
@@ -24,7 +24,7 @@ struct io; // opaque
 
 extern unsigned int ioblksz(const struct io * io);
 
-// Returns the block size of the I/O object. All operations must in multiples of
+// Returns the block size of the I/O object. All I/O operations must in multiples of
 // this size.
 //
 // On entry ioblksz() assumes:
@@ -76,7 +76,6 @@ extern struct io * ioaddref(struct io * io);
 // On return ioaddref() gurantees:
 // - The return value is /io/.
 //
-// * This function does not allocate memory.
 // * This function may be called from an ISR.
 //
 // See also: iorefcnt(), iodropref().
@@ -159,7 +158,6 @@ extern long iostore(struct io * io, unsigned long long pos, const void * buf, lo
 
 
 int ioctl(struct io * io, int op, void * arg);
-int ioctl_u(struct io * io, int u_op, uintptr_t u_arg);
 
 #define IOC_GETBLKSZ 0 // no arg, return value is block size
 
@@ -170,68 +168,76 @@ int ioctl_u(struct io * io, int u_op, uintptr_t u_arg);
 
 // Performs a special operation on an I/O object. The /op/ parameter specifies
 // the operation, one of the IOC-prefixed constants defined above. The operation
-// may take an optional argument, whis is passed via /arg/ or /u_arg/.
+// may take an optional argument, whis is passed via /arg/.
 //
-// The difference between ioctl() and ioctl_u() is that ioctl() assumes that the
-// pointer argument is valid, while ioctl_u() puts the responsibility of
-// checking the pointer argument on the I/O object implementation. Thus, ioctl()
-// should be used for calls originating inside the kernel (from trusted code),
-// while ioctl_u() should be used to service the /ioctl/ system call.
-//
-// Unless otherwise indicated, ioctl() and ioctl_u() return 0 to indicate
-// success. If the request ioctl operation is not supported, both functions
+// Unless otherwise indicated, ioctl() eturns 0 to indicate
+// success. If the request operation is not supported, both functions
 // return -ENOTSUP. In case of error, both functions return a negative error
 // code, the negation of one of the constants defined on error.h.
 //
-// If the operation expects an argument and /u_arg/ does not point to region of
-// user memory sufficient to contain the argument or the memory does not have
-// the required access permissions, ioctl_u() returns -EACCESS.
-//
 // On entry ioctl() assumes:
 // - /io/ points to a valid I/O object with a non-zero reference count.
+// - if not NULL, /arg/ is a properly aligned pointer of the required type
 //
 // The following list describes specific system-defined ioctl() operations.
 //
-// - int blksz = ioctl(io, IOC_GETBLKSZ, NULL);
+// - int ioctl(io, IOC_GETBLKSZ, NULL);
 //   Gets the block size of an I/O object. All I/O operations on the object must
 //   be in multiples of the block size. The size is returned via the return
-//   value, _not_ via a pointer output argument like IOC_GETEND, etc. The
-//   returned block size may also be obtained using ioblksz(). This operation is
-//   supported by all I/O objects. The block size is at least 1, so the return
-//   value is never 0.
+//   value, _not_ via a pointer output argument like most ioctl() operations.
+//   The returned block size may also be obtained using ioblksz(). This
+//   operation is supported by all I/O objects. The block size is at least 1, so
+//   the return value is never 0.
 //
-// - unsigned long long endpos; ioctl(io, IOC_GETEND, &endpos); Gets
-//   size/capacity of a storage I/O object. The size/capacity in bytes is equal
-//   to the last valid byte position within the object, which is the position
-//   just after the last byte. The size is written as an integer of unsigned
-//   long long type to the address given by /arg/. The /arg/ argument must be a
-//   properly-aligned pointer to a region of memory large enough to hold a
-//   variable of type unsigned long long. All I/O objects implementing either
-//   the _fetch_ or _store_ operations must also support the IOC_GETEND
-//   operation.
+// - int ioctl(io, IOC_GETEND, unsigned long long * endposptr);
+//   Gets size/capacity of a storage I/O object. The size/capacity in bytes is
+//   equal to the last valid byte position within the object, which is the
+//   position just after the last byte. The size is written as an integer of
+//   unsigned long long type to the address given by /endposptr/. The
+//   /endposptr/ argument must be a properly-aligned pointer to a region of
+//   memory large enough to hold a variable of type unsigned long long. All I/O
+//   objects implementing either the _fetch_ or _store_ operations must also
+//   support the IOC_GETEND operation.
 //
-// - unsigned long long endpos; ioctl(io, IOC_SETEND, &endpos); Resized a
-//   storage I/O object. The size/capacity in bytes is equal to the last valid
-//   byte position within the object, which is the position just after the last
-//   byte. /arg/ must point to an unsigned long long typed integer containing
-//   the request size. Not all storage I/O objects support this operation. The
-//   /arg/ argument must be a properly-aligned pointer.
+// - int ioctl(io, IOC_SETEND, unsigned long long * endposptr);
+//   Resized a storage I/O object. The size/capacity in bytes is equal to the
+//   last valid byte position within the object, which is the position just
+//   after the last byte. The /endposptr/ argument must be properly aligned and
+//   must point to a region of memory large enough to hold a variable of type
+//   unsigned long long. Not all storage I/O objects support this operation.
 //
-// - unsigned long long pos; ioctl(io, IOC_GETPOS, &pos); Gets the byte position
-//   at which the next _read_ or _write_ operation would occur in a storage I/O
-//   object. This position is known as the _current position_ in a storage I/O
-//   object that supports either _read_ or _write_ operations. The current byte
-//   position is written as an integer of unsigned long long type to the address
-//   given by /arg/. The /arg/ argument must be a properly-aligned pointer to a
-//   region of memory large enough to hold a variable of type unsigned long
+// - int ioctl(io, IOC_GETPOS, unsigned long long * posptr);
+//   Gets the byte position at which the next _read_ or _write_ operation would
+//   occur in a storage I/O object. This position is known as the _current
+//   position_ in a storage I/O object that supports either _read_ or _write_
+//   operations. The current byte position is written as an integer of unsigned
+//   long long type to the address given by /posptr/. The /posptr/ argument must
+//   be a properly-aligned pointer to a region of memory large enough to hold a
+//   variable of type unsigned long long.
+//
+// - int ioctl(io, IOC_SETPOS, unsigned long long * posptr);
+//   Sets the byte position at which the next _read_ or _write_ operation would
+//   occur in a storage I/O object. This position is known as the _current
+//   position_ in a storage I/O object that supports either _read_ or _write_
+//   operations. The /posptr/ argument must be properly aligned and must point
+//   to a region of memory large enough to hold a variable of type unsigned long
 //   long.
+
+int ioctl_u(struct io * io, int op, uintptr_t arg_uma);
+
+// Performs a special operation on an I/O object, allowing an untrusted
+// argument. The function behaves identically to ioctl(), but, unlike ioctl(),
+// /arg_uma/ may be an invalid pointer. The I/O object implementation is
+// responsible for ensuring that /arg_uma/ is a valid, properly aligned,
+// user-accessible pointer of the required type. Thus, ioctl() should be used
+// for calls originating inside the kernel (from trusted code), while ioctl_u()
+// should be used to service the /ioctl/ system call.
 //
-// - unsigned long long pos; ioctl(io, IOC_SETPOS, &pos); Sets the byte position
-//   at which the next /read/ or /write/ operation would occur in a storage I/O
-//   object. This position is known as the _current position_ in a storage I/O
-//   object that supports either _read_ or _write_ operations. /arg/ must point
-//   to an integer of type unsigned long long containing the new position. The
-//   /arg/ argument must be a properly-aligned pointer.
+// In addition to the error codes returned by ioctl(), ioctl_u() returns
+// -EACCESS if /arg_uma/ is not user accessible and -EINVAL if it is misaligned.
+//
+// See also: ioctl().
+
 
 // SPECIAL IO OBJECTS
 //
