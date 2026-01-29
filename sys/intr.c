@@ -103,18 +103,18 @@ void handle_smode_interrupt(unsigned int cause) {
     handle_interrupt(cause);
 }
 
+#ifndef MP2
 void handle_umode_interrupt(unsigned int cause) {
 #ifdef STUDENT
     // YOUR CODE HERE
 #else
     // called from trap.s
     handle_interrupt(cause);
-#ifndef MP2
     enable_interrupts();
     submit_running_thread();
-#endif // MP2
 #endif // STUDENT
 }
+#endif // MP2
 
 extern long enable_interrupts(void) {
     return csrrsi_sstatus_SIE();

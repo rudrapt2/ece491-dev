@@ -26,7 +26,7 @@
         #       void * sepc;
         #   };
 
-        # We define a macro for each member's offset within the trap frame and a
+        # We define a macro for the offset of each member within the trap frame and a
         # macro for the trap frame size. Do not confuse `A5`, a constant defined
         # below, with the /a5/ register.
 
@@ -82,17 +82,29 @@
 
 _smode_trap_entry:
 
+<<<<<<< HEAD
         # Swap /sp/ and /sscratch/. When we're in U mode, sscratch contains a
         # pointer to a trap frame at the base of the kernel stack. When we're in
         # S mode, /sscratch/ is zero.
+=======
+.ifndef MP2
+        # Swap _sp_ and _sscratch_. When we are in U mode, sscratch contains a
+        # pointer to a trap frame at the base of the kernel stack. When we are in
+        # S mode, _sscratch_ is zero.
+>>>>>>> 2bab8d38e70e49b1661f30f955bd9cf6620ac5af
 
         csrrw   sp, sscratch, sp
         beqz    sp, smode_trap_entry_from_smode
 
 smode_trap_entry_from_umode:
 
+<<<<<<< HEAD
         # When we're in U mode, sscratch contains a pointer to a trap frame at
         # the base of the kernel stack. This pointer, now in /sp/, is our kernel
+=======
+        # When we are in U mode, sscratch contains a pointer to a trap frame at
+        # the base of the kernel stack. This pointer, now in _sp_, is our kernel
+>>>>>>> 2bab8d38e70e49b1661f30f955bd9cf6620ac5af
         # stack pointer.
         
         # Save general purpose registers to trap frame
@@ -165,8 +177,13 @@ smode_trap_entry_from_umode:
         # rest after disabling interrupts (_late_).
         
         # The _early_ restore registers are those whose exact value is not
+<<<<<<< HEAD
         # critical if an interrupt should occur while we're restoring them. The
         # _late_ registers are /gp/, /tp/, and /sp/, plus the temporary /t6/. We
+=======
+        # critical if an interrupt should occur while we are restoring them. The
+        # _late_ registers are _gp_, _tp_, and _sp_, plus the temporary _t6_. We
+>>>>>>> 2bab8d38e70e49b1661f30f955bd9cf6620ac5af
         # are still in S mode (and will be until we the sret instruction), so
         # /gp/, /tp/, and /sp/ must have their correct kernel values if we take
         # an interrupt.
@@ -238,11 +255,12 @@ smode_trap_entry_from_umode:
 
 smode_trap_entry_from_smode:
 
-        # When we're in S mode, we continue using the kernel /sp/, /tp/, and
+        # When we are in S mode, we continue using the kernel /sp/, /tp/, and
         # /gp/. First, recover /sp/ from sscratch and write zero to scratch to
         # indicate that we are now in S mode.
 
         csrrw   sp, sscratch, zero      # Get kernel SP back from sscratch
+.endif
         addi    sp, sp, -TFRSZ          # Allocate trap frame
 
         # Save general purpose registers to trap frame
@@ -361,6 +379,7 @@ smode_trap_entry_from_smode:
 
         j       handle_smode_interrupt # in intr.c
 
+.ifndef MP2
 # void __attribute__ ((noreturn)) trap_frame_jump(struct trap_frame * tfr);
 #
 # Restores CPU state from a trap frame as when returning to U mode. If indeed
@@ -426,6 +445,6 @@ trap_frame_jump:
         ld      a0, A0(a0)
 
         sret    # Punch it, Chewie!
+.endif
 
         .end
-

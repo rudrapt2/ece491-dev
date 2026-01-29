@@ -103,9 +103,6 @@ static const struct iointf viorng_intf = {
 // virtio.c when a VirtIO RNG device is found.
 
 void viorng_attach(volatile struct virtio_mmio_regs * regs, int irqno) {
-#ifdef STUDENT
-    // YOUR CODE HERE
-#else
     static unsigned short instcnt = 0; // number of viorng devices
     virtio_featset_t enabled_features, wanted_features, needed_features;
     struct viorng_device * vrng;
@@ -129,6 +126,10 @@ void viorng_attach(volatile struct virtio_mmio_regs * regs, int irqno) {
         return;
     }
 
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
+
     // Allocate and initialize device struct
 
     vrng = kmalloc(sizeof(struct viorng_device));
@@ -139,9 +140,14 @@ void viorng_attach(volatile struct virtio_mmio_regs * regs, int irqno) {
 
     condition_init(&vrng->bufupd, "viorng.bufupd");
 
+#endif
+
     regs->status |= VIRTIO_STAT_FEATURES_OK;
     assert(regs->status & VIRTIO_STAT_FEATURES_OK);
     
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     // Initialize fields of descriptor that will not change.
 
     vrng->vq.avail.ring[0] = 0;
@@ -154,11 +160,16 @@ void viorng_attach(volatile struct virtio_mmio_regs * regs, int irqno) {
         (uintptr_t)&vrng->vq.desc,
         (uintptr_t)&vrng->vq.used,
         (uintptr_t)&vrng->vq.avail);
+
+#endif
     
     regs->status |= VIRTIO_STAT_DRIVER_OK; //set the driver to OK
     // fence o,oi
     __sync_synchronize();
 
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     register_device(VIORNG_NAME, instcnt++, &viorng_open, vrng);
     ioinit(&vrng->io, &viorng_intf, 1, 0);
 #endif

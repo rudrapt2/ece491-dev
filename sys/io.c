@@ -4,6 +4,7 @@
 // SPDX-License-identifier: NCSA
 //
 
+#include "io.h"
 #include "ioimpl.h"
 #include <stddef.h>
 #include "error.h"
@@ -208,17 +209,21 @@ long seekio_read(struct io * io, void * buf, long bufsz) {
 long seekio_write(struct io * io, const void * buf, long len) {
     struct seekio * const sio = (struct seekio*)io;
     long reqlen, retlen;
+    long new_end;
 
     if (io->intf->store == NULL)
         return -ENOTSUP;
     
-    if (sio->pos == sio->end)
-        return 0;
-    
-    if (sio->end - sio->pos < len)
+    if (sio->end - sio->pos < len) {
+        new_end = sio->pos + len;
+        ioctl(io, IOC_SETEND, &new_end);
         reqlen = sio->end - sio->pos;
+    }
     else
         reqlen = ROUND_DOWN(len, sio->base.blksz);
+    
+    if (reqlen == 0)
+        return 0;
     
     retlen = io->intf->store(&sio->base, sio->pos, buf, reqlen);
 
@@ -256,7 +261,7 @@ int seekio_ioctl(struct io * io, int op, void * arg) {
     }
 }
 
-void seekio_resize(struct seekio * sio, unsigned long long endpos) {
+void seekio_resized(struct seekio * sio, unsigned long long endpos) {
     sio->end = endpos;
 }
 

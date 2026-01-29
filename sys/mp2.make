@@ -49,7 +49,7 @@ CFLAGS += -I.
 # CFLAGS += -DTHREAD_DEBUG -DTHREAD_TRACE
 # CFLAGS += -DTIMER_DEBUG -DTIMER_TRACE
 
-ASFLAGS = -march=rv64imazicsr
+ASFLAGS = -march=rv64imazicsr -defsym MP2=1
 
 LDFLAGS = -melf64lriscv -T board/qvirt.ld
 

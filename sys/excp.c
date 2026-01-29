@@ -19,15 +19,6 @@
 #include "process.h"
 #endif
 
-// EXPORTED FUNCTION DECLARATIONS
-//
-
-// The following two functions, defined below, are called to handle an exception
-// from trap.s.
-
-extern void handle_smode_exception(unsigned int cause, struct trap_frame * tfr);
-extern void handle_umode_exception(unsigned int cause, struct trap_frame * tfr);
-
 #ifndef MP2
 // IMPORTED FUNCTION DECLARATIONS
 //
@@ -93,11 +84,11 @@ void handle_smode_exception(unsigned int cause, struct trap_frame* tfr) {
     panic(msgbuf);
 }
 
+#ifndef MP2
 void handle_umode_exception(unsigned int cause, struct trap_frame * tfr) {
 #ifdef STUDENT
-    // (your MP3cp2 code here)
+    // YOUR CODE HERE
 #else
-#ifndef MP2
     const char * name = NULL;
     int handled = 0;
     trace("%s(cause=%d, tfr=%p)", __func__, cause, tfr);
@@ -147,9 +138,6 @@ void handle_umode_exception(unsigned int cause, struct trap_frame * tfr) {
     }
 
     process_exit();
-#else
-    (void)cause;
-    (void)tfr;
-#endif // !defined(MP2)
 #endif // STUDENT
 }
+#endif // MP2

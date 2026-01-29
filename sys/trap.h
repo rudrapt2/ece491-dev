@@ -37,6 +37,7 @@ struct trap_frame {
     void * sepc;                              // must be here (see trap.s)
 };
 
+#ifndef MP2
 extern void trap_frame_jump(struct trap_frame * tfr, void * sscratch)
     __attribute__ ((noreturn));
 
@@ -51,8 +52,7 @@ extern void trap_frame_jump(struct trap_frame * tfr, void * sscratch)
 //
 // On return trap_frame_jump() guarantees:
 // - Does not return (transfers control via sret).
-
-
+#endif
 
 
 // Trap dispatch entry points used by trap.s.
@@ -83,6 +83,7 @@ extern void handle_smode_exception(unsigned int cause, struct trap_frame * tfr);
 //
 // * This function may be called from an ISR.
 
+#ifndef MP2
 extern void handle_umode_exception(unsigned int cause, struct trap_frame * tfr);
 
 // Handles an exception that occurred while executing in U mode.
@@ -95,6 +96,7 @@ extern void handle_umode_exception(unsigned int cause, struct trap_frame * tfr);
 // - Returns to trap.s, which will restore U-mode state and sret.
 //
 // * This function may be called from an ISR.
+#endif
 
 extern void handle_smode_interrupt(unsigned int cause);
 
@@ -110,6 +112,7 @@ extern void handle_smode_interrupt(unsigned int cause);
 //
 // * This function may be called from an ISR.
 
+#ifndef MP2
 extern void handle_umode_interrupt(unsigned int cause);
 
 // Handles an interrupt that occurred while executing in U mode.
@@ -123,5 +126,6 @@ extern void handle_umode_interrupt(unsigned int cause);
 // - Returns to trap.s, which will restore U-mode state and sret.
 //
 // * This function may be called from an ISR.
+#endif
 
 #endif  // _TRAP_H_
