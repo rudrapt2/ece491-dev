@@ -71,9 +71,9 @@ switch_running_thread:
 
 start_thread:
 
-#ifdef STUDENT
+.ifdef STUDENT
         # YOUR CODE HERE
-#else
+.else
 
 # Code fragment used to start a new thread. When a thread is spawned, it is
 # placed on the ready list and the s-registers in its saved context are
@@ -94,7 +94,7 @@ start_thread:
         mv      ra, s11
         jr      s8
 
-#endif
+.endif
 
 # Statically allocated stack for the idle thread.
 
