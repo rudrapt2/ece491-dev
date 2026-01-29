@@ -210,9 +210,6 @@ long seekio_write(struct io * io, const void * buf, long len) {
     if (io->intf->store == NULL)
         return -ENOTSUP;
     
-    if (sio->pos == sio->end)
-        return 0;
-
     if (sio->end - sio->pos < len) {
         new_end = sio->pos + len;
         ioctl(io, IOC_SETEND, &new_end);
@@ -220,6 +217,9 @@ long seekio_write(struct io * io, const void * buf, long len) {
     }
     else
         reqlen = ROUND_DOWN(len, sio->base.blksz);
+    
+    if (reqlen == 0)
+        return 0;
     
     retlen = io->intf->store(&sio->base, sio->pos, buf, reqlen);
 
