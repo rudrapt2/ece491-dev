@@ -85,6 +85,9 @@ struct vioblk_request_header {
  */ 
 
 struct vioblk_device {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     volatile struct virtio_mmio_regs * regs;
     int irqno;
 
@@ -111,6 +114,7 @@ struct vioblk_device {
         struct vioblk_request_header req_header;
         uint8_t req_status;
     } vq;
+#endif
 };
 
 // INTERNAL FUNCTION DECLARATIONS
@@ -195,6 +199,10 @@ void vioblk_attach(volatile struct virtio_mmio_regs * regs, int irqno) {
     // blksz must be a power of two
     assert (((blksz - 1) & blksz) == 0);
 
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
+
     // Allocate initialize device struct
 
     vb = kcalloc(1, sizeof(*vb));
@@ -257,9 +265,13 @@ void vioblk_attach(volatile struct virtio_mmio_regs * regs, int irqno) {
 
     regs->status |= VIRTIO_STAT_DRIVER_OK;    
     __sync_synchronize(); // fence o,oi
+#endif
 }
 
 int vioblk_open(struct io ** ioptr, void * aux) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     struct vioblk_device * const vb = aux;
 
 	trace("%s(%d,{regs=%p})", __func__, instno, vb->regs);
@@ -273,9 +285,13 @@ int vioblk_open(struct io ** ioptr, void * aux) {
     *ioptr = ioaddref(&vb->io);
 
     return 0;
+#endif
 }
 
 void vioblk_reclaim(struct io * io) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     struct vioblk_device * const vb = 
         (void*)io - offsetof(struct vioblk_device, io);
     
@@ -283,6 +299,7 @@ void vioblk_reclaim(struct io * io) {
 
     virtio_reset_virtq(vb->regs, 0);
     disable_intr_source(vb->irqno);
+#endif
 }
 
 long vioblk_fetch (
@@ -291,6 +308,9 @@ long vioblk_fetch (
     void * buf,
     long bytecnt)
 {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     struct vioblk_device * const vb = 
         (void*)io - offsetof(struct vioblk_device, io);
     unsigned long long blkpos;
@@ -346,6 +366,7 @@ long vioblk_fetch (
     default:
         panic(NULL);
     }
+#endif
 }
 
 
@@ -355,6 +376,9 @@ static long vioblk_store (
     const void * buf,
     long bytecnt)
 {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     struct vioblk_device * const vb = 
         (void*)io - offsetof(struct vioblk_device, io);
     unsigned long long blkpos;
@@ -410,9 +434,13 @@ static long vioblk_store (
     default:
         panic(NULL);
     }
+#endif
 }
 
 int vioblk_ioctl(struct io * io, int op, void * arg) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     struct vioblk_device * const vb = 
         (void*)io - offsetof(struct vioblk_device, io);
     
@@ -425,9 +453,13 @@ int vioblk_ioctl(struct io * io, int op, void * arg) {
     default:
         return -ENOTSUP;
     }
+#endif
 }
 
 void vioblk_isr(int irqno, void * aux) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     struct vioblk_device * const vb = aux;
     uint32_t intr_status;
 
@@ -439,4 +471,5 @@ void vioblk_isr(int irqno, void * aux) {
 
     if (intr_status & 1)
         condition_broadcast(&vb->vq.used_updated);
+#endif
 }

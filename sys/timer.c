@@ -76,12 +76,12 @@ static void disable_timer_interrupts(void); // clears sie.STIE
 //
 
 void timer_init(unsigned int freq) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     assert (freq > 0);
     timer_frequency = freq;
 
-#ifdef STUDENT
-    // (your MP3cp3 code here)
-#else
     bolt_period = freq / BOLT_FREQ;
     timer_initialized = 1;
     sbi_set_timer(0); // interrupt immediately
@@ -91,7 +91,7 @@ void timer_init(unsigned int freq) {
 
 void alarm_sleep_until(unsigned long long twake) {
 #ifdef STUDENT
-    // (your MP2cp3 code here)
+    // YOUR CODE HERE
 #else
     struct timer_alarm alarm;
     unsigned long long tnow;
@@ -145,7 +145,6 @@ void sleep_us(unsigned int us) {
 void handle_timer_interrupt(void) {
 #ifndef STUDENT
     unsigned long long talarm;   // next alarm interrupt time
-    unsigned long long tnow;
     struct timer_alarm * head;
     struct timer_alarm * next;
 
@@ -156,12 +155,12 @@ void handle_timer_interrupt(void) {
     head = sleep_list;
 #endif // STUDENT
 
-    tnow = rdtime();
+    unsigned long long tnow = rdtime();
 
     trace("[%lu] %s()", tnow, __func__);
 
 #ifdef STUDENT
-    // (your MP2cp3 code here)
+    // YOUR CODE HERE
 #else
     while (head != NULL && head->twake <= tnow) {
         debug("[%lu] Waking threads sleeping on <%p>", tnow, head);

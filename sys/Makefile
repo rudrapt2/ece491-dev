@@ -26,7 +26,7 @@ BASE_OBJS = \
 	error.o \
 	thrasm.o \
 	trap.o \
-	board/qemu-virt.o
+	board/qvirt.o
 
 MP2_OBJS = \
 	$(BASE_OBJS) \
@@ -83,13 +83,14 @@ CFLAGS += -I.
 
 ASFLAGS = -march=rv64imazicsr
 
-LDFLAGS = -melf64lriscv
+LDFLAGS = -melf64lriscv -T board/qvirt.ld
 
 BASE_QEMUOPTS = -global virtio-mmio.force-legacy=false
 BASE_QEMUOPTS += -machine virt -nographic
 BASE_QEMUOPTS += -object rng-random,filename=/dev/urandom,id=rng0
 BASE_QEMUOPTS += -device virtio-rng-device,rng=rng0
 BASE_QEMUOPTS += -serial mon:stdio
+BASE_QEMUOPTS += -bios bios/osbi181q.bin
 
 MP2_QEMUOPTS = $(BASE_QEMUOPTS)
 MP2_QEMUOPTS += -serial pty
@@ -113,7 +114,7 @@ clean:
 #
 
 mp2-kernel.elf: $(MP2_OBJS)
-	$(LD) $(LDFLAGS) -T kernel.ld -o $@ $^
+	$(LD) $(LDFLAGS) -o $@ $^
 
 run-mp2: mp2-kernel.elf
 	$(QEMU) $(MP2_QEMUOPTS) -m 8M -kernel $<
@@ -128,7 +129,7 @@ mp2-%.o: %.c
 #
 
 mp3-kernel.elf: $(MP2_OBJS) mp3-main.o
-	$(LD) $(LDFLAGS) -T kernel.ld -o $@ $^
+	$(LD) $(LDFLAGS) -o $@ $^
 
 run-mp3: mp3-kernel.elf
 	$(QEMU) $(MP2_QEMUOPTS) -m 8M -kernel $<

@@ -43,6 +43,20 @@ static struct {
 static void handle_interrupt(unsigned int cause);
 static void handle_extern_interrupt(void);
 
+// Dispatches a supervisor-mode interrupt by cause code. The /cause/ argument is
+// a supervisor interrupt cause value as reported by the trap handler.
+//
+// On entry handle_interrupt() assumes:
+// - It is called with interrupts disabled from a trap context.
+//
+// On return handle_interrupt() guarantees:
+// - The appropriate subsystem interrupt handler is invoked for supported
+//   causes.
+// - The system panics for unsupported causes.
+//
+// * This function is called from an ISR.
+// * This function does not context-switch.
+
 // EXPORTED FUNCTION DEFINITIONS
 //
 
@@ -85,18 +99,18 @@ void handle_smode_interrupt(unsigned int cause) {
     handle_interrupt(cause);
 }
 
+#ifndef MP2
 void handle_umode_interrupt(unsigned int cause) {
 #ifdef STUDENT
-    // (your MP3cp2 code here)
+    // YOUR CODE HERE
 #else
     // called from trap.s
     handle_interrupt(cause);
-#ifndef MP2
     enable_interrupts();
     submit_running_thread();
-#endif // MP2
 #endif // STUDENT
 }
+#endif // MP2
 
 extern long enable_interrupts(void) {
     return csrrsi_sstatus_SIE();
@@ -122,6 +136,9 @@ extern int interrupts_disabled(void) {
 //
 
 void handle_interrupt(unsigned int cause) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     switch (cause) {
         case RISCV_SCAUSE_STI:
             handle_timer_interrupt();
@@ -133,9 +150,13 @@ void handle_interrupt(unsigned int cause) {
             panic(NULL);
             break;
     }
+#endif
 }
 
 void handle_extern_interrupt(void) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     int srcno;
 
     srcno = plic_claim_interrupt();
@@ -150,4 +171,5 @@ void handle_extern_interrupt(void) {
     isrtab[srcno].isr(srcno, isrtab[srcno].israux);
 
     plic_finish_interrupt(srcno);
+#endif
 }

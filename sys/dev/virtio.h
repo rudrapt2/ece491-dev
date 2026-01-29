@@ -127,6 +127,10 @@ struct virtio_mmio_regs {
     } config;
 };
 
+#ifdef STUDENT
+
+#else
+
 struct virtq_desc {
     uint64_t addr; ///< Address (guest-physical). 
     uint32_t len; ///< Length
@@ -165,6 +169,7 @@ struct virtq_used {
 #define VIRTQ_USED_SIZE(n) \
     (sizeof(struct virtq_used)+(n)*sizeof(struct virtq_used_elem))
 
+#endif
 
 // EXPORTED FUNCTION DECLARATIONS
 //

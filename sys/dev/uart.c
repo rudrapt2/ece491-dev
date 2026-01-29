@@ -159,6 +159,9 @@ void attach_uart(void * mmio_base, int irqno) {
 }
 
 int uart_open(struct io ** ioptr, void * aux) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     struct uart_device * const uart = aux;
 
     trace("%s()", __func__);
@@ -171,18 +174,18 @@ int uart_open(struct io ** ioptr, void * aux) {
     rbuf_init(&uart->rxbuf);
     rbuf_init(&uart->txbuf);
 
-    // Read receive buffer register to flush any stale data in hardware buffer
+    // Read RBR to flush any stale data in hardware buffer
 
     uart->regs->rbr; // forces a read because uart->regs is volatile
 
     // Enable interrupts when data ready (DR) status asserted
 
     uart->regs->ier = IER_DRIE;
-
     enable_intr_source(uart->irqno, UART_INTR_PRIO, uart_isr, uart);
 
     *ioptr = ioaddref(&uart->io);
     return 0;
+#endif
 }
 
 void uart_reclaim(struct io * io) {
@@ -190,14 +193,21 @@ void uart_reclaim(struct io * io) {
         (void*)io - offsetof(struct uart_device, io);
 
     trace("%s()", __func__);
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
 
     // Disable all interrupts from device
 
     uart->regs->ier = 0;
     disable_intr_source(uart->irqno);
+#endif
 }
 
 long uart_read(struct io * io, void * buf, long bufsz) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     struct uart_device * const uart =
         (void*)io - offsetof(struct uart_device, io);
     long n = 0; // number of bytes copied from ring buffer
@@ -230,9 +240,13 @@ long uart_read(struct io * io, void * buf, long bufsz) {
     uart->regs->ier |= IER_DRIE; // enable receive interrupts
     
     return n;
+#endif
 }
 
 long uart_write(struct io * io, const void * buf, long len) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     struct uart_device * const uart =
         (void*)io - offsetof(struct uart_device, io);
     long n = 0; // number of bytes written so far
@@ -264,9 +278,13 @@ long uart_write(struct io * io, const void * buf, long len) {
     }
 
     return n;
+#endif
 }
 
 void uart_isr(int srcno, void * aux) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     struct uart_device * const uart = aux;
     const uint_fast8_t line_status = uart->regs->lsr;
 
@@ -288,6 +306,7 @@ void uart_isr(int srcno, void * aux) {
         } else
             uart->regs->ier &= ~IER_THREIE;
     }
+#endif
 }
 
 void rbuf_init(struct ringbuf * rbuf) {

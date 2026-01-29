@@ -1,4 +1,4 @@
-// qemu-virt.c - A FAT-like file system
+// opirv.c - Orange Pi RV system initialization
 //
 // Copyright (c) 2026 University of Illinois
 // SPDX-License-identifier: NCSA
@@ -9,22 +9,22 @@
 #include "console.h" // console_init();
 #include "heap.h" // heap_init()
 
-// Run-time QEMU configuration
+// Run-time configuration
 //
 
-#define NUART 3
-#define RAM_SIZE_MB 8
+#define NUART 0
+#define RAM_SIZE_MB (2*1024)
 
-// QEMU constants
+// Board constants
 //
 
-#define RAM_START_PMA 0x80000000UL
+#define RAM_START_PMA 0x40000000UL
 
 #ifndef TIMER_FREQ
-#define TIMER_FREQ 10000000UL  // qemu/include/hw/intc/riscv_aclint.h
+#define TIMER_FREQ 10000000UL  // FIXME
 #endif
 
-// MMIO addresses
+// MMIO addresses (FIXME!)
 //
 
 #ifndef PLIC_MMIO_BASE
@@ -35,11 +35,6 @@
 #define UART1_MMIO_BASE 0x10000100UL  // PMA
 #define UART_MMIO_BASE(i) (UART0_MMIO_BASE + (i) * (UART1_MMIO_BASE - UART0_MMIO_BASE))
 #define UART0_INTR_SRCNO 10
-
-#define VIRTIO0_MMIO_BASE 0x10001000UL  // PMA
-#define VIRTIO1_MMIO_BASE 0x10002000UL  // PMA
-#define VIRTIO_MMIO_BASE(i) (VIRTIO0_MMIO_BASE + (i) * (VIRTIO1_MMIO_BASE - VIRTIO0_MMIO_BASE))
-#define VIRTIO0_INTR_SRCNO 1
 
 #define RTC_MMIO_BASE 0x00101000L
 
@@ -61,7 +56,7 @@ extern void attach_uart(void * mmio_base, int irqno); // dev/uart.c
 extern void attach_virtio(void * mmio_base, int irqno); // dev/virtio.c
 extern void attach_rtc(void * mmio_base); // dev/rtc.c
 
-void board_init(void) {    
+void board_init(unsigned int hartid, void * dtb) {    
     console_init();
     plic_init((void*)PLIC_MMIO_BASE);
     timer_init(TIMER_FREQ);
@@ -77,7 +72,4 @@ void attach_devices(void) {
 
     for (i = 0; i < NUART; i++)
         attach_uart((void*)UART_MMIO_BASE(i), UART0_INTR_SRCNO+i);
-    
-    for (i = 0; i < 8; i++)
-        attach_virtio((void*)VIRTIO_MMIO_BASE(i), VIRTIO0_INTR_SRCNO+i);
 }
