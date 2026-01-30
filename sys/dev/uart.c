@@ -91,10 +91,13 @@ struct uart_device {
 
     struct io io;
 
-    unsigned long rxovrcnt; // number of times OE was set
-    
+#ifdef STUDENT
+    // YOUR MP2cp3 CODE HERE
+#else
     struct condition rxbnotempty; // signalled when rxbuf becomes not empty
     struct condition txbnotfull;  // signalled when txbuf becomes not full
+    unsigned long rxovrcnt; // number of times OE was set on entry to ISR
+#endif
 
     struct ringbuf rxbuf;
     struct ringbuf txbuf;
@@ -140,9 +143,12 @@ void attach_uart(void * mmio_base, int irqno) {
     uart->regs = mmio_base;
     uart->irqno = irqno;
 
+#ifdef STUDENT
+    // YOUR MP2cp3 CODE HERE
+#else
     condition_init(&uart->rxbnotempty, "uart.rxnotempty");
     condition_init(&uart->txbnotfull, "uart.txnotfull");
-
+#endif
 
     // Initialize hardware device
 
@@ -160,7 +166,7 @@ void attach_uart(void * mmio_base, int irqno) {
 
 int uart_open(struct io ** ioptr, void * aux) {
 #ifdef STUDENT
-    // YOUR CODE HERE
+    // YOUR MP2cp1 CODE HERE
 #else
     struct uart_device * const uart = aux;
 
@@ -194,7 +200,7 @@ void uart_reclaim(struct io * io) {
 
     trace("%s()", __func__);
 #ifdef STUDENT
-    // YOUR CODE HERE
+    // YOUR MP2cp1 CODE HERE
 #else
 
     // Disable all interrupts from device
@@ -206,7 +212,7 @@ void uart_reclaim(struct io * io) {
 
 long uart_read(struct io * io, void * buf, long bufsz) {
 #ifdef STUDENT
-    // YOUR CODE HERE
+    // YOUR MP2cp1 CODE HERE
 #else
     struct uart_device * const uart =
         (void*)io - offsetof(struct uart_device, io);
