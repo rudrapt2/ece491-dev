@@ -127,7 +127,7 @@ void plic_init(void * mmio_base) {
 	plic_initialized = 1;
 }
 
-extern void plic_enable_source(int srcno, int prio) {
+void plic_enable_source(int srcno, int prio) {
 	trace("%s(srcno=%d,prio=%d)", __func__, srcno, prio);
 	assert (0 < srcno && srcno <= PLIC_SRC_CNT);
 	assert (prio > 0);
@@ -135,19 +135,19 @@ extern void plic_enable_source(int srcno, int prio) {
 	plic_set_source_priority(srcno, prio);
 }
 
-extern void plic_disable_source(int srcno) {
+void plic_disable_source(int srcno) {
 	trace("%s()", __func__);
 	assert (0 < srcno && srcno <= PLIC_SRC_CNT);
 
 	plic_set_source_priority(srcno, 0);
 }
 
-extern int plic_claim_interrupt(void) {
+int plic_claim_interrupt(void) {
 	trace("%s()", __func__);
 	return plic_claim_context_interrupt(CTX(0,1));
 }
 
-extern void plic_finish_interrupt(int irqno) {
+void plic_finish_interrupt(int irqno) {
 	trace("%s(irqno=%d)", __func__, irqno);
 	plic_complete_context_interrupt(CTX(0,1), irqno);
 }

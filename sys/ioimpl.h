@@ -318,8 +318,6 @@ extern long seekio_read(struct io * io, void * buf, long blkcap);
 // Reads from a seek-io object into a buffer at its internal position.
 // Equivalent to iofetch, with internal position set to /pos/.
 //
-// * This function may call functions that allocate memory from the heap.
-// * this function may call functions that allocate physical memory pages.
 // * This function may switch to another thread context.
 // * This function must _not_ be called from an ISR.
 
@@ -332,8 +330,6 @@ extern long seekio_write(struct io * io, const void * buf, long blkcnt);
 // past the end of the buffer. If SETEND succeeds, it will write as normal.
 // If SETEND fails, it will return the number of bytes successfully written.
 //
-// * This function may call functions that allocate memory from the heap.
-// * this function may call functions that allocate physical memory pages.
 // * This function may switch to another thread context.
 // * This function must _not_ be called from an ISR.
 

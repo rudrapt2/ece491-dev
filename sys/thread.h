@@ -30,7 +30,6 @@ extern void thrmgr_init(void);
 //
 // * This function must be called once at system initialization time with
 //   interrupts disabled before any other functions declared in thread.h.
-// * This function may allocate memory from the heap.
 // * this function may allocate physical memory pages.
 //
 // See spawn_thread().
@@ -116,8 +115,6 @@ extern int spawn_thread (
 //   than NTHR (compile-time parameter) and there is sufficient memory to
 //   allocate a thread stack and at least 256 bytes of additional memory.
 //
-// * This function may allocate memory from the heap.
-// * this function may allocate memory pages from the memory manager.
 // * This function must _not_ be called from an ISR.
 //
 // See also: exit_running_thread(), join_thread().
