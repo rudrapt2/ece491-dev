@@ -119,7 +119,7 @@ void plic_init(void * mmio_base) {
 	
 	// Route all sources to S mode on hart 0 only
 
-	for (int i = 1; i < PLIC_CTX_CNT; i++)
+	for (int i = 0; i < PLIC_CTX_CNT; i++)
 		plic_disable_all_sources_for_context(i);
 	
 	plic_enable_all_sources_for_context(CTX(0,1));
