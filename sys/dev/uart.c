@@ -165,9 +165,6 @@ void attach_uart(void * mmio_base, int irqno) {
 }
 
 int uart_open(struct io ** ioptr, void * aux) {
-#ifdef STUDENT
-    // YOUR MP2cp1 CODE HERE
-#else
     struct uart_device * const uart = aux;
 
     trace("%s()", __func__);
@@ -184,14 +181,17 @@ int uart_open(struct io ** ioptr, void * aux) {
 
     uart->regs->rbr; // forces a read because uart->regs is volatile
 
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     // Enable interrupts when data ready (DR) status asserted
 
     uart->regs->ier = IER_DRIE;
     enable_intr_source(uart->irqno, UART_INTR_PRIO, uart_isr, uart);
+#endif
 
     *ioptr = ioaddref(&uart->io);
     return 0;
-#endif
 }
 
 void uart_reclaim(struct io * io) {
@@ -200,7 +200,7 @@ void uart_reclaim(struct io * io) {
 
     trace("%s()", __func__);
 #ifdef STUDENT
-    // YOUR MP2cp1 CODE HERE
+    // YOUR CODE HERE
 #else
 
     // Disable all interrupts from device
@@ -212,7 +212,7 @@ void uart_reclaim(struct io * io) {
 
 long uart_read(struct io * io, void * buf, long bufsz) {
 #ifdef STUDENT
-    // YOUR MP2cp1 CODE HERE
+    // YOUR CODE HERE
 #else
     struct uart_device * const uart =
         (void*)io - offsetof(struct uart_device, io);
@@ -249,7 +249,7 @@ long uart_read(struct io * io, void * buf, long bufsz) {
 #endif
 }
 
-long uart_write(struct io * io, const void * buf, long len) {
+long uart_write(struct io * io, const void * buf, long buflen) {
 #ifdef STUDENT
     // YOUR CODE HERE
 #else
