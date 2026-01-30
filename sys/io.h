@@ -113,7 +113,6 @@ extern long iofill(struct io * io, void * buf, long len);
 
 // Reads from an I/O object into a buffer.
 //
-// * This function may call functions that allocate memory from the heap.
 // * this function may call functions that allocate physical memory pages.
 // * This function may switch to another thread context.
 // * This function must _not_ be called from an ISR.
@@ -125,7 +124,6 @@ extern long iowrite(struct io * io, const void * buf, long len);
 
 // Writes from a buffer to an I/O object.
 //
-// * This function may call functions that allocate memory from the heap.
 // * this function may call functions that allocate physical memory pages.
 // * This function may switch to another thread context.
 // * This function must _not_ be called from an ISR.
@@ -137,7 +135,6 @@ extern long iofetch(struct io * io, unsigned long long pos, void * buf, long len
 
 // Fetches data from a storage I/O object into a buffer.
 //
-// * This function may call functions that allocate memory from the heap.
 // * this function may call functions that allocate physical memory pages.
 // * This function may switch to another thread context.
 // * This function must _not_ be called from an ISR.
@@ -149,7 +146,6 @@ extern long iostore(struct io * io, unsigned long long pos, const void * buf, lo
 
 // Stores data from a buffer into a storage I/O object.
 //
-// * This function may call functions that allocate memory from the heap.
 // * this function may call functions that allocate physical memory pages.
 // * This function may switch to another thread context.
 // * This function must _not_ be called from an ISR.

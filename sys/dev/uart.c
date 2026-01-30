@@ -92,7 +92,7 @@ struct uart_device {
     struct io io;
 
 #ifdef STUDENT
-    // YOUR MP2cp3 CODE HERE
+    // YOUR CODE HERE
 #else
     struct condition rxbnotempty; // signalled when rxbuf becomes not empty
     struct condition txbnotfull;  // signalled when txbuf becomes not full
@@ -144,7 +144,7 @@ void attach_uart(void * mmio_base, int irqno) {
     uart->irqno = irqno;
 
 #ifdef STUDENT
-    // YOUR MP2cp3 CODE HERE
+    // YOUR CODE HERE
 #else
     condition_init(&uart->rxbnotempty, "uart.rxnotempty");
     condition_init(&uart->txbnotfull, "uart.txnotfull");

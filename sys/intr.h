@@ -75,9 +75,10 @@ extern void enable_intr_source (
 // be greater than 0. Calling enable_intr_source() with /prio/ greater than
 // INTR_PRIO_MAX is equivalent to calling it with /prio/ equal to INTR_PRIO_MAX.
 //
-// The /isr/ argument must be a pointer to a function of the correct type. It
-// will be called with the interrupt soruce number as the first argument and
-// /israux/ as the second argument to service an interrupt from source /srcno/.
+// The /isr/ argument is the ISR that should be called when the source raises an
+// interrupt. it must be a pointer to a function of the correct type. It will be
+// called with the interrupt soruce number as the first argument and /israux/ as
+// the second argument to service an interrupt from source /srcno/.
 //
 // The /isr/ pointer must remain valid for at least as long as the interrupt
 // source remains enabled. The /israux/ pointer is passed to the ISR as
