@@ -85,6 +85,10 @@ void enable_intr_source (
 
     isrtab[srcno].isr = isr;
     isrtab[srcno].israux = israux;
+
+    if (prio > INTR_PRIO_MAX)
+        prio = INTR_PRIO_MAX;
+    
     plic_enable_source(srcno, prio);
 }
 

@@ -67,27 +67,27 @@ struct plic_regs {
 //
 
 static inline void plic_set_source_priority (
-	uint_fast32_t srcno, uint_fast32_t level);
+	uint32_t srcno, uint32_t level);
 
-static inline int plic_source_pending(uint_fast32_t srcno);
+static inline int plic_source_pending(uint32_t srcno);
 
 static inline void plic_enable_source_for_context (
-	uint_fast32_t ctxno, uint_fast32_t srcno);
+	uint32_t ctxno, uint32_t srcno);
 
 static inline void plic_disable_source_for_context (
-	uint_fast32_t ctxno, uint_fast32_t srcno);
+	uint32_t ctxno, uint32_t srcno);
 
 static inline void plic_set_context_threshold (
-	uint_fast32_t ctxno, uint_fast32_t level);
+	uint32_t ctxno, uint32_t level);
 
-static inline uint_fast32_t plic_claim_context_interrupt (
-	uint_fast32_t ctxno);
+static inline uint32_t plic_claim_context_interrupt (
+	uint32_t ctxno);
 
 static inline void plic_complete_context_interrupt (
-	uint_fast32_t ctxno, uint_fast32_t srcno);
+	uint32_t ctxno, uint32_t srcno);
 
-static void plic_enable_all_sources_for_context(uint_fast32_t ctxno);
-static void plic_disable_all_sources_for_context(uint_fast32_t ctxno);
+static void plic_enable_all_sources_for_context(uint32_t ctxno);
+static void plic_disable_all_sources_for_context(uint32_t ctxno);
 
 // EXPORTED GLOBAL VARIABLES
 //
@@ -119,7 +119,7 @@ void plic_init(void * mmio_base) {
 	
 	// Route all sources to S mode on hart 0 only
 
-	for (int i = 1; i < PLIC_CTX_CNT; i++)
+	for (int i = 0; i < PLIC_CTX_CNT; i++)
 		plic_disable_all_sources_for_context(i);
 	
 	plic_enable_all_sources_for_context(CTX(0,1));
@@ -155,7 +155,7 @@ void plic_finish_interrupt(int irqno) {
 // INTERNAL FUNCTION DEFINITIONS
 //
 
-static inline void plic_set_source_priority(uint_fast32_t srcno, uint_fast32_t level) {
+static inline void plic_set_source_priority(uint32_t srcno, uint32_t level) {
 #ifdef STUDENT
 	// YOUR CODE HERE
 #else
@@ -163,7 +163,7 @@ static inline void plic_set_source_priority(uint_fast32_t srcno, uint_fast32_t l
 #endif
 }
 
-static inline int plic_source_pending(uint_fast32_t srcno) {
+static inline int plic_source_pending(uint32_t srcno) {
 #ifdef STUDENT
 	// YOUR CODE HERE
 #else
@@ -174,7 +174,7 @@ static inline int plic_source_pending(uint_fast32_t srcno) {
 #endif
 }
 
-static inline void plic_enable_source_for_context(uint_fast32_t ctxno, uint_fast32_t srcno) {
+static inline void plic_enable_source_for_context(uint32_t ctxno, uint32_t srcno) {
 #ifdef STUDENT
 	// YOUR CODE HERE
 #else
@@ -185,7 +185,7 @@ static inline void plic_enable_source_for_context(uint_fast32_t ctxno, uint_fast
 #endif
 }
 
-static inline void plic_disable_source_for_context(uint_fast32_t ctxno, uint_fast32_t srcno) {
+static inline void plic_disable_source_for_context(uint32_t ctxno, uint32_t srcno) {
 #ifdef STUDENT
 	// YOUR CODE HERE
 #else
@@ -197,7 +197,7 @@ static inline void plic_disable_source_for_context(uint_fast32_t ctxno, uint_fas
 #endif
 }
 
-static inline void plic_set_context_threshold(uint_fast32_t ctxno, uint_fast32_t level) {
+static inline void plic_set_context_threshold(uint32_t ctxno, uint32_t level) {
 #ifdef STUDENT
 	// YOUR CODE HERE
 #else
@@ -205,7 +205,7 @@ static inline void plic_set_context_threshold(uint_fast32_t ctxno, uint_fast32_t
 #endif
 }
 
-static inline uint_fast32_t plic_claim_context_interrupt(uint_fast32_t ctxno) {
+static inline uint32_t plic_claim_context_interrupt(uint32_t ctxno) {
 #ifdef STUDENT
 	// YOUR CODE HERE
 #else
@@ -213,7 +213,7 @@ static inline uint_fast32_t plic_claim_context_interrupt(uint_fast32_t ctxno) {
 #endif
 }
 
-static inline void plic_complete_context_interrupt(uint_fast32_t ctxno, uint_fast32_t srcno) {
+static inline void plic_complete_context_interrupt(uint32_t ctxno, uint32_t srcno) {
 #ifdef STUDENT
 	// YOUR CODE HERE
 #else
@@ -221,7 +221,7 @@ static inline void plic_complete_context_interrupt(uint_fast32_t ctxno, uint_fas
 #endif
 }
 
-static void plic_enable_all_sources_for_context(uint_fast32_t ctxno) {
+static void plic_enable_all_sources_for_context(uint32_t ctxno) {
 #ifdef STUDENT
 	// YOUR CODE HERE
 #else
@@ -232,7 +232,7 @@ static void plic_enable_all_sources_for_context(uint_fast32_t ctxno) {
 #endif
 }
 
-static void plic_disable_all_sources_for_context(uint_fast32_t ctxno) {
+static void plic_disable_all_sources_for_context(uint32_t ctxno) {
 #ifdef STUDENT
 	// YOUR CODE HERE
 #else

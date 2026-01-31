@@ -9,8 +9,8 @@
         .type   _smode_trap_entry, @function
         .balign 4 # Trap entry must be 4-byte aligned
 
-        # When entering a trap, we store all CPU state in a _trap frame_ struct,
-        # which is defined as follows in trap.h:
+        # When entering a trap, we store all CPU state in a /trap frame/
+        # structure, which is defined as follows in trap.h:
         # 
         #   struct trap_frame {
         #       long a0, a1, a2, a3, a4, a5, a6, a7;
@@ -28,7 +28,7 @@
 
         # We define a macro for the offset of each member within the trap frame and a
         # macro for the trap frame size. Do not confuse `A5`, a constant defined
-        # below, with the _a5_ register.
+        # below, with the /a5/ register.
 
         .equ    A0, 0*8
         .equ    A1, 1*8 
@@ -74,7 +74,7 @@
         #       void * kgp;
         #   };
         # 
-        # This allows us to restore the S-mode _gp_ and _tp_ values.
+        # This allows us to restore the S-mode /gp/ and /tp/ values.
         #
 
         .equ    KGP, 1*8
@@ -82,18 +82,29 @@
 
 _smode_trap_entry:
 
+<<<<<<< HEAD
+        # Swap /sp/ and /sscratch/. When we're in U mode, sscratch contains a
+        # pointer to a trap frame at the base of the kernel stack. When we're in
+        # S mode, /sscratch/ is zero.
+=======
 .ifndef MP2
         # Swap _sp_ and _sscratch_. When we are in U mode, sscratch contains a
         # pointer to a trap frame at the base of the kernel stack. When we are in
         # S mode, _sscratch_ is zero.
+>>>>>>> 2bab8d38e70e49b1661f30f955bd9cf6620ac5af
 
         csrrw   sp, sscratch, sp
         beqz    sp, smode_trap_entry_from_smode
 
 smode_trap_entry_from_umode:
 
+<<<<<<< HEAD
+        # When we're in U mode, sscratch contains a pointer to a trap frame at
+        # the base of the kernel stack. This pointer, now in /sp/, is our kernel
+=======
         # When we are in U mode, sscratch contains a pointer to a trap frame at
         # the base of the kernel stack. This pointer, now in _sp_, is our kernel
+>>>>>>> 2bab8d38e70e49b1661f30f955bd9cf6620ac5af
         # stack pointer.
         
         # Save general purpose registers to trap frame
@@ -134,42 +145,47 @@ smode_trap_entry_from_umode:
         rdinstret       t6
         sd              t6, SINSTRET(sp)
         
-        # Save U-mode _sp_, which is still in sscratch
+        # Save U-mode /sp/, which is still in sscratch
 
         csrrw   t6, sscratch, zero
         sd      t6, SP(sp)
 
-        # Save _sstatus_ and _sepc_ CSRs to trap frame
+        # Save /sstatus/ and /sepc/ CSRs to trap frame
 
         csrr    t6, sstatus
         sd      t6, SSTATUS(sp)
         csrr    t6, sepc
         sd      t6, SEPC(sp)
 
-        # Set up _fp_ to look like a normal stack frame
+        # Set up /fp/ to look like a normal stack frame
 
         addi    fp, sp, TFRSZ
 
-        # Load _gp_ and _tp_ from thread stack anchor
+        # Load /gp/ and /tp/ from thread stack anchor
 
         ld      gp, KGP(fp)
         ld      tp, KTP(fp)
 
-        # Set up _ra_ to return from exception and interrupt handlers to next
+        # Set up /ra/ to return from exception and interrupt handlers to next
         # instruction after call
 
         call    1f
 
         # U mode handlers return here because the call instruction above places
-        # this address in _ra_ before jumping to an exception or trap handler.
+        # this address in /ra/ before jumping to an exception or trap handler.
         # We restore some registers from the trap frame now (_early_), and the
         # rest after disabling interrupts (_late_).
         
         # The _early_ restore registers are those whose exact value is not
+<<<<<<< HEAD
+        # critical if an interrupt should occur while we're restoring them. The
+        # _late_ registers are /gp/, /tp/, and /sp/, plus the temporary /t6/. We
+=======
         # critical if an interrupt should occur while we are restoring them. The
         # _late_ registers are _gp_, _tp_, and _sp_, plus the temporary _t6_. We
+>>>>>>> 2bab8d38e70e49b1661f30f955bd9cf6620ac5af
         # are still in S mode (and will be until we the sret instruction), so
-        # _gp_, _tp_, and _sp_ must have their correct kernel values if we take
+        # /gp/, /tp/, and /sp/ must have their correct kernel values if we take
         # an interrupt.
         
         ld      a0, A0(sp)
@@ -200,8 +216,8 @@ smode_trap_entry_from_umode:
         ld      ra, RA(sp)
         ld      fp, FP(sp)
 
-        # We need interrupts disabled after restoring _sepc_ so that it does not
-        # get clobbered by another trap entry. Restore _sstatus_ first, which
+        # We need interrupts disabled after restoring /sepc/ so that it does not
+        # get clobbered by another trap entry. Restore /sstatus/ first, which
         # automatically disables interrupts.
 
         ld      t6, SSTATUS(sp)
@@ -209,11 +225,11 @@ smode_trap_entry_from_umode:
         ld      t6, SEPC(sp)
         csrw    sepc, t6
 
-        # Save _sp_ (which points to the trap frame) to _sscratch_.
+        # Save /sp/ (which points to the trap frame) to /sscratch/.
 
         csrw    sscratch, sp
 
-        # Restore _t6_ and _sp_ and we are done!
+        # Restore /t6/ and /sp/ and we are done!
 
         ld      t6, T6(sp)
         ld      gp, GP(sp)
@@ -224,7 +240,7 @@ smode_trap_entry_from_umode:
 
         # Execution of trap entry continues here from `call 1f` above. Jump to
         # exception handler or interrupt handler depending on what brought us
-        # here. Note that we clear the most significant bit of _scause_ before
+        # here. Note that we clear the most significant bit of /scause/ before
         # passing its value to the interrupt handler.
 
 1:      csrr    a0, scause      # a0 contains "exception code"
@@ -239,8 +255,8 @@ smode_trap_entry_from_umode:
 
 smode_trap_entry_from_smode:
 
-        # When we are in S mode, we continue using the kernel _sp_, _tp_, and
-        # _gp_. First, recover _sp_ from sscratch and write zero to scratch to
+        # When we are in S mode, we continue using the kernel /sp/, /tp/, and
+        # /gp/. First, recover /sp/ from sscratch and write zero to scratch to
         # indicate that we are now in S mode.
 
         csrrw   sp, sscratch, zero      # Get kernel SP back from sscratch
@@ -290,19 +306,19 @@ smode_trap_entry_from_smode:
         csrr    t6, sepc
         sd      t6, SEPC(sp)
 
-        # Set up _fp_ to look like a normal stack frame
+        # Set up /fp/ to look like a normal stack frame
 
         addi    fp, sp, TFRSZ
         
-        # Set up _ra_ to return from exception and interrupt handlers to next
+        # Set up /ra/ to return from exception and interrupt handlers to next
         # instruction after call
 
         call    1f
 
         # S mode handlers return here because the call instruction above places
-        # this address in _ra_ before we jump to an exception or trap handler.
-        # Restore all GPRs except _gp_ and _tp_ (not saved/restored in S mode),
-        # _sp_ (restored last) and _t6_ (used as temporary).
+        # this address in /ra/ before we jump to an exception or trap handler.
+        # Restore all GPRs except /gp/ and /tp/ (not saved/restored in S mode),
+        # /sp/ (restored last) and /t6/ (used as temporary).
         
         ld      a0, A0(sp)
         ld      a1, A1(sp)
@@ -332,8 +348,8 @@ smode_trap_entry_from_smode:
         ld      ra, RA(sp)
         ld      fp, FP(sp)
 
-        # We need interrupts disabled after restoring _sepc_ so that it does not
-        # get clobbered by another trap entry. Restore _sstatus_ first, which
+        # We need interrupts disabled after restoring /sepc/ so that it does not
+        # get clobbered by another trap entry. Restore /sstatus/ first, which
         # automatically disables interrupts.
 
         ld      t6, SSTATUS(sp)
@@ -341,7 +357,7 @@ smode_trap_entry_from_smode:
         ld      t6, SEPC(sp)
         csrw    sepc, t6
 
-        # Restore _t6_ and _sp_ last
+        # Restore /t6/ and /sp/ last
 
         ld      t6, T6(sp)
         addi    sp, sp, TFRSZ
@@ -350,7 +366,7 @@ smode_trap_entry_from_smode:
 
         # Execution of trap entry continues here from `call 1f` above. Jump to
         # exception handler or interrupt handler depending on what brought us
-        # here. Note that we clear the most significant bit of _scause_ before
+        # here. Note that we clear the most significant bit of /scause/ before
         # passing its value to the interrupt handler.
 
 1:      csrr    a0, scause      # a0 contains "exception code"
@@ -365,10 +381,10 @@ smode_trap_entry_from_smode:
 
 .ifndef MP2
 # void __attribute__ ((noreturn)) trap_frame_jump(struct trap_frame * tfr);
-
+#
 # Restores CPU state from a trap frame as when returning to U mode. If indeed
 # returning to U mode, the caller is responsible for placing the address of the
-# re-entry trap frame into _sscratch_.
+# re-entry trap frame into /sscratch/.
 
         .global trap_frame_jump
         .type   trap_frame_jump, @function
@@ -379,8 +395,8 @@ trap_frame_jump:
 
         # Start by restoring some GPRs now (_early_) and some after disabling
         # interrupts (_late_). See discussion in smode_trap_entry_from_umode.
-        # The _late_ registers are _gp_, _tp_, _sp_, as well as _a0_ (points to
-        # trap frame) and _t6_ (used as a temporary).
+        # The _late_ registers are /gp/, /tp/, /sp/, as well as /a0/ (points to
+        # trap frame) and /t6/ (used as a temporary).
 
         ld      a2, A2(a0)
         ld      a3, A3(a0)
@@ -408,13 +424,13 @@ trap_frame_jump:
         ld      ra, RA(a0)
         ld      fp, FP(a0)
 
-        # Restore _sstatus_ but make sure SIE=0 to disable interrupts
+        # Restore /sstatus/ but make sure SIE=0 to disable interrupts
 
         ld      t6, SSTATUS(a0)
         andi    t6, t6, ~2 # SIE
         csrw    sstatus, t6
 
-        # Restore _sepc_ and late-restore registers
+        # Restore /sepc/ and late-restore registers
 
         csrw sscratch, a1
 
