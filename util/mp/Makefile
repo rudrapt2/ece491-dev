@@ -19,6 +19,8 @@ FILES_FOR_COPYING   := \
     sys/dev/viorng.c \
     sys/dev/virtio.c \
     sys/dev/virtio.h \
+    sys/games/rule30-mp2.o \
+    sys/games/trek-mp2.o \
     sys/conf.h \
     sys/console.c \
     sys/console.h \

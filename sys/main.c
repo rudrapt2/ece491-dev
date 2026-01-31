@@ -88,7 +88,7 @@ void run_games(void) {
     if (result != 0)
         rngseed = rdtime();
 
-#if 1 // Set to 1 for MP3cp3
+#if 1 // Set to 1 for MP2cp3
 
     // Open UART for rule30.
 
