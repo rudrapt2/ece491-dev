@@ -136,7 +136,7 @@ preprocess_assembly: check_clean copy_files
 UNIFDEF_FILES := $(filter %.c %.h,$(TARGET_FILES)) $(TARGET_ASM_PREPROCESSING_FILES)
 
 mp2_gold: preprocess_assembly
-	$(call run-unifdef,-DMP2)
+	$(call run-unifdef,-DMP2 -t)
 
 mp2_release: preprocess_assembly
-	$(call run-unifdef,-DMP2 -DSTUDENT)
+	$(call run-unifdef,-DMP2 -DSTUDENT -t)
