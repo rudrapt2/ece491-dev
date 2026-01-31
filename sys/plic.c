@@ -66,24 +66,24 @@ struct plic_regs {
 // INTERNAL FUNCTION DECLARATIONS
 //
 
-static void plic_set_source_priority (
+static inline void plic_set_source_priority (
 	uint_fast32_t srcno, uint_fast32_t level);
 
-static int plic_source_pending(uint_fast32_t srcno);
+static inline int plic_source_pending(uint_fast32_t srcno);
 
-static void plic_enable_source_for_context (
+static inline void plic_enable_source_for_context (
 	uint_fast32_t ctxno, uint_fast32_t srcno);
 
-static void plic_disable_source_for_context (
+static inline void plic_disable_source_for_context (
 	uint_fast32_t ctxno, uint_fast32_t srcno);
 
-static void plic_set_context_threshold (
+static inline void plic_set_context_threshold (
 	uint_fast32_t ctxno, uint_fast32_t level);
 
-static uint_fast32_t plic_claim_context_interrupt (
+static inline uint_fast32_t plic_claim_context_interrupt (
 	uint_fast32_t ctxno);
 
-static void plic_complete_context_interrupt (
+static inline void plic_complete_context_interrupt (
 	uint_fast32_t ctxno, uint_fast32_t srcno);
 
 static void plic_enable_all_sources_for_context(uint_fast32_t ctxno);
@@ -127,7 +127,7 @@ void plic_init(void * mmio_base) {
 	plic_initialized = 1;
 }
 
-extern void plic_enable_source(int srcno, int prio) {
+void plic_enable_source(int srcno, int prio) {
 	trace("%s(srcno=%d,prio=%d)", __func__, srcno, prio);
 	assert (0 < srcno && srcno <= PLIC_SRC_CNT);
 	assert (prio > 0);
@@ -135,19 +135,19 @@ extern void plic_enable_source(int srcno, int prio) {
 	plic_set_source_priority(srcno, prio);
 }
 
-extern void plic_disable_source(int srcno) {
+void plic_disable_source(int srcno) {
 	trace("%s()", __func__);
 	assert (0 < srcno && srcno <= PLIC_SRC_CNT);
 
 	plic_set_source_priority(srcno, 0);
 }
 
-extern int plic_claim_interrupt(void) {
+int plic_claim_interrupt(void) {
 	trace("%s()", __func__);
 	return plic_claim_context_interrupt(CTX(0,1));
 }
 
-extern void plic_finish_interrupt(int irqno) {
+void plic_finish_interrupt(int irqno) {
 	trace("%s(irqno=%d)", __func__, irqno);
 	plic_complete_context_interrupt(CTX(0,1), irqno);
 }
