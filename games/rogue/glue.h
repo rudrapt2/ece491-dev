@@ -6,8 +6,8 @@
 
 // #include "io.h"
 #include <stdint.h>
-#include "string.h"
-#include "syscall.h"
+#include "usr/string.h"
+#include "usr/syscall.h"
 
 // extern struct io_intf * stdio;
 extern const char * const termcap;

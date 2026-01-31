@@ -14,7 +14,7 @@ extern void puts(const char * s);
 extern void printf(const char * fmt, ...);
 extern char * getsn(char * buf, size_t n);
 
-#if defined MP2 || defined AEE31 || defined AEE32
+#if defined (AEE0) || defined (AEE2) || defined (AEE31) || defined (AEE32)
 extern size_t strlen(const char * s);
 extern void * memset(void * s, int c, size_t n);
 extern int strncmp(const char * s1, const char * s2, size_t n);
