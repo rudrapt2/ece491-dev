@@ -71,7 +71,7 @@ void attach_rtc(void * mmio_base) {
 
     rtc->regs = mmio_base;
 
-    register_device("rtc", instcnt++, &rtc_open, rtc);
+    register_device("rtc", -1, &rtc_open, rtc);
     ioinit(&rtc->io, &rtc_intf, 8, 0);
 #endif
 }
