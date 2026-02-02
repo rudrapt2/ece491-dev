@@ -1,7 +1,7 @@
-#include "string.h"
-#include "syscall.h"
-#include "viohi.h"
-#include "heap.h"
+#include "usr/heap.h"
+#include "usr/viohi.h"
+#include "usr/string.h"
+#include "usr/syscall.h"
 
 static void input_handler();
 static void alarm_handler();

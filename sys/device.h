@@ -56,12 +56,20 @@ typedef int (*device_openfn_t)(struct io ** ioptr, void * aux);
 // I/O object, initializing it with ioinit()/seekio_init(), and returning it via
 // /ioptr/.
 //
+// All openfn() implementations registered with the device manager must follow
+// the following specifications.
+//
 // On entry openfn() assumes:
 // - /ioptr/ is non-NULL.
 // - /aux/ is the pointer passed at registration time.
 //
 // On return openfn() guarantees (on success):
-// - *ioptr points to a valid I/O object with a non-zero reference count.
+// - The pointer at /ioptr/ points to a valid I/O object.
+// - The pointer returned via /ioptr/ is considered an independent reference for
+//   the purposes of reference-counting.
+// - The returned I/O object is ready to perform I/O operation supported by the
+//   device.
+// - on failure, openfn() returns a negative error code.
 
 extern int register_device (
     const char * name,

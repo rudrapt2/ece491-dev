@@ -91,10 +91,13 @@ struct uart_device {
 
     struct io io;
 
-    unsigned long rxovrcnt; // number of times OE was set
-    
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     struct condition rxbnotempty; // signalled when rxbuf becomes not empty
     struct condition txbnotfull;  // signalled when txbuf becomes not full
+    unsigned long rxovrcnt; // number of times OE was set on entry to ISR
+#endif
 
     struct ringbuf rxbuf;
     struct ringbuf txbuf;
@@ -140,9 +143,12 @@ void attach_uart(void * mmio_base, int irqno) {
     uart->regs = mmio_base;
     uart->irqno = irqno;
 
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     condition_init(&uart->rxbnotempty, "uart.rxnotempty");
     condition_init(&uart->txbnotfull, "uart.txnotfull");
-
+#endif
 
     // Initialize hardware device
 
@@ -159,9 +165,6 @@ void attach_uart(void * mmio_base, int irqno) {
 }
 
 int uart_open(struct io ** ioptr, void * aux) {
-#ifdef STUDENT
-    // YOUR CODE HERE
-#else
     struct uart_device * const uart = aux;
 
     trace("%s()", __func__);
@@ -178,14 +181,17 @@ int uart_open(struct io ** ioptr, void * aux) {
 
     uart->regs->rbr; // forces a read because uart->regs is volatile
 
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     // Enable interrupts when data ready (DR) status asserted
 
     uart->regs->ier = IER_DRIE;
     enable_intr_source(uart->irqno, UART_INTR_PRIO, uart_isr, uart);
+#endif
 
     *ioptr = ioaddref(&uart->io);
     return 0;
-#endif
 }
 
 void uart_reclaim(struct io * io) {
@@ -243,7 +249,7 @@ long uart_read(struct io * io, void * buf, long bufsz) {
 #endif
 }
 
-long uart_write(struct io * io, const void * buf, long len) {
+long uart_write(struct io * io, const void * buf, long buflen) {
 #ifdef STUDENT
     // YOUR CODE HERE
 #else
@@ -254,7 +260,7 @@ long uart_write(struct io * io, const void * buf, long len) {
    
     trace("%s(%ld)", __func__, len);
 
-    if (len == 0)
+    if (buflen == 0)
         return 0;
 
     assert (buf != NULL);
@@ -263,7 +269,7 @@ long uart_write(struct io * io, const void * buf, long len) {
     // _buf_ to ring buffer. Unlike the read case, we write all characters
     // before returning.
 
-    while (n < len) {
+    while (n < buflen) {
         pie = disable_interrupts();
 
         while (rbuf_full(&uart->txbuf))
@@ -271,7 +277,7 @@ long uart_write(struct io * io, const void * buf, long len) {
 
         restore_interrupts(pie);
 
-        while (!rbuf_full(&uart->txbuf) && n < len)
+        while (!rbuf_full(&uart->txbuf) && n < buflen)
             rbuf_putc(&uart->txbuf, ((const char*)buf)[n++]);
         
         uart->regs->ier |= IER_THREIE;

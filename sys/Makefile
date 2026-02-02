@@ -26,7 +26,7 @@ BASE_OBJS = \
 	error.o \
 	thrasm.o \
 	trap.o \
-	board/qemu-virt.o
+	board/qvirt.o
 
 MP2_OBJS = \
 	$(BASE_OBJS) \
@@ -93,7 +93,7 @@ CFLAGS += -I.
 
 ASFLAGS = -march=rv64imazicsr
 
-LDFLAGS = -melf64lriscv
+LDFLAGS = -melf64lriscv -T board/qvirt.ld
 
 BASE_QEMUOPTS = -global virtio-mmio.force-legacy=false
 BASE_QEMUOPTS += -machine virt -nographic
@@ -126,7 +126,7 @@ clean:
 #
 
 mp2-kernel.elf: $(MP2_OBJS)
-	$(LD) $(LDFLAGS) -T board/qemu-virt.ld -o $@ $^
+	$(LD) $(LDFLAGS) -o $@ $^
 
 run-mp2: mp2-kernel.elf
 	$(QEMU) $(MP2_QEMUOPTS) -m 8M -kernel $<

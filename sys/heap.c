@@ -24,6 +24,9 @@
 #define HEAP_ALIGN 8
 #endif
 
+#ifndef PAGE_SIZE
+#define PAGE_SIZE 4096
+#endif
 
 // INTERNAL CONSTANT DEFINITIONS
 //

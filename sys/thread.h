@@ -30,7 +30,6 @@ extern void thrmgr_init(void);
 //
 // * This function must be called once at system initialization time with
 //   interrupts disabled before any other functions declared in thread.h.
-// * This function may allocate memory from the heap.
 // * this function may allocate physical memory pages.
 //
 // See spawn_thread().
@@ -116,8 +115,6 @@ extern int spawn_thread (
 //   than NTHR (compile-time parameter) and there is sufficient memory to
 //   allocate a thread stack and at least 256 bytes of additional memory.
 //
-// * This function may allocate memory from the heap.
-// * this function may allocate memory pages from the memory manager.
 // * This function must _not_ be called from an ISR.
 //
 // See also: exit_running_thread(), join_thread().
@@ -381,8 +378,8 @@ extern void condition_init(struct condition * cond, const char * name);
 // during the lifetime of the structure.
 //
 // On entry condition_init() assumes:
-// - /cond/ is a pointer to a region of memory large enough to hold an instance
-//   of a /condition/ structure.
+// - /cond/ is a properly-aligned pointer to a region of memory large enough to
+//   hold an instance of a /condition/ structure.
 // - /name/ is a pointer to a null-terminated string or NULL.
 //
 // On return condition_init() guarantees:
@@ -541,8 +538,8 @@ extern void rwlock_init(struct rwlock * rwlk, const char * name);
 // that the lock is only used during the lifetime of the structure.
 //
 // On entry rwlock_init() assumes:
-// - /rwlk/ is a valid pointer to a region of memory large enough to hold an
-//   instance of a /rwlock/ structure.
+// - /rwlk/ is a properly-aligned pointer to a region of memory large enough to
+//   hold an instance of a /rwlock/ structure.
 // - /name/ is a pointer to a null-terminated string or NULL.
 //
 // On return rwlock_init() guarantees:

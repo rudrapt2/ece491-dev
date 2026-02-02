@@ -85,6 +85,10 @@ void enable_intr_source (
 
     isrtab[srcno].isr = isr;
     isrtab[srcno].israux = israux;
+
+    if (prio > INTR_PRIO_MAX)
+        prio = INTR_PRIO_MAX;
+    
     plic_enable_source(srcno, prio);
 }
 
@@ -99,18 +103,18 @@ void handle_smode_interrupt(unsigned int cause) {
     handle_interrupt(cause);
 }
 
+#ifndef MP2
 void handle_umode_interrupt(unsigned int cause) {
 #ifdef STUDENT
     // YOUR CODE HERE
 #else
     // called from trap.s
     handle_interrupt(cause);
-#ifndef MP2
     enable_interrupts();
     submit_running_thread();
-#endif // MP2
 #endif // STUDENT
 }
+#endif // MP2
 
 extern long enable_interrupts(void) {
     return csrrsi_sstatus_SIE();

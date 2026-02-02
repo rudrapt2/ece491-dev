@@ -5,12 +5,12 @@
 
 #include "glue.h"
 
-#if defined AEE0 + defined AEE1 + defined MP2 + defined AEE31 + defined AEE32 > 1
-#error "Exactly one of AEE0, AEE1, MP2, AEE31, or AEE32 must be defined"
+#if defined AEE0 + defined AEE1 + defined AEE2 + defined AEE31 + defined AEE32 > 1
+#error "Exactly one of AEE0, AEE1, AEE2, AEE31, or AEE32 must be defined"
 #endif
 
-#if defined AEE0 + defined AEE1 + defined MP2 + defined AEE31 + defined AEE32 < 1
-#error "Exactly one of AEE0, AEE1, MP2, AEE31, or AEE32 must be defined"
+#if defined AEE0 + defined AEE1 + defined AEE2 + defined AEE31 + defined AEE32 < 1
+#error "Exactly one of AEE0, AEE1, AEE2, AEE31, or AEE32 must be defined"
 #endif
 
 #ifndef RAND_MAX
@@ -22,25 +22,27 @@ int exited = 0;
 // COMPILE-TIME CONFIGURATION
 //
 
-// defined(AEE0) MP0
+// defined AEE0 (MP0)
 //  - Provides a trek_start(void) entry point
 //  - Calls kputc() and kgetc() for terminal I/O
 //
-// defined(AEE2) MP2
-//  - Provides a trek_start(struct io * io) entry point
-//  - calls ioread() and iowrite() for terminal I/O
+// defined AEE2 (MP2)
+//  - Provides a trek_start(struct serial * term) entry point
+//  - calls serial_send() and serial_recieve() for terminal I/O
 //
-// defined(AEE31)
+// defined AEE31 (MP3 CP1)
 //  - Provides a trek_start(struct uio * uio) entry point
 //  - calls uio_read() and uio_write() for terminal I/O
 //  - implements uio_read() and uio_write() in glue.c
 //  - cannot link to kernel functions
 //
-// defined(AEE32)
+// defined AEE32 (MP3 CP2 + MP3 CP3)
 //  - Provides a main(int argc, const char * argv[]) entry point
 //  - calls _read() and _write() for terminal I/O
 
-#ifdef AEE0
+#if defined (AEE0)
+#include "kernel/string.h"
+
 static char gluegetc(void);
 static void glueputc(char c);
 static char getchar(void);
@@ -125,28 +127,27 @@ void putchar(char c) {
 }
 #endif
 
-#ifdef MP2
+#if defined (AEE2)
 #include "kernel/string.h"
 
 static char gluegetc(void);
 static void glueputc(char c);
 static char getchar(void);
 
-struct serial; // external object
-static struct serial * trek_term;
+struct io; // external object
+static struct io * trek_io;
 
-// from device.c
-extern int serial_recv(struct serial * ser, void * buf, unsigned int bufsz);
-extern int serial_send(struct serial * ser, const void * buf, unsigned int len);
+extern long ioread(struct io * io, void * buf, long bufsz);
+extern long iowrite(struct io * io, const void * buf, long len);
 
 // from see.s
 extern void halt(void);
 
 static unsigned long rndst = 0;
 
-void trek_start(struct serial * term, unsigned long rngseed) {
+void trek_start(struct io * tio, unsigned long rngseed) {
 	extern void trek_main(void);
-	trek_term = term;
+	trek_io = tio;
     
 	if (rngseed == 0)
 		rndst = 0xECE391;
@@ -160,7 +161,7 @@ char gluegetc(void) {
 	int len;
 	char c;
 
-	len = serial_recv(trek_term, &c, 1);
+	len = ioread(trek_io, &c, 1);
 
 	if (len != 1)
 		halt();
@@ -171,7 +172,7 @@ char gluegetc(void) {
 void glueputc(char c) {
 	int len;
 
-	len = serial_send(trek_term, &c, 1);
+	len = iowrite(trek_io, &c, 1);
 
 	if (len != 1)
 		halt();
@@ -227,8 +228,8 @@ void puts(const char * s) {
 			while (*s != '\0' && *s != '\n')
 				s += 1;
 			if (s != start)
-				serial_send(trek_term, start, s - start);
-			serial_send(trek_term, "\r\n", 2);
+				iowrite(trek_io, start, s - start);
+			iowrite(trek_io, "\r\n", 2);
 			if (*s == '\0')
 				break;
 			s += 1;
@@ -282,9 +283,9 @@ int rand(void) {
 
 #endif
 
-#ifdef AEE31
-#include "uio.h"
-#include "kern_string.h"
+#if defined (AEE31)
+#include "usr/uio.h"
+#include "kernel/string.h"
 
 static char getchar(void);
 
@@ -467,9 +468,11 @@ void putchar(char c) {
 }
 #endif
 
-#ifdef AEE32
+#if defined (AEE32)
 
-#include "user_string.h"
+#include "usr/string.h"
+#include "usr/syscall.h"
+
 
 static unsigned long rndst = 0;
 
@@ -481,6 +484,7 @@ void main(void) {
 #else
 	rndst = RAND_SEED;
 #endif
+    _open(2, "dev/uart1");
 	trek_main();
 }
 
