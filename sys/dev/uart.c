@@ -260,7 +260,7 @@ long uart_write(struct io * io, const void * buf, long buflen) {
    
     trace("%s(%ld)", __func__, len);
 
-    if (len == 0)
+    if (buflen == 0)
         return 0;
 
     assert (buf != NULL);
@@ -269,7 +269,7 @@ long uart_write(struct io * io, const void * buf, long buflen) {
     // _buf_ to ring buffer. Unlike the read case, we write all characters
     // before returning.
 
-    while (n < len) {
+    while (n < buflen) {
         pie = disable_interrupts();
 
         while (rbuf_full(&uart->txbuf))
@@ -277,7 +277,7 @@ long uart_write(struct io * io, const void * buf, long buflen) {
 
         restore_interrupts(pie);
 
-        while (!rbuf_full(&uart->txbuf) && n < len)
+        while (!rbuf_full(&uart->txbuf) && n < buflen)
             rbuf_putc(&uart->txbuf, ((const char*)buf)[n++]);
         
         uart->regs->ier |= IER_THREIE;

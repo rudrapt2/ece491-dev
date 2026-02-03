@@ -21,6 +21,8 @@ OBJS = \
 	dev/rtc.o \
 	dev/virtio.o \
 	dev/viorng.o \
+	games/rule30-mp2.o \
+	games/trek-mp2.o \
 	string.o \
 	plic.o \
 	string.o \

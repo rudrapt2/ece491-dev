@@ -19,6 +19,8 @@ FILES_FOR_COPYING   := \
     sys/dev/viorng.c \
     sys/dev/virtio.c \
     sys/dev/virtio.h \
+    sys/games/rule30-mp2.o \
+    sys/games/trek-mp2.o \
     sys/conf.h \
     sys/console.c \
     sys/console.h \
@@ -136,7 +138,7 @@ preprocess_assembly: check_clean copy_files
 UNIFDEF_FILES := $(filter %.c %.h,$(TARGET_FILES)) $(TARGET_ASM_PREPROCESSING_FILES)
 
 mp2_gold: preprocess_assembly
-	$(call run-unifdef,-DMP2)
+	$(call run-unifdef,-DMP2 -t)
 
 mp2_release: preprocess_assembly
-	$(call run-unifdef,-DMP2 -DSTUDENT)
+	$(call run-unifdef,-DMP2 -DSTUDENT -t)

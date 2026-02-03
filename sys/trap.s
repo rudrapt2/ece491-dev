@@ -26,7 +26,7 @@
         #       void * sepc;
         #   };
 
-        # We define a macro for the offset of each member within the trap frame and a
+        # We define a macro for each member's offset within the trap frame and a
         # macro for the trap frame size. Do not confuse `A5`, a constant defined
         # below, with the /a5/ register.
 
@@ -82,6 +82,7 @@
 
 _smode_trap_entry:
 
+.ifndef MP2
         # Swap /sp/ and /sscratch/. When we're in U mode, sscratch contains a
         # pointer to a trap frame at the base of the kernel stack. When we're in
         # S mode, /sscratch/ is zero.
@@ -212,7 +213,7 @@ smode_trap_entry_from_umode:
 
         csrw    sscratch, sp
 
-        # Restore /t6/ and /sp/ and we are done!
+        # Restore /t6/ and /sp/ and we're done!
 
         ld      t6, T6(sp)
         ld      gp, GP(sp)
@@ -238,9 +239,9 @@ smode_trap_entry_from_umode:
 
 smode_trap_entry_from_smode:
 
-        # When we are in S mode, we continue using the kernel /sp/, /tp/, and
+        # When we're in S mode, we continue using the kernel /sp/, /tp/, and
         # /gp/. First, recover /sp/ from sscratch and write zero to scratch to
-        # indicate that we are now in S mode.
+        # indicate that we're now in S mode.
 
         csrrw   sp, sscratch, zero      # Get kernel SP back from sscratch
 .endif

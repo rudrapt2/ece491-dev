@@ -9,20 +9,16 @@ LD=$(TOOLPREFIX)ld
 OBJCOPY=$(TOOLPREFIX)objcopy
 OBJDUMP=$(TOOLPREFIX)objdump
 
-UMODE := 1
-
 ULIB_OBJS = \
 	uio.o \
+	heap.o \
 	string.o \
 	syscall.o \
-	heap.o 
+	start.o
 
-ULIB_LD = no_umode.ld
+ULIB_LD = usr/umode.ld
 
-ifeq ($(UMODE), 1)
-	ULIB_OBJS += start.o
-	ULIB_LD = umode.ld
-endif
+OBJDIR=usr/build
 
 ALL_TARGETS = \
 	doomlauncher
@@ -31,24 +27,43 @@ CFLAGS = -Wall -fno-omit-frame-pointer -ggdb -gdwarf-2
 CFLAGS += -mcmodel=medany -fno-pie -no-pie -march=rv64g -mabi=lp64d
 CFLAGS += -ffreestanding -fno-common -nostdlib -mno-relax
 CFLAGS += -fno-asynchronous-unwind-tables
-CFLAGS += -I.
+CFLAGS += -I. -DUMODE
 
-ifeq ($(UMODE), 1)
-	CFLAGS += -DUMODE
-endif
+OBJS += $(addprefix $(OBJDIR)/, $(ULIB_OBJS))
 
 .PHONY: all bin/% bin 
+.SECONDARY: $(OBJS)
 
-.SECONDARY: $(ULIB_OBJS)
+# Can onyl work with MP3 in U mode
+
+#################################################
 
 all: $(addprefix bin/, $(ALL_TARGETS))
-	make -C doomgeneric
-
-bin/%: $(ULIB_OBJS) %.o 
-	$(LD) -T $(ULIB_LD) -o $@ $^
+	make -C source
+	cp data/doom1.wad bin/doom1.wad
 
 clean:
-	make clean -C doomgeneric
-	mv bin/doom1.wad ../
-	rm -rf *.o *.elf *.asm bin/*
-	mv ../doom1.wad bin/
+	make clean -C source
+	rm -rf *.o *.elf *.asm usr/build/ bin/
+
+#################################################
+
+$(OBJDIR):
+	mkdir -p $(OBJDIR)
+
+bin:
+	mkdir -p bin
+
+$(OBJDIR)/%.o: usr/%.c | $(OBJDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OBJDIR)/%.o: usr/%.S | $(OBJDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OBJDIR)/%.o: usr/%.s | $(OBJDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+bin/%: $(OBJS) %.o | bin
+	$(LD) -T $(ULIB_LD) -o $@ $^
+
+#################################################

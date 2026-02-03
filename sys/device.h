@@ -68,9 +68,11 @@ typedef int (*device_openfn_t)(struct io ** ioptr, void * aux);
 // - /aux/ is the pointer passed at registration time.
 //
 // On return openfn() guarantees (on success):
-// - *ioptr points to a valid I/O object with a non-zero reference count.
-// - the driver's ISR is registered with the same device irqno that is
-//   passed into driver's attachfn().
+// - The pointer at /ioptr/ points to a valid I/O object.
+// - The pointer returned via /ioptr/ is considered an independent reference for
+//   the purposes of reference-counting.
+// - The returned I/O object is ready to perform I/O operation supported by the
+//   device.
 // - on failure, openfn() returns a negative error code.
 
 extern int register_device (

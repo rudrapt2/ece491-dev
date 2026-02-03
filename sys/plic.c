@@ -66,24 +66,24 @@ struct plic_regs {
 // INTERNAL FUNCTION DECLARATIONS
 //
 
-static void plic_set_source_priority (
+static inline void plic_set_source_priority (
 	uint32_t srcno, uint32_t level);
 
-static int plic_source_pending(uint32_t srcno);
+static inline int plic_source_pending(uint32_t srcno);
 
-static void plic_enable_source_for_context (
+static inline void plic_enable_source_for_context (
 	uint32_t ctxno, uint32_t srcno);
 
-static void plic_disable_source_for_context (
+static inline void plic_disable_source_for_context (
 	uint32_t ctxno, uint32_t srcno);
 
-static void plic_set_context_threshold (
+static inline void plic_set_context_threshold (
 	uint32_t ctxno, uint32_t level);
 
-static uint32_t plic_claim_context_interrupt (
+static inline uint32_t plic_claim_context_interrupt (
 	uint32_t ctxno);
 
-static void plic_complete_context_interrupt (
+static inline void plic_complete_context_interrupt (
 	uint32_t ctxno, uint32_t srcno);
 
 static void plic_enable_all_sources_for_context(uint32_t ctxno);
