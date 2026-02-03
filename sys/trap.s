@@ -82,29 +82,17 @@
 
 _smode_trap_entry:
 
-<<<<<<< HEAD
         # Swap /sp/ and /sscratch/. When we're in U mode, sscratch contains a
         # pointer to a trap frame at the base of the kernel stack. When we're in
         # S mode, /sscratch/ is zero.
-=======
-.ifndef MP2
-        # Swap _sp_ and _sscratch_. When we are in U mode, sscratch contains a
-        # pointer to a trap frame at the base of the kernel stack. When we are in
-        # S mode, _sscratch_ is zero.
->>>>>>> 2bab8d38e70e49b1661f30f955bd9cf6620ac5af
 
         csrrw   sp, sscratch, sp
         beqz    sp, smode_trap_entry_from_smode
 
 smode_trap_entry_from_umode:
 
-<<<<<<< HEAD
         # When we're in U mode, sscratch contains a pointer to a trap frame at
         # the base of the kernel stack. This pointer, now in /sp/, is our kernel
-=======
-        # When we are in U mode, sscratch contains a pointer to a trap frame at
-        # the base of the kernel stack. This pointer, now in _sp_, is our kernel
->>>>>>> 2bab8d38e70e49b1661f30f955bd9cf6620ac5af
         # stack pointer.
         
         # Save general purpose registers to trap frame
@@ -177,13 +165,8 @@ smode_trap_entry_from_umode:
         # rest after disabling interrupts (_late_).
         
         # The _early_ restore registers are those whose exact value is not
-<<<<<<< HEAD
         # critical if an interrupt should occur while we're restoring them. The
         # _late_ registers are /gp/, /tp/, and /sp/, plus the temporary /t6/. We
-=======
-        # critical if an interrupt should occur while we are restoring them. The
-        # _late_ registers are _gp_, _tp_, and _sp_, plus the temporary _t6_. We
->>>>>>> 2bab8d38e70e49b1661f30f955bd9cf6620ac5af
         # are still in S mode (and will be until we the sret instruction), so
         # /gp/, /tp/, and /sp/ must have their correct kernel values if we take
         # an interrupt.
