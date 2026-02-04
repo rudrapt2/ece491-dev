@@ -167,7 +167,7 @@ smode_trap_entry_from_umode:
         
         # The _early_ restore registers are those whose exact value is not
         # critical if an interrupt should occur while we're restoring them. The
-        # _late_ registers are _gp_, _tp_, and _sp_, plus the temporary _t6_. We
+        # _late_ registers are /gp/, /tp/, and /sp/, plus the temporary /t6/. We
         # are still in S mode (and will be until we the sret instruction), so
         # /gp/, /tp/, and /sp/ must have their correct kernel values if we take
         # an interrupt.
