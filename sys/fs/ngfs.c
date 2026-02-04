@@ -116,7 +116,8 @@ static const struct iointf ngfs_file_intf = {
     .write = &seekio_write,
     .fetch = &ngfs_fetch,
     .store = &ngfs_store,
-    .ioctl = &ngfs_ioctl
+    .ioctl = &ngfs_ioctl,
+    .ioctl_u = (int(*)(struct io*, int, uintptr_t))&ngfs_ioctl
 };
 
 static const struct iointf ngfs_listing_io_intf = {
@@ -131,7 +132,7 @@ int mount_ngfs(const char * name, struct io * bkgio) {
     struct cache * cache;
     struct ngfs_file * f;
     struct ngfs_dir_entry * root_dir;
-    struct ngfs_dir_entry * dentry;
+    struct ngfs_dir_entry * dentry = NULL;
     uint32_t block;
 
     ngfs = kcalloc(1, sizeof(*ngfs));
@@ -214,7 +215,7 @@ int ngfs_open_file(struct ngfs * fs, const char * name, struct io ** ioptr) {
     fio->file = f;
     *ioptr = seekio_init(&fio->base, &ngfs_file_intf, f->dentry.size, 1, 1);
 
-    debug("ngfs_open: SUCCESS - file=%s, pos=0, refcnt=1", name);
+    debug("ngfs_open: SUCCESS - file=%s, refcnt=%d", name, f->refcnt);
     return 0;
 }
 
@@ -279,26 +280,16 @@ long ngfs_store(
     struct ngfs * ngfs = f->fs;
     struct cache * cache = ngfs->cache;
     uint32_t new_blockno = pos / NGFS_BLKSZ;
+    uint32_t block = fio->block;
     uint32_t bytes_written = 0;
-    uint32_t block, offset, remaining_len, write_len;
-    
-    // extend file size of necessary
-    if (f->dentry.size - pos < len) {
-        int result = update_size(ngfs, &f->dentry, pos + len);
-        if (result != 0)
-            return result;
-    }
+    uint32_t offset, remaining_len, write_len;
 
     // since we cache the block, we need to be careful if it changes
-    if (new_blockno > fio->blockno) {
-        for (int i = 0; i < new_blockno - fio->blockno; i++)
-            block = get_next_data_block(cache, block);
-    }
-    else if (new_blockno < fio->blockno) {
+    if (new_blockno < fio->blockno || block == NGFS_BLOCK_END)
         block = blockno_to_block(cache, &f->dentry, new_blockno);
-    }
-    
-    remaining_len = len;
+    else
+        for (; fio->blockno < new_blockno; fio->blockno++)
+            block = get_next_data_block(cache, block);
 
     for (remaining_len = len; remaining_len > 0; 
         block = get_next_data_block(cache, block)) 
@@ -332,6 +323,9 @@ int ngfs_create(struct filesystem * fs, const char * name) {
     if (strlen(name) > NGFS_MAX_FILENAME_LEN)
         return -EINVAL;
 
+    if (strcmp(name, root_dir->name) == 0)
+        return -EACCESS;
+
     // Check if the file already exists
     for (f = ngfs->files_list; f != NULL; f = f->next)
         if (strcmp(name, f->dentry.name) == 0)
@@ -357,6 +351,8 @@ int ngfs_create(struct filesystem * fs, const char * name) {
     // Add to fslist
     f = kcalloc(1, sizeof(struct ngfs_file));
     memcpy(&f->dentry, &root_entries[file_idx], DENTRYSZ);
+    debug("Releasing cache block %d", 
+        IDX_TO_ABS(blockno_to_block(cache, root_dir, curr_size / NGFS_BLKSZ)));
     cache_release(cache, (void *)root_entries, CACHE_DIRTY);
 
     f->fs = ngfs;
@@ -417,6 +413,7 @@ int ngfs_delete(struct filesystem * fs, const char * name) {
     {
         if (strcmp(name, dentry->name) == 0) {
             memcpy(dentry, &last_dentry, DENTRYSZ);
+            debug("Releasing cache block %d (ptr is 0x%llx)", block, dentry);
             free_associated_cache_block(cache, dentry, CACHE_DIRTY);
             break;
         }
@@ -447,61 +444,35 @@ int ngfs_ioctl(struct io * io, int op, void * arg) {
             return seekio_ioctl(io, op, arg);
         case IOC_SETEND:
             result = update_size(ngfs, &f->dentry, *(uint32_t *)arg);
-            if (result != 0) return result;
-            return seekio_ioctl(io, op, arg);
+            seekio_resized(&fio->base, f->dentry.size);
+            return result;
         default:
             return -ENOTSUP;
     }
 }
 
-int update_size(
-    struct ngfs * ngfs, 
-    struct ngfs_dir_entry * dentry, 
-    uint32_t end) 
-{
-    uint32_t new_blocks, new_block;
-    struct cache * cache = ngfs->cache;
-    uint32_t block = 
-        blockno_to_block(cache, dentry, dentry->size / NGFS_BLKSZ);
-
-    if (end > dentry->size) { // extend
-        new_blocks = CEIL(end, NGFS_BLKSZ) - CEIL(dentry->size, NGFS_BLKSZ);
-        while (new_blocks-- > 0) {
-            new_block = get_free_data_block(ngfs);
-            if (new_block == NGFS_BLOCK_END) return -ENOMEM;
-            if (dentry->size == 0) dentry->start_block = new_block;
-            else set_next_data_block(cache, block, new_block);
-        }
-    }
-    else { // truncate
-        free_blocks(cache, get_next_data_block(cache, block));
-        set_next_data_block(cache, block, NGFS_BLOCK_END);
-    }
-    
-    dentry->size = end;
-    return 0;
-}
-
 void ngfs_flush(struct filesystem * fs) {
     trace("%s()", __func__);
     struct ngfs * ngfs = (void *)fs;
-    struct cache * cache = ngfs->cache;
-    struct ngfs_dir_entry * dentry;
+    struct ngfs_dir_entry * dentry = NULL;
     struct ngfs_file * f = ngfs->files_list;
     uint32_t block;
+
+    if (f == NULL) return;
     
+    // technically this is unnecessary, since order doesnt matter
+    // however for debugging purposes its easier to maintain order
+    while (f->next) f = f->next; 
+
     // write all dentry info to root dir
-    // besides the root dentry, we dont care about the order
     for (uint32_t idx = 1; 
         iterate_dentry(ngfs, &idx, &block, &dentry, CACHE_DIRTY);)
     {
         assert(f != NULL); // check consistency
         memcpy(dentry, &f->dentry, DENTRYSZ);
-        f = f->next;
+        f = f->prev;
     }
     assert(f == NULL); // check consistency
-
-    cache_flush(cache);
 }
 
 int ngfs_open_listing(struct ngfs * fs, struct io ** ioptr) {
@@ -540,6 +511,39 @@ long ngfs_listing_read(struct io * io, void * buf, long bufsz) {
     return len;
 }
 
+int update_size(
+    struct ngfs * ngfs, 
+    struct ngfs_dir_entry * dentry, 
+    uint32_t end) 
+{
+    uint32_t new_blocks, new_block;
+    struct cache * cache = ngfs->cache;
+    uint32_t block = 
+        blockno_to_block(cache, dentry, dentry->size / NGFS_BLKSZ);
+
+    // extend
+    if (end > dentry->size) {
+        new_blocks = CEIL(end, NGFS_BLKSZ) - CEIL(dentry->size, NGFS_BLKSZ);
+        while (new_blocks-- > 0) {
+            new_block = get_free_data_block(ngfs);
+            if (new_block == NGFS_BLOCK_END) return -ENOMEM;
+            if (dentry->size == 0) dentry->start_block = new_block;
+            else set_next_data_block(cache, block, new_block);
+            dentry->size += NGFS_BLKSZ; // for consistency
+        }
+    }
+    // truncate
+    else if (CEIL(end, NGFS_BLKSZ) < CEIL(dentry->size, NGFS_BLKSZ)) {
+        free_blocks(cache, block);
+        if (end == 0) dentry->start_block = NGFS_BLOCK_END;
+        else set_next_data_block(cache, 
+            blockno_to_block(cache, dentry, end / NGFS_BLKSZ), NGFS_BLOCK_END);
+    }
+    
+    dentry->size = end;
+    return 0;
+}
+
 long read_from_block(
     struct cache * cache, 
     uint32_t block, 
@@ -553,11 +557,13 @@ long read_from_block(
     assert(block != NGFS_BLOCK_END);
     trace("%s(block=%lu,off=%lu,%p,%ld)", __func__, block, offset, buf, bufsz);
     
+    debug("Attempting to fetch cache block %d", block);
     if (cache_fetch(cache, block * NGFS_BLKSZ, &block_data) != 0) {
         return -1;
     }
 
     memcpy(buf, (uint8_t*)block_data + offset, bufsz);
+    debug("Releasing cache block %d", block);
     cache_release(cache, block_data, CACHE_CLEAN);
 
     return bufsz;
@@ -576,11 +582,13 @@ long write_to_block(
     assert(block != NGFS_BLOCK_END);
     trace("%s(block=%lu,off=%lu,%p,%ld)", __func__, block, offset, buf, bufsz);
     
+    debug("Attempting to fetch cache block %d", block);
     if (cache_fetch(cache, block * NGFS_BLKSZ, &block_data) != 0) {
         return -1;
     }
 
     memcpy((uint8_t*)block_data + offset, buf, bufsz);
+    debug("Releasing cache block %d", block);
     cache_release(cache, block_data, CACHE_DIRTY);
 
     return bufsz;
@@ -592,11 +600,13 @@ uint32_t get_free_data_block(struct ngfs * fs) {
 
     for (uint32_t fat_block = 0; fat_block < fs->num_fat_blocks; fat_block++) {
 
+        debug("Attempting to fetch cache block %d", fat_block);
         cache_fetch(fs->cache, fat_block * NGFS_BLKSZ, (void**)&fat);
 
         for (int idx = 0; idx < NGFS_FAT_ENTRIES_PER_BLOCK; idx++) {
             if (fat->fat[idx] == NGFS_BLOCK_FREE) {
                 fat->fat[idx] = NGFS_BLOCK_END;
+                debug("Releasing cache block %d", fat_block);
                 cache_release(fs->cache, (void *)fat, CACHE_DIRTY);
 
                 // this line is needed bc it breaks otherwise
@@ -610,6 +620,7 @@ uint32_t get_free_data_block(struct ngfs * fs) {
             }
         }
 
+        debug("Releasing cache block %d", fat_block);
         cache_release(fs->cache, (void *)fat, CACHE_CLEAN);
     }
 
@@ -641,17 +652,17 @@ uint32_t get_next_data_block(struct cache * cache, uint32_t block) {
 void free_blocks(struct cache * cache, uint32_t start) {
     uint32_t next;
     uint32_t cur = start;
+    assert(cur != NGFS_BLOCK_FREE);
     while (cur != NGFS_BLOCK_END) {
-        assert(cur != NGFS_BLOCK_FREE);
         next = get_next_data_block(cache, cur);
         set_next_data_block(cache, cur, NGFS_BLOCK_FREE);
         cur = next;
     }
-    cache_flush(cache);
 }
 
 void * get_cache_from_block(struct cache * cache, uint32_t block) {
     void* ptr;
+    debug("Attempting to fetch cache block %d", block);
     if (cache_fetch(cache, block * NGFS_BLKSZ, &ptr))
         return NULL;
     return ptr;
@@ -664,10 +675,10 @@ uint32_t blockno_to_block(
 {
     uint32_t total_blocks, block;
 
-    total_blocks = file->size / NGFS_BLKSZ;
+    total_blocks = CEIL(file->size, NGFS_BLKSZ);
 
     // n too large -> get last block
-    blockno = MIN(blockno, total_blocks);
+    blockno = MIN(blockno, total_blocks-1);
 
     block = file->start_block;
     for (int bno = 0; bno < blockno; bno++) 
@@ -689,6 +700,7 @@ int iterate_dentry(
     int dirty) 
 {
     if (*idx >= ngfs->root_dir.size / DENTRYSZ) {
+        debug("Releasing cache block %d (ptr is 0x%llx)", *block, *dentry);
         free_associated_cache_block(ngfs->cache, *dentry, dirty);
         return 0;
     }
@@ -699,6 +711,7 @@ int iterate_dentry(
     }
     
     if (*idx % DENTRIES_PER_BLOCK == 0) {
+        debug("Releasing cache block %d (ptr is 0x%llx)", *block, *dentry);
         free_associated_cache_block(ngfs->cache, *dentry, dirty);
         *block = get_next_data_block(ngfs->cache, *block);
         *dentry = get_cache_from_block(ngfs->cache, IDX_TO_ABS(*block));
@@ -717,5 +730,6 @@ int free_associated_cache_block(
     if (entry == NULL) return -1;
     cache_release(cache, 
         (void *)ROUND_DOWN((uintptr_t)entry, NGFS_BLKSZ), dirty);
+    if (dirty) cache_flush(cache);
     return 0;
 }

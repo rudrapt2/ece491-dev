@@ -141,7 +141,7 @@ mp2-%.o: %.c
 #
 
 mp3-kernel.elf: $(MP3_OBJS) main.o
-	$(LD) $(LDFLAGS) -T board/qemu-virt.ld -o $@ $^
+	$(LD) $(LDFLAGS) -o $@ $^
 
 run-mp3: mp3-kernel.elf
 	$(QEMU) $(MP3_QEMUOPTS) -m 8M -kernel $<

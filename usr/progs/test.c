@@ -3,7 +3,7 @@
 #include "../error.h"
 #include "../shell.h"
 #include "../heap.h"
-#include "../uio.h"
+#include "../io.h"
 
 unsigned long long rand_state;
 
@@ -112,6 +112,10 @@ void test_write(int argc, char * argv[]) {
         result = _write(fd, path, written);
         if (result < 0) {
             printf("Failed to write to %s: %s\n", path, error_name(result));
+            return;
+        }
+        if (result == 0) {
+            printf("Failed to write to %s: %s\n", path, "Wrote 0 bytes");
             return;
         }
         if (result < written) {
@@ -223,6 +227,10 @@ void test_write_long(int argc, char * argv[]) {
                 printf("Failed to write to %s on iteration %d: %s\n", path, j, error_name(result));
                 return;
             }
+            if (result == 0) {
+                printf("Failed to write to %s on iteration %d: %s\n", path, j, "Wrote 0 bytes");
+                return;
+            }
             if (result < written) {
                 printf("WARNING: wrote %d bytes to %s instead of %d\n", 
                     result, path, written);
@@ -299,7 +307,7 @@ void test_set_end(int argc, char * argv[]) {
             printf("Failed to open %s: %s\n", path, error_name(fd));
             return;
         }
-        result = _ioctl(fd, FCNTL_SETEND, &end);
+        result = _ioctl(fd, IOC_SETEND, &end);
         if (result < 0) {
             printf("Failed to set end of %s: %s\n", path, error_name(result));
             return;

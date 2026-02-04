@@ -197,8 +197,10 @@ void process_exit(void) {
 
     trace("%s() in %s", __func__, thread_name(running_thread()));
 
-    if (running_thread() == 0)
+    if (running_thread() == 0) {
+        flush_all_filesys();
         shutdown();
+    }
 
     discard_active_mspace();
 
