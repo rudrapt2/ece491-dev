@@ -123,7 +123,7 @@ struct cache * create_cache(struct io * bkgio, unsigned long cache_blksz) {
     unsigned int blksz;
     int i;
 
-    trace("%s(%p)", __func__, disk);
+    trace("%s(%p)", __func__, bkgio);
 
     assert (bkgio != NULL);
 

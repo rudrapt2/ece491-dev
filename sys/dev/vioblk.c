@@ -274,7 +274,7 @@ int vioblk_open(struct io ** ioptr, void * aux) {
 #else
     struct vioblk_device * const vb = aux;
 
-	trace("%s(%d,{regs=%p})", __func__, instno, vb->regs);
+	trace("%s(%d,{regs=%p})", __func__, vb->irqno, vb->regs);
     
     vb->vq.avail.idx = 0;
     vb->vq.used.idx = 0;
@@ -316,7 +316,7 @@ long vioblk_fetch (
     unsigned long long blkpos;
     int pie;
 
-    trace("%s(%lld,%ld)", __func__, pos, bytecnt);
+    trace("%s(%lld,%ld)", __func__, bytepos, bytecnt);
 
     if (vb->bytecap < bytepos || vb->bytecap - bytepos < bytecnt)
         return -EINVAL;

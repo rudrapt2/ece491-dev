@@ -391,7 +391,7 @@ long syswrite(int fd, const void *buf, size_t len) {
 int sysioctl(int fd, int op, uintptr_t arg_uma) {
     struct process * self;
 
-    trace("%s(%d,%d,%p)", __func__, fd, op, arg);
+    trace("%s(%d,%d,%p)", __func__, fd, op, arg_uma);
 
     if (fd < 0 || PROC_IOMAX <= fd)
         return -EBADF;

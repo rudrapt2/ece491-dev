@@ -256,8 +256,8 @@ int ktfs_open_file(const char * name, struct io ** ioptr) {
     for(struct ktfs_file* curr_file = files_list; curr_file != NULL; curr_file = curr_file->next){
         // found file in filesystem
         if (strncmp(name, curr_file->dentry.name, KTFS_MAX_FILENAME_LEN) == 0){
-          debug("ktfs_open: file=%s, flag=%d, pos=%ld, refcnt=%d",
-                name, curr_file->flag, curr_file->pos, curr_file->io.refcnt);
+          debug("ktfs_open: file=%s, flag=%d",
+                name, curr_file->flag);
           if (curr_file->flag & FILE_OPENED)
           { // do not allow opening a file multiple times simultaneously
             debug("ktfs_open: EBUSY - file already opened");
@@ -282,8 +282,8 @@ int ktfs_open_file(const char * name, struct io ** ioptr) {
  */
 void ktfs_close(struct io* io) {
     struct ktfs_file* curr_file = (void*)io - offsetof(struct ktfs_file, io);
-    debug("ktfs_close: file=%s, flag=%d, pos=%ld, refcnt=%d",
-          curr_file->dentry.name, curr_file->flag, curr_file->pos, io->refcnt);
+    debug("ktfs_close: file=%s, flag=%d",
+          curr_file->dentry.name, curr_file->flag);
     curr_file->flag &= ~FILE_OPENED;
     debug("ktfs_close: DONE - file=%s, flag now=%d", curr_file->dentry.name, curr_file->flag);
 }
