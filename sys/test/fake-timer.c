@@ -24,7 +24,7 @@ const char * alarm_name(const struct alarm * al) {
     return "fakealarm";
 }
 
-void alarm_sleep_until(struct alarm * al, unsigned long long twake) {
+void sleep_until(struct alarm * al, unsigned long long twake) {
     return;
 }
 

@@ -91,7 +91,7 @@ void timer_init(unsigned int freq) {
 #endif // STUDENT
 }
 
-void alarm_sleep_until(unsigned long long twake) {
+void sleep_until(unsigned long long twake) {
 #ifdef STUDENT
     // YOUR CODE HERE
 #else
@@ -133,15 +133,15 @@ void alarm_sleep_until(unsigned long long twake) {
 }
 
 void sleep_sec(unsigned int sec) {
-    alarm_sleep_until(rdtime() + 1ULL * sec * timer_frequency);
+    sleep_until(rdtime() + 1ULL * sec * timer_frequency);
 }
 
 void sleep_ms(unsigned int ms) {
-    alarm_sleep_until(rdtime() + 1ULL * ms * timer_frequency / 1000);
+    sleep_until(rdtime() + 1ULL * ms * timer_frequency / 1000);
 }
 
 void sleep_us(unsigned int us) {
-    alarm_sleep_until(rdtime() + 1ULL * us * timer_frequency / 1000 / 1000);
+    sleep_until(rdtime() + 1ULL * us * timer_frequency / 1000 / 1000);
 }
 
 void handle_timer_interrupt(void) {
