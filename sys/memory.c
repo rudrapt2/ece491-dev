@@ -526,7 +526,7 @@ int handle_umode_page_fault(struct trap_frame * tfr, uintptr_t vma) {
 // INTERNAL FUNCTION DEFINITIONS
 //
 
-int _ptab_reset(unsigned int lvl, struct pte * pt) {
+int _ptab_reset(unsigned int lvl, struct pte * pt, int keep_global) {
     int empty = 1; // subtable contains a mapping
     unsigned int i;
     void * pp;
@@ -543,13 +543,13 @@ int _ptab_reset(unsigned int lvl, struct pte * pt) {
                         free_phys_page(pp);
                 } else {
                     assert (!PTE_LEAF(pt[i]));
-                    empty &= _ptab_reset(lvl - 1, pp);
+                    empty &= _ptab_reset(lvl - 1, pp, keep_global);
                 }
 
                 pt[i] = null_pte();
             
             } else
-                empty = 0;
+                empty &= ~keep_global; //Mark non-empty only if keeping globals
         }
     }
 
@@ -560,7 +560,7 @@ int _ptab_reset(unsigned int lvl, struct pte * pt) {
 }
 
 void ptab_reset(struct pte * ptab) {
-    _ptab_reset(ROOT_LEVEL, ptab);
+    _ptab_reset(ROOT_LEVEL, ptab, 1);
 }
 
 void _ptab_clone(unsigned int lvl, struct pte * dst, struct pte * src) {
@@ -594,8 +594,7 @@ struct pte * ptab_clone(struct pte * ptab) {
 }
 
 void ptab_discard(struct pte * ptab) {
-    _ptab_reset(ROOT_LEVEL, ptab);
-    free_phys_page(ptab);
+    _ptab_reset(ROOT_LEVEL, ptab, 0);
 }
 
 void _ptab_insert (
@@ -617,11 +616,11 @@ void _ptab_insert (
         if (!PTE_VALID(pt[i])) {
             cpt = alloc_phys_page();
             memset(cpt, 0, PAGE_SIZE);
-            pt[i] = ptab_pte(cpt, rwxug_flags & PTE_G);
+            pt[i] = ptab_pte(cpt, 0); // intermediate page tables should NEVER be global
         } else {
             assert (!PTE_LEAF(pt[i]));
-            // Clear G bit if we're inserting a non-global mapping
-            pt[i].flags &= (pt[i].flags & rwxug_flags) | ~PTE_G;
+	    // You can never clear the global bit later
+	    assert ((rwxug_flags & PTE_G) || !PTE_GLOBAL(pt[i]));
             cpt = pageptr(pt[i].ppn);
         }
 
