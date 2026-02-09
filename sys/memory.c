@@ -501,6 +501,9 @@ unsigned long free_phys_page_count(void) {
     return cnt;
 }
 
+//This function isn't required and can be removed. We can rename to
+//handle_page_fault in general maybe since we only want to handle
+//page faults in user range either way.
 int handle_smode_page_fault(struct trap_frame * tfr, uintptr_t vma) {
     // ...
     return 0;
@@ -509,6 +512,7 @@ int handle_smode_page_fault(struct trap_frame * tfr, uintptr_t vma) {
 int handle_umode_page_fault(struct trap_frame * tfr, uintptr_t vma) {
     struct pte * pte;
     void * pp;
+    long pie = disable_interrupts();
 
     if (UMEM_START_VMA <= vma && vma < UMEM_END_VMA) {
         pte = ptab_fetch(active_space_ptab(), VPN(vma));
@@ -516,10 +520,12 @@ int handle_umode_page_fault(struct trap_frame * tfr, uintptr_t vma) {
             pp = alloc_phys_page();
             memset(pp, 0, PAGE_SIZE);
             map_page(vma, pp, PTE_R | PTE_W | PTE_U);
+	    restore_interrupts(pie);
             return 1; // handled, restart instruction
         }
     }
-
+    
+    restore_interrupts(pie);
     return 0; // not handled
 }
 
