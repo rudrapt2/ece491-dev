@@ -755,7 +755,6 @@ void rwlock_release(struct rwlock * rwlk) {
 #else
     assert (rwlk->cnt > 0);
     rwlk->cnt -= 1;
-    rwlk->owner = NULL; //
 
     if (rwlk->cnt == 0) {
         assert (rwlk->owner == NULL || rwlk->owner == TP);

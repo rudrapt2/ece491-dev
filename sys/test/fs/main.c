@@ -80,16 +80,13 @@ static unsigned long long rand() {
 }
 
 int fake_elf_load(struct io * io, void (**eptr)(void)) {
-    static const uint32_t MAGIC_LSB = 0x464c457f;
     struct elf64_ehdr ehdr;
     struct elf64_phdr phdr;
     uint_fast16_t phidx;
     unsigned long long size;
     unsigned long long pos;
     long result;
-    int pte_flags;
     int entry_ok = 0;
-    size_t memsz;
     char c;
 
     // Get ELF file length
@@ -159,8 +156,6 @@ int fake_elf_load(struct io * io, void (**eptr)(void)) {
 
         // Round up p_memsz to page boundary boundary
 
-        memsz = (phdr.p_memsz + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
-
         if (phdr.p_vaddr <= ehdr.e_entry &&
             ehdr.e_entry < phdr.p_vaddr + phdr.p_memsz)
         {
@@ -228,7 +223,7 @@ void elf_check() {
 
 void test_fs() {
     rand_state = rdtime();
-    char FILE[] = "shell"; // contents should be same as blob.raw
+    char FILE[] = "rudra_garbo"; // contents should be same as blob.raw
     struct io * fio, * memio;
     int result;
     unsigned long long start = 0;
@@ -268,6 +263,56 @@ void test_fs() {
         }
     }
     kprintf("test_fs passed with %d byte file\n", bytes);
+}
+
+void test_fs_copy() {
+    struct io * fio, * memio;
+    unsigned long fsz = _kimg_blob_end - _kimg_blob_start;
+    int result;
+    char c, p;
+    unsigned long long start = 0;
+
+    assert(fsz > 0);
+
+    delete_file("c", "tmp");
+    
+    result = create_file("c", "tmp");
+    if (result < 0) {
+        kprintf("Failed to create file %s:\n", "tmp", error_name(result));
+        return;
+    }
+
+    result = open_file("c", "tmp", &fio);
+    if (result < 0) {
+        kprintf("Failed to open file %s:\n", "tmp", error_name(result));
+        return;
+    }
+
+    assert(fsz == iowrite(fio, _kimg_blob_start, fsz));
+    ioctl(fio, IOC_SETPOS, &start);
+
+    memio = create_memio(_kimg_blob_start, fsz, NULL);
+
+    for (;;) {
+        result = ioread(fio, &c, 1);
+        if (result < 0) {
+            kprintf("Failed to read from file (%s)\n", error_name(result));
+            return;
+        }
+        result = ioread(memio, &p, 1);
+        if (result < 0) {
+            kprintf("Failed to read from memio (%s)\n", error_name(result));
+            return;
+        }
+        if (result == 0) break;
+        if (p != c) {
+            kprintf("Read %c but expected %c\n", c, p);
+            return;
+        }
+        start++;
+    }
+
+    kprintf("test copy passed (copied %lu bytes)\n", start);
 }
 
 void mount_drive(char * mntname, char * devname, 
@@ -311,5 +356,6 @@ void main(unsigned int hartid, void * dtb) {
     mount_drive("c", "vioblk1", mount_ngfs);
 
     // test_fs();
-    elf_check();
+    // elf_check();
+    test_fs_copy();
 }

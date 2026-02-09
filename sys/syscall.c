@@ -117,7 +117,7 @@ long syscall(const struct trap_frame * tfr) {
     case SYSCALL_IOCTL:
         return sysioctl(tfr->a0, tfr->a1, tfr->a2);
     case SYSCALL_PIPE:
-        return syspipe((int *)tfr->a0, (int *)tfr->a0);
+        return syspipe((int *)tfr->a0, (int *)tfr->a1);
     case SYSCALL_CREATE:
         return syscreate((char *)tfr->a0);
     case SYSCALL_DELETE:
@@ -427,12 +427,12 @@ int syspipe(int * wfdptr, int * rfdptr) {
 
     // Find two free file descriptor slots
 
-    wfd = allocfd(self, /* reqfd */ -1, /* notfd */ -1);
+    wfd = allocfd(self, /* reqfd */ *wfdptr, /* notfd */ -1);
 
     if (wfd < 0)
         return wfd;
     
-    rfd = allocfd(self, /* reqfd */ -1, /* notfd */ wfd);
+    rfd = allocfd(self, /* reqfd */ *rfdptr, /* notfd */ wfd);
 
     if (rfd < 0)
         return rfd;
@@ -441,6 +441,8 @@ int syspipe(int * wfdptr, int * rfdptr) {
     *rfdptr = rfd;
 
     create_iopipe(&self->iotab[wfd], &self->iotab[rfd]);
+
+    return 0;
 }
 
 int sysiodup(int oldfd, int newfd) {

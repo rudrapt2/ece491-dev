@@ -5,6 +5,8 @@
 #include "../heap.h"
 #include "../io.h"
 
+#define FBUFSZ 256
+
 unsigned long long rand_state;
 
 // helper functions
@@ -12,6 +14,16 @@ static unsigned long long rand(void) {
     rand_state *= 25214903917UL;
     rand_state += 11;
     return (rand_state >> 12);
+}
+
+static size_t fprintf(int fd, const char * fmt, ...) {
+    va_list ap;
+    char buf[FBUFSZ];
+    va_start(ap, fmt);
+    size_t n = vsnprintf(buf, FBUFSZ, fmt, ap);
+    _write(fd, buf, n);
+    va_end(ap);
+    return n;
 }
 
 // test cases
@@ -462,9 +474,10 @@ void test_race(int argc, char * argv[]) {
     char* mp = "/c/";
     int proc_idx = 0;
     char c;
+    unsigned long long pos;
 
     if (argc < 3) {
-        printf("USAGE: %s [NUM_FORKS] [NUM_ITERS] [MOUNTPOINT (c)]\n", argv[0]);
+        fprintf(CONSOLEOUT, "USAGE: %s [NUM_FORKS] [NUM_ITERS] [MOUNTPOINT (c)]\r\n", argv[0]);
         return;
     }
 
@@ -478,7 +491,7 @@ void test_race(int argc, char * argv[]) {
     _delete(path);
     result = _create(path);
     if (result < 0) {
-        printf("Failed to create %s (%s)\n", path, error_name(result));
+        fprintf(CONSOLEOUT, "Failed to create %s (%s)\r\n", path, error_name(result));
         return;
     }
 
@@ -491,35 +504,60 @@ void test_race(int argc, char * argv[]) {
 
     fd = _open(-1, path);
     if (fd < 0) {
-        printf("proc%d failed to open %s (%s)\n", proc_idx, path, error_name(fd));
+        fprintf(CONSOLEOUT, "proc%d failed to open %s (%s)\r\n", proc_idx, path, error_name(fd));
         return;
     }
 
-    dprintf(STDOUT, "proc%d initialized\n", proc_idx);
+    fprintf(STDOUT, "proc%d initialized\r\n", proc_idx);
 
     for (int i = 0; i < num_iters; i++) {
-        switch (rand() % 2) {
+        switch (rand() % 4) {
             case 0: // read
                 result = _read(fd, &c, sizeof(c));
                 if (result < 0) 
-                    printf("proc%d failed to read (%s)\n", proc_idx, error_name(result));
+                    fprintf(CONSOLEOUT, "proc%d failed to read (%s)\r\n", proc_idx, error_name(result));
                 if (result == 0)
-                    printf("proc%d read 0 bytes\n", proc_idx);
+                    fprintf(CONSOLEOUT, "proc%d read 0 bytes\r\n", proc_idx);
                 else
-                    printf("proc%d read %c\n", proc_idx, c);
+                    fprintf(CONSOLEOUT, "proc%d read %c\r\n", proc_idx, c);
                 continue;
             case 1: // write
                 c = '0' + proc_idx;
                 result = _write(fd, &c, sizeof(c));
                 if (result < 0) 
-                    printf("proc%d failed to write (%s)\n", proc_idx, error_name(result));
+                    fprintf(CONSOLEOUT, "proc%d failed to write (%s)\r\n", proc_idx, error_name(result));
                 if (result == 0)
-                    printf("proc%d wrote 0 bytes\n", proc_idx);
+                    fprintf(CONSOLEOUT, "proc%d wrote 0 bytes\r\n", proc_idx);
                 else
-                    printf("proc%d wrote %c\n", proc_idx, c);
+                    fprintf(CONSOLEOUT, "proc%d wrote %c\r\n", proc_idx, c);
+                continue;
+            case 2: // setpos
+                _ioctl(fd, IOC_GETEND, &pos);
+                pos = rand() % pos;
+                result = _ioctl(fd, IOC_SETPOS, &pos);
+                if (result < 0)
+                    fprintf(CONSOLEOUT, "proc%d failed to setpos to %llu (%s)\r\n", proc_idx, pos, error_name(result));
+                else
+                    fprintf(CONSOLEOUT, "proc%d setpos to %llu\r\n", proc_idx, pos);
+                continue;
+            case 3: // setend
+                _ioctl(fd, IOC_GETEND, &pos);
+                pos = rand() % (pos + 4096);
+                result = _ioctl(fd, IOC_SETEND, &pos);
+                if (result < 0)
+                    fprintf(CONSOLEOUT, "proc%d failed to setend to %llu (%s)\r\n", proc_idx, pos, error_name(result));
+                else
+                    fprintf(CONSOLEOUT, "proc%d setend to %llu\r\n", proc_idx, pos);
                 continue;
         }
     }
+
+    _close(fd);
+    result = _delete(path);
+    if (result < 0) 
+        fprintf(CONSOLEOUT, "proc%d failed to delete %s (%s)\r\n", proc_idx, path, error_name(result));
+    else
+        fprintf(CONSOLEOUT, "proc%d deleted %s\r\n", proc_idx, path);
 }
 
 struct testcase {

@@ -12,14 +12,13 @@ void main (int argc, char** argv)
         return;
     }
     
-    while (--argc) {
-        argv++;
-        result = _delete(argv[0]);
+    for (int i = 1; i < argc; i++) {
+        result = _delete(argv[i]);
 
         if (result < 0) {
-            printf("Could not delete file %s: %s\n", argv[0], error_name(result));
+            printf("%s: failed to delete %s (%s)\n", 
+                argv[0], argv[i], error_desc(result));
             continue;
         }
-        dprintf(STDOUT, "Successfully removed %s\n", argv[0]);
     }
 }

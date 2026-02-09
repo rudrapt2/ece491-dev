@@ -17,7 +17,8 @@ void main (int argc, char** argv)
     if (argc != 1) {
         in_stream = _open(-1, argv[1]);
         if (in_stream < 0) {
-            printf("Could not open file %s: %s\n", argv[1], error_name(in_stream));
+            printf("%s: failed to open %s (%s)\n", 
+                argv[0], argv[1], error_desc(in_stream));
             return;
         }
     }
@@ -25,11 +26,12 @@ void main (int argc, char** argv)
     while (1) {
         result = _read(in_stream, &buffer, 1);
         if (result < 0) {
-            printf("Could not read buffer: %s\n", error_name(result));
+            printf("%s: failed to read (%s)\n", 
+                argv[0], error_desc(result));
             return;
         }
         if (buffer == 3 && in_stream == STDIN) {
-            printf("Program Killed\n");
+            printf("Killed\n");
             return;
         }
         if (result == 0) {
@@ -37,11 +39,18 @@ void main (int argc, char** argv)
             return;
         }
         cc++;
-        nc += (buffer=='\n');
-        if (buffer==' ' || buffer=='\n') in_word = 0;
-        else {
-            if(in_word==0) wc++;
-            in_word = 1;
+        switch (buffer) {
+            case '\n':
+                nc++;
+            case '\r':
+            case '\t':
+            case ' ':
+                in_word = 0;
+                break;
+            default:
+                if (!in_word) wc++;
+                in_word = 1;
+                break;
         }
     }
 }

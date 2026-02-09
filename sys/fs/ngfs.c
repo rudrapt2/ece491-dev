@@ -103,6 +103,8 @@ static inline long update_root_dir(struct ngfs * ngfs);
 static int iterate_dentry(struct ngfs * ngfs, uint32_t * idx, uint32_t * block, struct ngfs_dir_entry ** dentry, int dirty);
 static int free_associated_cache_block(struct cache * cache, struct ngfs_dir_entry * entry, int dirty);
 static int update_size(struct ngfs * ngfs, struct ngfs_dir_entry * dentry, uint32_t end);
+static void update_pos(struct ngfs * ngfs, struct ngfs_io * fio, uint32_t newpos);
+static void clear_block(struct cache * cache, uint32_t block, uint32_t offset, uint32_t len);
 
 // INTERNAL GLOBAL VARIABLES
 
@@ -219,7 +221,9 @@ int ngfs_open_file(struct ngfs * fs, const char * name, struct io ** ioptr) {
         return -ENOENT;
     }
 
+    debug("Attempting to acquire lock exclusively");
     rwlock_acquire(&f->lock, 1);
+    debug("Acquired lock exclusively");
 
     if (++f->refcnt == 0) { // too many opens
         f->refcnt--;
@@ -233,8 +237,9 @@ int ngfs_open_file(struct ngfs * fs, const char * name, struct io ** ioptr) {
     fio->block = f->dentry.start_block;
     fio->write_idx = f->write_idx;
     fio->file = f;
-    *ioptr = seekio_init(&fio->base, &ngfs_file_intf, f->dentry.size, 1, 1);
+    *ioptr = seekio_init(&fio->base, &ngfs_file_intf, 1, 1);
     rwlock_release(&f->lock);
+    debug("Released lock exclusively");
     rwlock_release(&fs->fs_lock);
 
     debug("ngfs_open: SUCCESS - file=%s, refcnt=%d", name, f->refcnt);
@@ -246,11 +251,14 @@ void ngfs_reclaim(struct io * io) {
     struct ngfs_io * fio = (void*)io;
     struct ngfs_file * f = fio->file;
     
+    debug("Attempting to acquire lock exclusively");
     rwlock_acquire(&f->lock, 1);
+    debug("Acquired lock exclusively");
     assert(f->refcnt > 0);
     kfree(fio);
     f->refcnt--;
     rwlock_release(&f->lock);
+    debug("Released lock exclusively");
 }
 
 long ngfs_fetch(
@@ -261,28 +269,34 @@ long ngfs_fetch(
     struct ngfs * ngfs = f->fs;
     struct cache * cache = ngfs->cache;
     uint32_t bytes_read = 0;
-    uint32_t block = fio->block;
-    uint32_t offset = pos % NGFS_BLKSZ; 
-    uint32_t remaining_len, read_len;
-    trace("%s(pos=%llu,blockno=%lu,block=%lu)", __func__, pos, fio->blockno, fio->block);
+    uint32_t offset, block, remaining_len, read_len;
+    trace("%s(pos=%llu,bufsz=%ld,blockno=%lu,block=%lu)", 
+        __func__, pos, bufsz, fio->blockno, fio->block);
 
+    if (pos > UINT32_MAX) return -EINVAL;
+
+    debug("Attempting to acquire lock shared");
     rwlock_acquire(&f->lock, 0);
+    debug("Acquired lock shared");
+    if (pos > f->dentry.size) {
+        rwlock_release(&f->lock);
+        debug("Released lock shared");
+        return -EINVAL;
+    }
+    bufsz = MIN(bufsz, f->dentry.size - pos);
     
     // since we cache the block, we need to be careful if it changes
-    if (f->write_idx != fio->write_idx || fio->blockno != pos / NGFS_BLKSZ) {
-        block = blockno_to_block(cache, &f->dentry, pos / NGFS_BLKSZ);
-        seekio_resized(&fio->base, f->dentry.size);
-        // since a resize may have happened, need to double check bounds
-        bufsz = (pos > f->dentry.size) ? 0 : MIN(bufsz, f->dentry.size - pos);
-        fio->write_idx = f->write_idx;
-    }
+    update_pos(ngfs, fio, pos);
 
+    block = fio->block;
+    offset = pos % NGFS_BLKSZ;
     for (remaining_len = bufsz; remaining_len > 0; ) {
+        debug("Block is now %u", block);
         assert(block != NGFS_BLOCK_END);
         
         read_len = MIN(remaining_len, NGFS_BLKSZ - offset);
         read_from_block(cache, IDX_TO_ABS(block), offset, 
-        (uint8_t*)buf + bytes_read, read_len);
+            (uint8_t*)buf + bytes_read, read_len);
         
         remaining_len -= read_len;
         pos += read_len;
@@ -292,6 +306,7 @@ long ngfs_fetch(
     }
     
     rwlock_release(&f->lock);
+    debug("Released lock shared");
     fio->block = block;
     fio->blockno = pos / NGFS_BLKSZ;
 
@@ -305,29 +320,29 @@ long ngfs_store(
     struct ngfs_file * f = fio->file;
     struct ngfs * ngfs = f->fs;
     struct cache * cache = ngfs->cache;
-    uint32_t block = fio->block;
     uint32_t bytes_written = 0;
-    uint32_t offset = pos % NGFS_BLKSZ; 
-    uint32_t remaining_len, write_len;
+    uint32_t offset, block, remaining_len, write_len;
     trace("%s(pos=%llu,blockno=%lu,block=%lu)", __func__, pos, fio->blockno, fio->block);
 
+    if (pos > UINT32_MAX) return -EINVAL;
+
+    debug("Attempting to acquire lock exclusively");
     rwlock_acquire(&f->lock, 1);
+    debug("Acquired lock exclusively");
+    if (pos + len > f->dentry.size) 
+        update_size(ngfs, &f->dentry, pos + len);
     
     // since we cache the block, we need to be careful if it changes
-    if (f->write_idx != fio->write_idx || fio->blockno != pos / NGFS_BLKSZ) {
-        block = blockno_to_block(cache, &f->dentry, pos / NGFS_BLKSZ);
-        seekio_resized(&fio->base, f->dentry.size);
-        // since a resize may have happened, need to double check bounds
-        len = (pos > f->dentry.size) ? 0 : MIN(len, f->dentry.size - pos);
-        fio->write_idx = f->write_idx;
-    }
+    update_pos(ngfs, fio, pos);
 
+    block = fio->block;
+    offset = pos % NGFS_BLKSZ;
     for (remaining_len = len; remaining_len > 0; ) {
         assert(block != NGFS_BLOCK_END);
         
         write_len = MIN(remaining_len, NGFS_BLKSZ - offset);
         write_to_block(cache, IDX_TO_ABS(block), offset, 
-        (uint8_t*)buf + bytes_written, write_len);
+            (uint8_t*)buf + bytes_written, write_len);
         
         remaining_len -= write_len;
         pos += write_len;
@@ -337,6 +352,7 @@ long ngfs_store(
     }
     
     rwlock_release(&f->lock);
+    debug("Released lock exclusively");
     fio->block = block;
     fio->blockno = pos / NGFS_BLKSZ;
 
@@ -479,34 +495,31 @@ int ngfs_ioctl(struct io * io, int op, void * arg) {
     struct ngfs_io * fio = (void*)io;
     struct ngfs_file * f = fio->file;
     struct ngfs * ngfs = f->fs;
-    uint32_t uarg;
+    unsigned long long * const ullarg = arg;
+    trace("%s(op=%d)", __func__, op);
 
     if(arg == NULL)
         return -EINVAL;
 
     switch (op) {
-        case IOC_GETEND: // the easy cases
         case IOC_GETPOS:
+        case IOC_SETPOS:
             return seekio_ioctl(io, op, arg);
 
-        case IOC_SETPOS: // caching
-            uarg = *(uint32_t *)arg;
-            rwlock_acquire(&f->lock, 0);
-            if (uarg < f->dentry.size) {
-                fio->blockno = uarg / NGFS_BLKSZ;
-                fio->block = 
-                    blockno_to_block(ngfs->cache, &f->dentry, fio->blockno);
-            }
-            result = seekio_ioctl(io, op, arg);
-            rwlock_release(&f->lock);
-            return result;
+        case IOC_GETEND:
+            *ullarg = f->dentry.size;
+            return 0;
 
         case IOC_SETEND:
+            if (*ullarg > UINT32_MAX) return -EINVAL;
+            debug("Attempting to acquire lock exclusively");
             rwlock_acquire(&f->lock, 1);
-            result = update_size(ngfs, &f->dentry, *(uint32_t *)arg);
-            seekio_resized(&fio->base, f->dentry.size);
-            fio->write_idx = ++f->write_idx;
+            debug("Acquired lock exclusively");
+            result = update_size(ngfs, &f->dentry, *ullarg);
+            f->write_idx++;
+            update_pos(ngfs, fio, fio->base.pos);
             rwlock_release(&f->lock);
+            debug("Released lock exclusively");
             return result;
 
         default:
@@ -540,6 +553,7 @@ void ngfs_flush(struct filesystem * fs) {
 
 flush_done:
     rwlock_release(&ngfs->fs_lock);
+    debug("Released lock exclusively");
 }
 
 int ngfs_open_listing(struct ngfs * fs, struct io ** ioptr) {
@@ -587,32 +601,52 @@ int update_size(
     struct ngfs_dir_entry * dentry, 
     uint32_t end) 
 {
-    uint32_t new_blocks, new_block, block;
+    uint32_t new_block, block;
     struct cache * cache = ngfs->cache;
-
-    block = blockno_to_block(cache, dentry, dentry->size / NGFS_BLKSZ);
-
     // extend
     if (end > dentry->size) {
-        new_blocks = CEIL(end, NGFS_BLKSZ) - CEIL(dentry->size, NGFS_BLKSZ);
-        while (new_blocks-- > 0) {
+        block = blockno_to_block(cache, dentry, dentry->size / NGFS_BLKSZ);
+        if (dentry->size % NGFS_BLKSZ != 0) {
+            clear_block(cache, IDX_TO_ABS(block), 
+            dentry->size % NGFS_BLKSZ, end - dentry->size);
+            dentry->size = ROUND_UP(dentry->size, NGFS_BLKSZ);
+        }
+
+        while (CEIL(dentry->size, NGFS_BLKSZ) < CEIL(end, NGFS_BLKSZ)) {
             new_block = get_free_data_block(ngfs);
             if (new_block == NGFS_BLOCK_END) return -ENOMEM;
+            clear_block(cache, IDX_TO_ABS(new_block), 0, end - dentry->size);
             if (dentry->size == 0) dentry->start_block = new_block;
             else set_next_data_block(cache, block, new_block);
             dentry->size += NGFS_BLKSZ; // for consistency
+            block = new_block;
         }
     }
     // truncate
     else if (CEIL(end, NGFS_BLKSZ) < CEIL(dentry->size, NGFS_BLKSZ)) {
+        block = blockno_to_block(cache, dentry, CEIL(end, NGFS_BLKSZ));
         free_blocks(cache, block);
         if (end == 0) dentry->start_block = NGFS_BLOCK_END;
-        else set_next_data_block(cache, 
-            blockno_to_block(cache, dentry, end / NGFS_BLKSZ), NGFS_BLOCK_END);
+        else set_next_data_block(cache, block, NGFS_BLOCK_END);
     }
     
     dentry->size = end;
     return 0;
+}
+
+void update_pos(struct ngfs * ngfs, struct ngfs_io * fio, uint32_t newpos) {
+    struct cache * cache = ngfs->cache;
+    if (newpos > fio->file->dentry.size) return;
+    if (fio->write_idx != fio->file->write_idx || 
+        fio->blockno > newpos / NGFS_BLKSZ)
+    {
+        fio->write_idx = fio->file->write_idx;
+        fio->blockno = newpos / NGFS_BLKSZ;
+        fio->block = blockno_to_block(cache, &fio->file->dentry, fio->blockno);
+        return;
+    }
+    for (;fio->blockno < newpos / NGFS_BLKSZ; fio->blockno++)
+        fio->block = get_next_data_block(cache, fio->block);
 }
 
 long read_from_block(
@@ -626,7 +660,6 @@ long read_from_block(
 
     assert(offset + bufsz <= NGFS_BLKSZ); // bad requests
     assert(block != NGFS_BLOCK_END);
-    
     if (cache_fetch(cache, block * NGFS_BLKSZ, &block_data) != 0) {
         return -1;
     }
@@ -648,7 +681,6 @@ long write_to_block(
 
     assert(offset + bufsz <= NGFS_BLKSZ); // bad requests
     assert(block != NGFS_BLOCK_END);
-    
     if (cache_fetch(cache, block * NGFS_BLKSZ, &block_data) != 0) {
         return -1;
     }
@@ -664,7 +696,6 @@ uint32_t get_free_data_block(struct ngfs * fs) {
     uint32_t free_block;
 
     for (uint32_t fat_block = 0; fat_block < fs->num_fat_blocks; fat_block++) {
-
         cache_fetch(fs->cache, fat_block * NGFS_BLKSZ, (void**)&fat);
 
         for (int idx = 0; idx < NGFS_FAT_ENTRIES_PER_BLOCK; idx++) {
@@ -678,6 +709,7 @@ uint32_t get_free_data_block(struct ngfs * fs) {
                 cache_flush(fs->cache);
 
                 free_block = fat_block * NGFS_FAT_ENTRIES_PER_BLOCK + idx;
+                debug("Allocated data block %lu", free_block);
                 return (free_block < fs->size / NGFS_BLKSZ - fs->num_fat_blocks) ?
                     free_block : NGFS_BLOCK_END;
             }
@@ -714,10 +746,11 @@ uint32_t get_next_data_block(struct cache * cache, uint32_t block) {
 void free_blocks(struct cache * cache, uint32_t start) {
     uint32_t next;
     uint32_t cur = start;
-    assert(cur != NGFS_BLOCK_FREE);
     while (cur != NGFS_BLOCK_END) {
+        assert(cur != NGFS_BLOCK_FREE);
         next = get_next_data_block(cache, cur);
         set_next_data_block(cache, cur, NGFS_BLOCK_FREE);
+        debug("Freed data block %lu", cur);
         cur = next;
     }
 }
@@ -791,4 +824,12 @@ int free_associated_cache_block(
         (void *)ROUND_DOWN((uintptr_t)entry, NGFS_BLKSZ), dirty);
     if (dirty) cache_flush(cache);
     return 0;
+}
+
+void clear_block(struct cache * cache, uint32_t block, uint32_t offset, uint32_t len) {
+    assert(offset < NGFS_BLKSZ);
+    len = MIN(NGFS_BLKSZ - offset, len);
+    void * data = get_cache_from_block(cache, block);
+    memset((uint8_t *)data + offset, 0, len);
+    cache_release(cache, data, CACHE_DIRTY);
 }

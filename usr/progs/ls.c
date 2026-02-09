@@ -9,32 +9,29 @@ void main (int argc, char** argv)
 {
     int fd, result;
     char buffer[BUFSZ+1];
-    int newline = 0;
     buffer[BUFSZ] = '\0';
+    char* dir = "";
     
     if (argc > 1)
-        fd = _open(-1, argv[1]);
-    else 
-        fd = _open(-1, "");
+        dir = argv[1];
+
+    fd = _open(-1, dir);
         
     if (fd < 0) {
-        printf("Could not open directory %s: %s\n", argv[1], error_name(fd));
+        printf("%s: could not open directory %s (%s)\n", 
+            argv[0], dir, error_desc(fd));
         return;
     }
 
-    while (1) {
+    for (;;) {
         result = _read(fd, buffer, BUFSZ);
         if (result < 0) {
-            printf("Read failed!\n");
+            printf("%s: failed to read \"%s\" (%s)\n", 
+                argv[0], dir, error_desc(result));
             return;
         }
 
-        if (result == 0) break;
-        
-        if (newline) dprintf(STDOUT, "\n");
-        dprintf(STDOUT, "%s", buffer);
-        newline = 1;
+        if (result == 0) break; // EOF
+        dprintf(STDOUT, "%s\n", buffer);
     }
-    
-    dprintf(1,"\n");
 }

@@ -3,6 +3,8 @@
 #include "../shell.h"
 #include "../error.h"
 
+#define RTC_PATH "/dev/rtc"
+
 #define NSEC_PER_SEC (1000000000UL)
 #define NSEC_PER_MIN (60UL * NSEC_PER_SEC)
 #define NSEC_PER_HR (60UL * NSEC_PER_MIN)
@@ -32,10 +34,11 @@ void main (int argc, char** argv)
     };
 
     
-    dev_fd = _open(-1, "dev/rtc0");
+    dev_fd = _open(-1, RTC_PATH);
 
     if (dev_fd < 0) {
-        printf("Could not open rtc: %d", error_name(dev_fd));
+        printf("%s: could not open %s (%s)\n", 
+            argv[0], RTC_PATH, error_desc(dev_fd));
         return;
     }
 

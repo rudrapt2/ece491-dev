@@ -4,18 +4,17 @@
 
 #define BUFSZ 512
 
-static void cat_stream(int fd) {
+static int cat_stream(int fd) {
     char buffer[BUFSZ];
     int result;
 
-    while (1) {
+    for (;;) {
         result = _read(fd, buffer, BUFSZ);
-        if (result < 0) {
-            printf("Read failed!\n");
-            return;
-        }
-        if (result == 0) {
-            return; // EOF
+        if (result <= 0) 
+            return result;
+        if (buffer[result] == 3 && fd == STDIN) {
+            printf("Killed\n");
+            return 0;
         }
         _write(STDOUT, buffer, result);
     }
@@ -23,9 +22,13 @@ static void cat_stream(int fd) {
 
 void main(int argc, char** argv)
 {
+    int result;
     // no args, read from STDIN
     if (argc == 1) {
-        cat_stream(STDIN);
+        result = cat_stream(STDIN);
+        if (result)
+            printf("%s: failed to read from STDIN (%s)\n", 
+                argv[0], error_desc(result));
         return;
     }
 
@@ -33,10 +36,14 @@ void main(int argc, char** argv)
     for (int i = 1; i < argc; i++) {
         int fd = _open(-1, argv[i]);
         if (fd < 0) {
-            printf("Could not open %s: %s\n", argv[i], error_name(fd));
+            printf("%s: could not open %s (%s)\n", 
+                argv[0], argv[i], error_desc(fd));
             continue;
         }
-        cat_stream(fd);
+        result = cat_stream(fd);
+        if (result)
+            printf("%s: failed to read %s (%s)\n", 
+                argv[0], argv[i], error_desc(result));
         _close(fd);
     }
 }

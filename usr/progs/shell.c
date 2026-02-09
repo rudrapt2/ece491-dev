@@ -22,19 +22,19 @@ void exec(int argc, char* argv[]) {
     fd = _open(-1, path);
 
 	if (fd < 0) {
-		printf("Unable to access %s (%s)\n", path, error_name(fd));
+		printf("Unable to access %s (%s)\n", path, error_desc(fd));
 		return;
 	}
 
 	result = _exec(fd, argc, argv);
-	printf("Failed to exec %s (%s)", path, error_name(result));
+	printf("Failed to exec %s (%s)", path, error_desc(result));
 }
 
 static int handle_file_input(char* file) {
     int res;
     _close(STDIN);
     res = _open(STDIN, file);
-    if (res < 0) printf("Failed to open file %s (%s)\n", file, error_name(res));
+    if (res < 0) printf("Failed to open file %s (%s)\n", file, error_desc(res));
     return res;
 }
 
@@ -45,34 +45,47 @@ static int handle_file_output(char* file) {
     if (res < 0) {
         res = _create(file);
         if (res < 0) {
-            printf("Failed to create file %s (%s)\n", file, error_name(res));
+            printf("Failed to create file %s (%s)\n", file, error_desc(res));
             return res;
         }
         res = _open(STDOUT, file);
     }
-    if (res < 0) printf("Failed to open file %s (%s)\n", file, error_name(res));
+    if (res < 0) printf("Failed to open file %s (%s)\n", file, error_desc(res));
     return res;
 }
 
 static int handle_pipe() {
+    int wtid;
     int wpipe = -1;
     int rpipe = -1;
     int res = _pipe(&wpipe, &rpipe);
 
     if (res < 0) {
-        printf("Failed to create pipe (%s)\n", error_name(res));
+        printf("Failed to create pipe (%s)\n", error_desc(res));
         return res;
     }
 
     res = _fork();
 
     if (res < 0) {
-        printf("Failed to fork (%s)\n", error_name(res));
+        printf("Failed to fork (%s)\n", error_desc(res));
         return res;
     }
 
     if (res) { // writer
         _close(rpipe);
+
+        // to make sure everything exits properly, we need a 
+        // waiter proc to ensure the main proc sleeps until
+        // all child threads are done executing.
+        wtid = _fork();
+        if (wtid > 0) {
+            _close(wpipe);
+            _wait(wtid);
+            _wait(res);
+            _exit();
+        }
+
         _close(STDOUT);
         _iodup(wpipe, STDOUT);
         _close(wpipe);
@@ -177,19 +190,6 @@ void main()
     char buf[BUFSIZE];
     int child;
 
-    /**************************************************/
-    // NOTE: REMOVE FROM STUDENT RELEASE
-    // this makes waiting for all children easier.
-    // if we dont do this we have to deal with children
-    // spawned by the main thread (ie cache thrfn)
-    // and would need to keep count of children spawned.
-    child = _fork();
-    if (child) {
-        _wait(child);
-        return;
-    }
-    /**************************************************/
-
     buf[BUFSIZE-1] = '\0'; // terminate
 
 	_open(CONSOLEOUT, "/dev/uart1");    // console device
@@ -210,7 +210,7 @@ void main()
 		child = _fork();
 		if (child) {
 			// Parent process: wait for all children
-			while (_wait(0) > 0);
+			_wait(child);
 		}
 		else {
 			// Child process: parse and execute

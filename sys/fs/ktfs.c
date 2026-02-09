@@ -198,7 +198,7 @@ int mount_ktfs(const char * name, struct io * bkgio) {
     for(uint64_t i = 0; i < root_directory.size / KTFS_DENSZ; i++) {
         // create a new file struct
         struct ktfs_file * new_file = kmalloc(sizeof(struct ktfs_file));
-        seekio_init(&new_file->io, &file_intf, fs_size, 1, 0);
+        seekio_init(&new_file->io, &file_intf, 1, 0);
         new_file->flag = 0;
 
         // get the address of the current dentry 
@@ -266,7 +266,7 @@ int ktfs_open_file(const char * name, struct io ** ioptr) {
             curr_file->flag |= FILE_OPENED;
             debug("ktfs_open: SUCCESS - file=%s, reset pos=0, refcnt=1", name);
             // wrap in a seekio
-            *ioptr = seekio_init(&curr_file->io, &file_intf, fs_size, 1, 1);
+            *ioptr = seekio_init(&curr_file->io, &file_intf, 1, 1);
             return 0;
         }
     }

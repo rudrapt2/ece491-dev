@@ -12,15 +12,13 @@ void main (int argc, char** argv)
         return;
     }
 
-    while (--argc) {
-        argv++;
-    
+    for (int i = 1; i < argc; i++) {
         result = _create(argv[0]);
 
         if (result < 0) {
-            printf("Could not create file %s: %s\n", argv[0], error_name(result));
+            printf("%s: failed to create %s (%s)\n", 
+                argv[0], argv[i], error_desc(result));
             continue;
         }
-        dprintf(STDOUT, "Successfully created %s\n", argv[0]);
     }
 }

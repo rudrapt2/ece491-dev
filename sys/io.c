@@ -4,6 +4,15 @@
 // SPDX-License-identifier: NCSA
 //
 
+#include "memory.h"
+#ifdef IO_TRACE
+#define TRACE
+#endif
+
+#ifdef IO_DEBUG
+#define DEBUG
+#endif
+
 #include "io.h"
 #include "ioimpl.h"
 #include <stddef.h>
@@ -169,68 +178,81 @@ int ioctl_u(struct io * io, int op, uintptr_t u_arg) {
 struct io * seekio_init (
     struct seekio * sio,
     const struct iointf * intf,
-    unsigned long long endpos,
     unsigned int blksz,
     unsigned int refcnt)
 {
     sio->pos = 0;
-    sio->end = endpos;
     return ioinit(&sio->base, intf, blksz, refcnt);
 }
 
 long seekio_read(struct io * io, void * buf, long bufsz) {
     struct seekio * const sio = (struct seekio*)io;
-    long reqlen, retlen;
+    int result;
+    long retlen;
+    unsigned long long end;
+    trace("%s(io=%s,bufsz=%ld)", __func__, io->intf->implname, bufsz);
 
     assert (sio->pos % io->blksz == 0);
-    assert (sio->end % io->blksz == 0);
 
     if (io->intf->fetch == NULL)
         return -ENOTSUP;
     
-    if (sio->pos == sio->end)
+    result = ioctl(io, IOC_GETEND, &end);
+    if (result < 0)
+        return result;
+
+    if (sio->pos == end)
         return 0;
+
+    if (sio->pos > end)
+        return -EINVAL;
     
-    if (sio->end - sio->pos < bufsz)
-        reqlen = sio->end - sio->pos;
-    else
-        reqlen = ROUND_DOWN(bufsz, sio->base.blksz);
+    if (end - sio->pos < bufsz)
+        bufsz = end - sio->pos;
     
-    retlen = io->intf->fetch(&sio->base, sio->pos, buf, reqlen);
+    debug("Calling fetch with pos=%llu, bufsz=%ld", sio->pos, bufsz);
+    retlen = io->intf->fetch(&sio->base, sio->pos, buf, bufsz);
 
     if (retlen <= 0)
         return retlen;
     
-    assert (retlen == reqlen);
+    assert (retlen == bufsz);
     sio->pos += retlen;
     return retlen;
 }
 
 long seekio_write(struct io * io, const void * buf, long len) {
     struct seekio * const sio = (struct seekio*)io;
-    long reqlen, retlen;
-    long new_end;
+    int result;
+    long retlen;
+    unsigned long long end, new_end;
 
     if (io->intf->store == NULL)
         return -ENOTSUP;
     
-    if (sio->end - sio->pos < len) {
+    result = ioctl(io, IOC_GETEND, &end);
+    if (result < 0)
+        return result;
+
+    if (sio->pos + len > end) {
         new_end = sio->pos + len;
-        ioctl(io, IOC_SETEND, &new_end);
-        reqlen = sio->end - sio->pos;
+        if (ioctl(io, IOC_SETEND, &new_end) == 0)
+            len = new_end - sio->pos;
+        else if (sio->pos > end)
+            return -EINVAL;
+        else
+            len = end - sio->pos;
     }
-    else
-        reqlen = ROUND_DOWN(len, sio->base.blksz);
     
-    if (reqlen == 0)
+    if (len == 0)
         return 0;
     
-    retlen = io->intf->store(&sio->base, sio->pos, buf, reqlen);
+    retlen = io->intf->store(&sio->base, sio->pos, buf, len);
 
     if (retlen <= 0)
         return retlen;
     
-    assert (retlen == reqlen);
+    assert (retlen == len);
     sio->pos += retlen;
     return retlen;
 }
@@ -240,18 +262,12 @@ int seekio_ioctl(struct io * io, int op, void * arg) {
     unsigned long long * const ullarg = arg;
 
     switch (op) {
-    case IOC_GETEND:
-        *ullarg = sio->end;
-        return 0;
-    
     case IOC_GETPOS:
         *ullarg = sio->pos;
         return 0;
 
     case IOC_SETPOS:
         if (*ullarg % io->blksz != 0)
-            return -EINVAL;
-        if (sio->end < *ullarg)
             return -EINVAL;
         sio->pos = *ullarg;
         return 0;
@@ -260,11 +276,6 @@ int seekio_ioctl(struct io * io, int op, void * arg) {
         return -ENOTSUP;
     }
 }
-
-void seekio_resized(struct seekio * sio, unsigned long long endpos) {
-    sio->end = endpos;
-}
-
 
 // NULLIO INTERNAL FUNCTION DECLARATIONS
 //
@@ -338,6 +349,7 @@ long nullio_store(struct io * io, unsigned long long pos, const void * buf, long
 
 struct memio {
     struct seekio base;
+    unsigned long long end;
     void * buf;
     void (*reclfn)(void*,size_t);
 };
@@ -348,6 +360,7 @@ struct memio {
 static void memio_reclaim(struct io * io);
 static long memio_fetch(struct io * io, unsigned long long pos, void * buf, long len);
 static long memio_store(struct io * io, unsigned long long pos, const void * buf, long len);
+static int memio_ioctl(struct io * io, int op, void * arg);
 
 // MEMIO INTERNAL CONSTANT DEFINITIONS
 //
@@ -359,7 +372,7 @@ static const struct iointf memio_intf = {
     .write = &seekio_write,
     .fetch = &memio_fetch,
     .store = &memio_store,
-    .ioctl = &seekio_ioctl
+    .ioctl = &memio_ioctl
 };
 
 // MEMIO EXPORTED FUNCTION DEFINITIONS
@@ -377,10 +390,11 @@ struct io * create_memio (
     assert (buf != NULL || size == 0);
     mio = kcalloc(1, sizeof(*mio));
     mio->buf = buf;
+    mio->end = size;
     mio->reclfn = reclfn;
 
     return seekio_init (
-        &mio->base, &memio_intf, size,
+        &mio->base, &memio_intf,
         /* blksz */ 1, /* refcnt */ 1);
 #endif
 }
@@ -392,7 +406,7 @@ void memio_reclaim(struct io * io) {
     struct memio * const mio = (struct memio*)io;
 
     if (mio->reclfn != NULL)
-        mio->reclfn(mio->buf, mio->base.end);
+        mio->reclfn(mio->buf, mio->end);
     
     kfree(mio);
 }
@@ -408,7 +422,7 @@ long memio_fetch(struct io * io, unsigned long long pos, void * buf, long len) {
     assert (len % io->blksz == 0); // ensured by iofetch()
     assert (0 <= len); // ensured by iofetch()
 
-    if (mio->base.end < pos || mio->base.end - pos < len)
+    if (mio->end < pos || mio->end - pos < len)
         return -EINVAL;
     
     memcpy(buf, mio->buf + pos, len);
@@ -427,11 +441,34 @@ long memio_store(struct io * io, unsigned long long pos, const void * buf, long 
     assert (len % io->blksz == 0); // ensured by iostore()
     assert (0 <= len); // ensured by iostore()
 
-    if (mio->base.end < pos || mio->base.end - pos < len)
+    if (mio->end < pos || mio->end - pos < len)
         return -EINVAL;
     
     memcpy(mio->buf + pos, buf, len);
     return len;
+#endif
+}
+
+int memio_ioctl(struct io * io, int op, void * arg) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
+    struct memio * const mio = (struct memio*)io;
+    unsigned long long * const ullarg = arg;
+
+    switch (op) {
+    case IOC_GETPOS:
+    case IOC_SETPOS:
+        return seekio_ioctl(io, op, arg);
+    
+    case IOC_GETEND:
+        *ullarg = mio->end;
+        return 0;
+    
+    default:
+        return -ENOTSUP;
+    }
+
 #endif
 }
 #ifndef MP2
@@ -492,12 +529,14 @@ void create_iopipe(struct io ** wioptr, struct io ** rioptr) {
 
 void iopipe_wio_reclaim(struct io * io) {
     struct iopipe * const p = (void*)io - offsetof(struct iopipe, wio);
+    condition_broadcast(&p->updated); // alert writers of broken pipe
     if (iorefcnt(&p->rio) == 0)
         iopipe_reclaim(p);
 }
 
 void iopipe_rio_reclaim(struct io * io) {
     struct iopipe * const p = (void*)io - offsetof(struct iopipe, rio);
+    condition_broadcast(&p->updated); // alert readers of broken pipe
     if (iorefcnt(&p->wio) == 0)
         iopipe_reclaim(p);
 }
@@ -539,17 +578,18 @@ long iopipe_write(struct io * io, const void * buf, long buflen) {
 
         if (iorefcnt(&p->rio) == 0) {
             p->wbusy = 0; // unlock!
+            condition_broadcast(&p->updated);
             return (bufoff != 0) ? bufoff : -EPIPE;
         }
         
         // Copy into page-sized ring buffer using memcpy
 
         int const woff = p->wpos % PAGE_SIZE;
-        int const roff = p->wpos % PAGE_SIZE;
+        int const roff = p->rpos % PAGE_SIZE;
         int copylen; // how much we can copy
         int wend;
 
-        if (roff < woff)
+        if (roff <= woff)
             wend = PAGE_SIZE;
         else
             wend = roff;
@@ -561,15 +601,41 @@ long iopipe_write(struct io * io, const void * buf, long buflen) {
     }
 
     p->wbusy = 0;
+    condition_broadcast(&p->updated);
     return bufoff;
 }
 
 long iopipe_read(struct io * io, void * buf, long bufsz) {
     struct iopipe * const p = (void*)io - offsetof(struct iopipe, rio);
-    (void)p;
-    (void)buf;
-    (void)bufsz;
-    return -ENOTSUP; // TODO
+    long bufread = 0;
+
+    // fast path
+    if(bufsz == 0)
+        return 0;
+    
+    // if theres nothing to read (and there's at least one writer)
+    // then wait until there is data in the pipe
+    while(p->rpos == p->wpos && iorefcnt(&p->wio) != 0)
+        condition_wait(&p->updated);
+
+    assert(p->rpos <= p->wpos);
+    // data is waiting in pipe
+    // since short reads are acceptable, we consume as much
+    // data as is available and return that
+    while (p->rpos < p->wpos && bufread < bufsz) {
+        int const woff = p->wpos % PAGE_SIZE;
+        int const roff = p->rpos % PAGE_SIZE;
+        int copylen = (woff > roff) ? woff - roff : PAGE_SIZE - roff;
+        copylen = MIN(copylen, bufsz - bufread);
+        memcpy(buf + bufread, p->buf + roff, copylen);
+        bufread += copylen;
+        p->rpos += copylen;
+    }
+    condition_broadcast(&p->updated);
+
+    // note that bufread can only be 0 if there are no writers AND
+    // no data left to consume. We can then return 0 to signify EOF.
+    return bufread;
 }
 
 void iopipe_reclaim(struct iopipe * p) {
