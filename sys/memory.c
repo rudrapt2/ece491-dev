@@ -519,7 +519,6 @@ int handle_umode_page_fault(struct trap_frame * tfr, uintptr_t vma) {
             pp = alloc_phys_page();
             memset(pp, 0, PAGE_SIZE);
             map_page(vma, pp, PTE_R | PTE_W | PTE_U);
-	    restore_interrupts(pie);
             return 1; // handled, restart instruction
         }
     }
