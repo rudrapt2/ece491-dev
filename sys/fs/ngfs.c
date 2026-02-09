@@ -174,6 +174,7 @@ int mount_ngfs(const char * name, struct io * bkgio) {
     for (uint32_t idx = 1; 
         iterate_dentry(ngfs, &idx, &block, &dentry, CACHE_CLEAN);) 
     {
+        assert(dentry->name[0] != '\0'); // valid entry
         f = kcalloc(1, sizeof(struct ngfs_file));
         memcpy(&f->dentry, dentry, DENTRYSZ);
         rwlock_init(&f->lock, f->dentry.name);
@@ -221,9 +222,7 @@ int ngfs_open_file(struct ngfs * fs, const char * name, struct io ** ioptr) {
         return -ENOENT;
     }
 
-    debug("Attempting to acquire lock exclusively");
     rwlock_acquire(&f->lock, 1);
-    debug("Acquired lock exclusively");
 
     if (++f->refcnt == 0) { // too many opens
         f->refcnt--;
@@ -239,7 +238,6 @@ int ngfs_open_file(struct ngfs * fs, const char * name, struct io ** ioptr) {
     fio->file = f;
     *ioptr = seekio_init(&fio->base, &ngfs_file_intf, 1, 1);
     rwlock_release(&f->lock);
-    debug("Released lock exclusively");
     rwlock_release(&fs->fs_lock);
 
     debug("ngfs_open: SUCCESS - file=%s, refcnt=%d", name, f->refcnt);
@@ -251,14 +249,11 @@ void ngfs_reclaim(struct io * io) {
     struct ngfs_io * fio = (void*)io;
     struct ngfs_file * f = fio->file;
     
-    debug("Attempting to acquire lock exclusively");
     rwlock_acquire(&f->lock, 1);
-    debug("Acquired lock exclusively");
     assert(f->refcnt > 0);
     kfree(fio);
     f->refcnt--;
     rwlock_release(&f->lock);
-    debug("Released lock exclusively");
 }
 
 long ngfs_fetch(
@@ -275,12 +270,9 @@ long ngfs_fetch(
 
     if (pos > UINT32_MAX) return -EINVAL;
 
-    debug("Attempting to acquire lock shared");
     rwlock_acquire(&f->lock, 0);
-    debug("Acquired lock shared");
     if (pos > f->dentry.size) {
         rwlock_release(&f->lock);
-        debug("Released lock shared");
         return -EINVAL;
     }
     bufsz = MIN(bufsz, f->dentry.size - pos);
@@ -306,7 +298,6 @@ long ngfs_fetch(
     }
     
     rwlock_release(&f->lock);
-    debug("Released lock shared");
     fio->block = block;
     fio->blockno = pos / NGFS_BLKSZ;
 
@@ -326,9 +317,7 @@ long ngfs_store(
 
     if (pos > UINT32_MAX) return -EINVAL;
 
-    debug("Attempting to acquire lock exclusively");
     rwlock_acquire(&f->lock, 1);
-    debug("Acquired lock exclusively");
     if (pos + len > f->dentry.size) 
         update_size(ngfs, &f->dentry, pos + len);
     
@@ -352,7 +341,6 @@ long ngfs_store(
     }
     
     rwlock_release(&f->lock);
-    debug("Released lock exclusively");
     fio->block = block;
     fio->blockno = pos / NGFS_BLKSZ;
 
@@ -369,7 +357,7 @@ int ngfs_create(struct filesystem * fs, const char * name) {
     struct ngfs_dir_entry * root_dir = &ngfs->root_dir;
     uint32_t curr_size = root_dir->size;
 
-    if (strlen(name) > NGFS_MAX_FILENAME_LEN)
+    if (strlen(name) > NGFS_MAX_FILENAME_LEN || strlen(name) == 0)
         return -EINVAL;
 
     if (strcmp(name, root_dir->name) == 0)
@@ -415,9 +403,8 @@ int ngfs_create(struct filesystem * fs, const char * name) {
     ngfs->files_list = f;
 
     update_root_dir(ngfs);
-    rwlock_release(&ngfs->fs_lock);
-
     cache_flush(cache);
+    rwlock_release(&ngfs->fs_lock);
 
     return 0;
 }
@@ -476,6 +463,8 @@ int ngfs_delete(struct filesystem * fs, const char * name) {
         if (strcmp(name, dentry->name) == 0) {
             memcpy(dentry, &last_dentry, DENTRYSZ);
             free_associated_cache_block(cache, dentry, CACHE_DIRTY);
+            debug("Deleted file %s at index %d (replaced by %s)", 
+                name, idx, last_dentry.name);
             break;
         }
     }
@@ -512,14 +501,11 @@ int ngfs_ioctl(struct io * io, int op, void * arg) {
 
         case IOC_SETEND:
             if (*ullarg > UINT32_MAX) return -EINVAL;
-            debug("Attempting to acquire lock exclusively");
             rwlock_acquire(&f->lock, 1);
-            debug("Acquired lock exclusively");
             result = update_size(ngfs, &f->dentry, *ullarg);
             f->write_idx++;
             update_pos(ngfs, fio, fio->base.pos);
             rwlock_release(&f->lock);
-            debug("Released lock exclusively");
             return result;
 
         default:
@@ -553,7 +539,6 @@ void ngfs_flush(struct filesystem * fs) {
 
 flush_done:
     rwlock_release(&ngfs->fs_lock);
-    debug("Released lock exclusively");
 }
 
 int ngfs_open_listing(struct ngfs * fs, struct io ** ioptr) {

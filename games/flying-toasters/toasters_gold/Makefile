@@ -10,19 +10,19 @@ OBJCOPY=$(TOOLPREFIX)objcopy
 OBJDUMP=$(TOOLPREFIX)objdump
 
 ULIB_OBJS = \
-	../uio.o \
-	../string.o \
-	../syscall.o \
-	../heap.o
+	../usr/uio.o \
+	../usr/string.o \
+	../usr/syscall.o \
+	../usr/heap.o
 
-ULIB_OBJS += ../start.o
-ULIB_LD = ../umode.ld
+ULIB_OBJS += ../usr/start.o
+ULIB_LD = ../usr/umode.ld
 
 CFLAGS = -Wall -fno-omit-frame-pointer -ggdb -gdwarf-2
 CFLAGS += -mcmodel=medany -fno-pie -no-pie -march=rv64g -mabi=lp64d
 CFLAGS += -ffreestanding -fno-common -nostdlib -mno-relax
 CFLAGS += -fno-asynchronous-unwind-tables
-CFLAGS += -I.
+CFLAGS += -I. -I../usr
 
 
 BLOB_OBJCOPY_FLAGS = \
@@ -42,7 +42,6 @@ sprites.o:
 toasters: $(ULIB_OBJS) toasters.o mp1.o sprites.o
 	$(LD) $(LDFLAGS) -T $(ULIB_LD) -o $@ $^
 	mv toasters.o sprites.o ../toasters 
-	mv toasters ../games/toasters-gold
 
 clean:
 	rm -rf *.o toasters ../*.o

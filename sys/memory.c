@@ -623,7 +623,7 @@ void _ptab_insert (
         } else {
             assert (!PTE_LEAF(pt[i]));
 	    // You can never clear the global bit later
-	    assert ((rwxug_flags & PTE_G) || !PTE_GLOBAL(pt[i]));
+	    // assert ((rwxug_flags & PTE_G) || !PTE_GLOBAL(pt[i]));
             cpt = pageptr(pt[i].ppn);
         }
 

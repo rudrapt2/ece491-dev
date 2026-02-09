@@ -21,7 +21,7 @@ static size_t fprintf(int fd, const char * fmt, ...) {
     char buf[FBUFSZ];
     va_start(ap, fmt);
     size_t n = vsnprintf(buf, FBUFSZ, fmt, ap);
-    _write(fd, buf, n);
+    _print(buf);
     va_end(ap);
     return n;
 }
@@ -560,23 +560,107 @@ void test_race(int argc, char * argv[]) {
         fprintf(CONSOLEOUT, "proc%d deleted %s\r\n", proc_idx, path);
 }
 
+void test_fs_race(int argc, char * argv[]) {
+    int num_iters, num_forks;
+    int ls, result;
+    char path[26];
+    char* mp = "/c/";
+    int proc_idx = 0;
+
+    if (argc < 3) {
+        fprintf(CONSOLEOUT, "USAGE: %s [NUM_FORKS] [NUM_ITERS] [MOUNTPOINT (c)]\r\n", argv[0]);
+        return;
+    }
+
+    num_forks = strtoul(argv[1], NULL, 10);
+    num_iters = strtoul(argv[2], NULL, 10);
+
+    if (argc >= 4)
+        mp = argv[3];
+
+    snprintf(path, 26, "%stestfile", mp);
+    _delete(path);
+    result = _create(path);
+    if (result < 0) {
+        fprintf(CONSOLEOUT, "Failed to create %s (%s)\r\n", path, error_name(result));
+        return;
+    }
+
+    for (int i = 0; i < num_forks; i++) {
+        proc_idx *= 2;
+        if (_fork() > 0) proc_idx++;
+    }
+
+    ls = _open(-1, mp);
+
+    rand_state = proc_idx;
+    fprintf(STDOUT, "proc%d initialized\r\n", proc_idx);
+
+    for (int i = 0; i < num_iters; i++) {
+        switch (rand() % 3) {
+            case 0: // create
+                result = _create(path);
+                if (result < 0) 
+                    fprintf(CONSOLEOUT, "[Iteration %d] proc%d failed to create %s (%s)\r\n", i, proc_idx, path, error_name(result));
+                else
+                    fprintf(CONSOLEOUT, "[Iteration %d] proc%d created %s\r\n", i, proc_idx, path);
+                continue;
+            case 1: // delete
+                result = _delete(path);
+                if (result < 0) 
+                    fprintf(CONSOLEOUT, "[Iteration %d] proc%d failed to delete %s (%s)\r\n", i, proc_idx, path, error_name(result));
+                else
+                    fprintf(CONSOLEOUT, "[Iteration %d] proc%d deleted %s\r\n", i, proc_idx, path);
+                continue;
+            case 2: // ls increment
+                result = _read(ls, path + strlen(mp), 26 - strlen(mp));
+                if (result == 0) {
+                    fprintf(CONSOLEOUT, "[Iteration %d] proc%d reached end of listing, restarting...\r\n", i, proc_idx);
+                    _close(ls);
+                    ls = _open(-1, mp);
+                    result = _read(ls, path + strlen(mp), 26 - strlen(mp));
+                }
+                if (result == 0) {
+                    fprintf(CONSOLEOUT, "[Iteration %d] FAIL: proc%d read 0 from listing twice\r\n", i, proc_idx);
+                }
+                if (result < 0)
+                    fprintf(CONSOLEOUT, "[Iteration %d] proc%d failed to read from listing (%s)\r\n", i, proc_idx, error_name(result));
+                else
+                    fprintf(CONSOLEOUT, "[Iteration %d] proc%d read %s from listing\r\n", i, proc_idx, path);
+                continue;
+        }
+    }
+
+    _close(ls);
+    fprintf(CONSOLEOUT, "proc%d finished\r\n", proc_idx);
+}
+
+void test_race_evil(int argc, char * argv[]) {
+    if (_fork()) 
+        return test_race(argc, argv);
+    
+    return test_fs_race(argc, argv);
+}
+
 struct testcase {
     const char * name;
     void (*main)(int argc, char * argv[]);
 };
 
 const struct testcase testcases[] = {
-    {.name="malloc",        .main=test_malloc},
-    {.name="create",        .main=test_create},
-    {.name="write",         .main=test_write},
-    {.name="read",          .main=test_read},
-    {.name="delete",        .main=test_delete},
-    {.name="write_long",    .main=test_write_long},
-    {.name="read_long",     .main=test_read_long},
-    {.name="set_end",       .main=test_set_end},
-    {.name="write_multi",   .main=test_write_multi},
-    {.name="read_multi",    .main=test_read_multi},
-    {.name="race",          .main=test_race},
+    {.name="malloc",        .main=&test_malloc},
+    {.name="create",        .main=&test_create},
+    {.name="write",         .main=&test_write},
+    {.name="read",          .main=&test_read},
+    {.name="delete",        .main=&test_delete},
+    {.name="write_long",    .main=&test_write_long},
+    {.name="read_long",     .main=&test_read_long},
+    {.name="set_end",       .main=&test_set_end},
+    {.name="write_multi",   .main=&test_write_multi},
+    {.name="read_multi",    .main=&test_read_multi},
+    {.name="race",          .main=&test_race},
+    {.name="fs_race",       .main=&test_fs_race},
+    {.name="race_evil",     .main=&test_race_evil},
 };
 
 void main (int argc, char* argv[]) {

@@ -1,5 +1,5 @@
 #include "after_dark.h"
-#include "../heap.h"
+#include "../usr/heap.h"
 
 extern char toaster_start[];
 extern char toast_start[];
