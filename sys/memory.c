@@ -512,7 +512,6 @@ int handle_smode_page_fault(struct trap_frame * tfr, uintptr_t vma) {
 int handle_umode_page_fault(struct trap_frame * tfr, uintptr_t vma) {
     struct pte * pte;
     void * pp;
-    long pie = disable_interrupts();
 
     if (UMEM_START_VMA <= vma && vma < UMEM_END_VMA) {
         pte = ptab_fetch(active_space_ptab(), VPN(vma));
@@ -525,7 +524,6 @@ int handle_umode_page_fault(struct trap_frame * tfr, uintptr_t vma) {
         }
     }
     
-    restore_interrupts(pie);
     return 0; // not handled
 }
 
