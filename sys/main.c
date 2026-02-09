@@ -97,6 +97,7 @@ void mount_drive(char * mntname, char * devname,
 }
 
 void exec_init() {
+#ifndef MP2
     char * argv[] = { NULL };
     struct io * initexe;
     int result;
@@ -113,6 +114,7 @@ void exec_init() {
     current_process()->iotab[0] = create_nullio();
 
     process_exec(initexe, 0, argv);
+#endif
 }
 
 #ifdef MP2
