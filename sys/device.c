@@ -11,8 +11,8 @@
 
 #include "conf.h"
 #include "error.h"
-#include "filesys.h"
 #ifndef MP2
+#include "filesys.h"
 #include "fsimpl.h"
 #endif
 #include "heap.h"

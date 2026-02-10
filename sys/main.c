@@ -16,11 +16,14 @@
 #include "misc.h" // for halt()
 #include "heap.h"
 #include "io.h"
+
+#ifndef MP2
 #include "fs/ngfs.h"
 #include "fs/ktfs.h"
 #include "fs/tarfs.h"
 #include "filesys.h"
 #include "process.h"
+#endif
 
 #ifndef MP2
 #define INITEXE "shell"
