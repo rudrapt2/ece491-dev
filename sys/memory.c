@@ -13,7 +13,6 @@
 #endif
 
 #include "memory.h"
-
 #include "conf.h"
 #include "console.h"
 #include "error.h"

@@ -4,7 +4,6 @@
 // SPDX-License-identifier: NCSA
 //
 
-#include "memory.h"
 #ifdef IO_TRACE
 #define TRACE
 #endif
@@ -13,6 +12,9 @@
 #define DEBUG
 #endif
 
+#ifndef MP2
+#include "memory.h"
+#endif
 #include "io.h"
 #include "ioimpl.h"
 #include <stddef.h>

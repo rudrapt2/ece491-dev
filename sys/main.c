@@ -76,6 +76,7 @@ void main(unsigned int hartid, void * dtb) {
 #endif
 }
 
+#ifndef MP2
 void mount_drive(char * mntname, char * devname, 
     int (*mount)(const char * mpname, struct io * bkgio)) {
     
@@ -98,9 +99,10 @@ void mount_drive(char * mntname, char * devname,
         halt();
     }
 }
+#endif
 
-void exec_init() {
 #ifndef MP2
+void exec_init() {
     char * argv[] = { NULL };
     struct io * initexe;
     int result;
@@ -117,8 +119,8 @@ void exec_init() {
     current_process()->iotab[0] = create_nullio();
 
     process_exec(initexe, 0, argv);
-#endif
 }
+#endif
 
 #ifdef MP2
 #define TREK_TERM_NAME "uart1"
