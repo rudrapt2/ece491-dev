@@ -531,6 +531,7 @@ int handle_umode_page_fault(struct trap_frame * tfr, uintptr_t vma) {
 
 int _ptab_reset(unsigned int lvl, struct pte * pt, int keep_global) {
     int empty = 1; // subtable contains a mapping
+    int entry_empty;
     unsigned int i;
     void * pp;
 
@@ -540,24 +541,24 @@ int _ptab_reset(unsigned int lvl, struct pte * pt, int keep_global) {
                 pp = pageptr(pt[i].ppn);
 
                 if (lvl == 0) {
-                    assert ((pt[i].flags & (PTE_W | PTE_X)) != 0);
+                    assert ((pt[i].flags & (PTE_R | PTE_W | PTE_X)) != 0);
                     // The if the page is in RAM, return it to the allocator
                     if ((void*)_kimg_end <= pp && pp < RAM_END)
                         free_phys_page(pp);
                 } else {
                     assert (!PTE_LEAF(pt[i]));
-                    empty &= _ptab_reset(lvl - 1, pp, keep_global);
+                    int entry_empty = _ptab_reset(lvl - 1, pp, keep_global);
+                    if(entry_empty)pt[i] = null_pte();
+                    empty &= entry_empty;
                 }
-
-                pt[i] = null_pte();
-            
             } else
-                empty &= ~keep_global; //Mark non-empty only if keeping globals
+                empty = !(keep_global); //Mark non-empty only if keeping globals
+
         }
     }
-
-    if (empty)
+    if (empty){
         free_phys_page(pt);
+    }
     
     return empty;
 }

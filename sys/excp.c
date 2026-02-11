@@ -62,7 +62,7 @@ void handle_smode_exception(unsigned int cause, struct trap_frame* tfr) {
             case RISCV_SCAUSE_LOAD_PAGE_FAULT:
             case RISCV_SCAUSE_STORE_PAGE_FAULT:
                 int handled = handle_umode_page_fault(tfr, csrr_stval());
-                if(handled)break; //If not handled just keep going until you hit the panic
+                if(handled)return; //If not handled just keep going until you hit the panic
             case RISCV_SCAUSE_INSTR_PAGE_FAULT:
             case RISCV_SCAUSE_LOAD_ADDR_MISALIGNED:
             case RISCV_SCAUSE_STORE_ADDR_MISALIGNED:
