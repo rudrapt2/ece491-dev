@@ -156,6 +156,7 @@ extern long iostore(struct io * io, unsigned long long pos, const void * buf, lo
 int ioctl(struct io * io, int op, void * arg);
 
 #define IOC_GETBLKSZ 0 // no arg, return value is block size
+#define IOC_RESET    1 // no arg
 
 #define IOC_GETEND 4 // arg is unsigned long long *
 #define IOC_SETEND 5 // arg is const unsigned long long *
@@ -184,6 +185,11 @@ int ioctl(struct io * io, int op, void * arg);
 //   The returned block size may also be obtained using ioblksz(). This
 //   operation is supported by all I/O objects. The block size is at least 1, so
 //   the return value is never 0.
+//
+// - int ioctl(io, IOC_RESET, NULL);
+//
+//   Resets the I/O object. Resets an I/O object to state equivalent to its
+//   initial state. The operation is I/O object-specific.
 //
 // - int ioctl(io, IOC_GETEND, unsigned long long * endposptr);
 //   Gets size/capacity of a storage I/O object. The size/capacity in bytes is

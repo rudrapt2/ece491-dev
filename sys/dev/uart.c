@@ -97,6 +97,7 @@ struct uart_device {
     struct condition rxbnotempty; // signalled when rxbuf becomes not empty
     struct condition txbnotfull;  // signalled when txbuf becomes not full
     unsigned long rxovrcnt; // number of times OE was set on entry to ISR
+    struct rwlock txlock; // transmit exclusive ccess
 #endif
 
     struct ringbuf rxbuf;
@@ -148,6 +149,7 @@ void attach_uart(void * mmio_base, int irqno) {
 #else
     condition_init(&uart->rxbnotempty, "uart.rxnotempty");
     condition_init(&uart->txbnotfull, "uart.txnotfull");
+    rwlock_init(&uart->txlock, "uart.txlock");
 #endif
 
     // Initialize hardware device
@@ -264,6 +266,10 @@ long uart_write(struct io * io, const void * buf, long buflen) {
         return 0;
 
     assert (buf != NULL);
+
+    // Acquire lock to write to ensure that writes are not interleaved.
+
+    rwlock_acquire(
 
     // Sleep until transmit ring buffer is not full, then copy characters from
     // _buf_ to ring buffer. Unlike the read case, we write all characters
