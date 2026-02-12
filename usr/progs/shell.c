@@ -2,6 +2,7 @@
 #include "../string.h"
 #include "../shell.h"
 #include "../error.h"
+#include "../io.h"
 
 #define BUFSIZE 256
 #define MAXARGS 64
@@ -49,6 +50,10 @@ static int handle_file_output(char* file) {
             return res;
         }
         res = _open(STDOUT, file);
+    }
+    else { // file exists, clear it out
+        unsigned long long end = 0;
+        _ioctl(STDOUT, IOC_SETEND, &end);
     }
     if (res < 0) printf("Failed to open file %s (%s)\n", file, error_desc(res));
     return res;

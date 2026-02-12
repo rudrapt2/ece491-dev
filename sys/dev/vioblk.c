@@ -91,7 +91,7 @@ struct vioblk_device {
     volatile struct virtio_mmio_regs * regs;
     int irqno;
 
-    struct io io;
+    struct seekio io;
 
     unsigned long long bytecap;
     unsigned long long blkcnt;
@@ -143,7 +143,10 @@ static const struct iointf vioblk_intf = {
     .reclaim = &vioblk_reclaim,
     .fetch = &vioblk_fetch,
     .store = &vioblk_store,
-    .ioctl = &vioblk_ioctl
+    .read = &seekio_read,
+    .write = &seekio_write,
+    .ioctl = &vioblk_ioctl,
+    .ioctl_u = (int(*)(struct io*, int, uintptr_t))&vioblk_ioctl
 };
 
 // EXPORTED FUNCTION DEFINITIONS
@@ -259,7 +262,7 @@ void vioblk_attach(volatile struct virtio_mmio_regs * regs, int irqno) {
     // Register device
 
     register_device(VIOBLK_NAME, instcnt++, &vioblk_open, vb);
-    ioinit(&vb->io, &vioblk_intf, blksz, 0);
+    ioinit(&vb->io.base, &vioblk_intf, blksz, 0);
     
     // Signal initialization complete
 
@@ -282,7 +285,7 @@ int vioblk_open(struct io ** ioptr, void * aux) {
     virtio_enable_virtq(vb->regs, 0);
     enable_intr_source(vb->irqno, VIOBLK_INTR_PRIO, vioblk_isr, vb);
 
-    *ioptr = ioaddref(&vb->io);
+    *ioptr = ioaddref(&vb->io.base);
 
     return 0;
 #endif
@@ -450,6 +453,9 @@ int vioblk_ioctl(struct io * io, int op, void * arg) {
     case IOC_GETEND:
         *(unsigned long long*)arg = vb->bytecap;
         return 0;
+    case IOC_GETPOS:
+    case IOC_SETPOS:
+        return seekio_ioctl(io, op, arg);
     default:
         return -ENOTSUP;
     }

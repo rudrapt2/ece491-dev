@@ -173,6 +173,7 @@ int process_fork(const struct trap_frame * tfr) {
     condition_init(&done, "fork_child_done");
     ctid = spawn_thread("fork_child", (void*)&fork_func, &done, tfr);
 
+    // this has a memory leak since we never free the child
     if (ctid < 0)
         return ctid;
     
