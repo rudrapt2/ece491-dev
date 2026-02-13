@@ -149,11 +149,19 @@ void exec_init() {
 	test_reset(uart, max_free, &fail, &total);
 	mtag_t new_mtag = test_clone(&fail, &total);
 	test_discard(new_mtag, max_free-3, &fail, &total); //lv 2, lv 1, lv 0 page for new global entry = 3
-		
-	if(wait_for_user_input(uart, "yYnN", "Skip Long Tests? Y/N\n")/2){
-
+	
+	if(fails != fail){
+		kprintf("WARN: Detected failing essential functionality. Skipping all to end.\n");
+		goto end_test;
 	}
 
+	//These tests need to be able to write arbitrary memory and reset.
+	//Luckily, they don't care about fragmentation.	
+	if(wait_for_user_input(uart, "yYnN", "Skip Long Tests? Y/N\n")/2){
+		complete_memtest((uintptr_t)0xc0001000, &fail, &total);
+	}
+
+end_test:
 	kprintf("Test Complete!\n");
 	kprintf("%d PASSES, %d FAILS out of %d TOTAL\n", total - fail, fail, total);
 }

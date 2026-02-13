@@ -19,6 +19,7 @@
 #include "misc.h"
 #include "conf.h"
 #include "string.h"
+#include "memory.h"
 
 #ifndef HEAP_ALIGN
 #define HEAP_ALIGN 8

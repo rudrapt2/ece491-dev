@@ -427,3 +427,46 @@ void test_discard(mtag_t mspace, int expected, int* fail, int* total){
 	}
 	kprintf("PASS\n");
 }
+
+//Test 17: Write/Readback all available pages
+//System test:
+//- Faults into every mappable user page
+//- Writes a pattern to the whole page
+//- Reads back the entire page to see that every byte was set
+//- Resets the memory space and performs a leak check
+//- Takes a long time
+//end argument is in case you mapped some stuff at the beginning of the user space.
+void complete_memtest(uintptr_t end, int* fail, int* total){
+	kprintf("Test 17: Write/Readback all available pages\n");
+	(*total)++;
+	int bad = 0;
+	if(end < UMEM_START_VMA)end = UMEM_START_VMA;
+	//You have to keep a tolerance of 3 because that's the max number of pages that can be
+	//allocated for a single page fault.
+	while(end < UMEM_END_VMA-PAGE_SIZE){
+		int pages = 0;
+		int leak_check = free_phys_page_count();
+		for(; (free_phys_page_count() >= 3) & (end <= UMEM_END_VMA-PAGE_SIZE); pages++){
+			memset((void*)(end), (pages & 0xFF), PAGE_SIZE);
+			end+=PAGE_SIZE;
+		}
+		for(int i = 0; i < pages; i++){
+			for(int j = 0; j < PAGE_SIZE; j++){
+				if(((char*)(void*)(end-pages*PAGE_SIZE+i*PAGE_SIZE))[j] != (i & 0xFF)){
+					kprintf("Mismatch at address %p - E: 0x%x GOT: 0x%x\n", end-pages*PAGE_SIZE+i*PAGE_SIZE+j, i & 0xFF, ((char*)(void*)(end-pages*PAGE_SIZE+i*PAGE_SIZE+j))[j]);
+					bad = 1;
+					//Honestly I'd suggest killing QEMU if you see this and you suspect yourself and not your RAM
+				}
+			}
+		}
+		reset_active_mspace();
+		if(free_phys_page_count() != leak_check){
+			kprintf("Expected %d pages, got %d pages after allocating up to %p.\n", leak_check, free_phys_page_count(), end);
+			bad = 1;
+		}
+	}
+	if(bad){
+		(*fail)++;
+		kprintf("FAIL\n");
+	}else kprintf("PASS\n");
+}

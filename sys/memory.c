@@ -161,7 +161,7 @@ static struct page_chunk * free_chunk_list;
 // EXPORTED FUNCTION DECLARATIONS
 //
 
-void memory_init(void) {
+void memory_init() {
     const void * const text_start = _kimg_text_start;
     const void * const text_end = _kimg_text_end;
     const void * const rodata_start = _kimg_rodata_start;
@@ -245,7 +245,7 @@ void memory_init(void) {
 
     // Initialize heap memory manager
 
-    heap_init(heap_start, heap_end - heap_end);
+    heap_init(heap_start, heap_end - heap_start);
 
     debug("Heap allocator: [%p,%p): %zu KB free", heap_start, heap_end,
           (heap_end - heap_start) / 1024);
