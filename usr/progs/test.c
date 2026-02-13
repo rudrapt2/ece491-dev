@@ -21,7 +21,7 @@ static size_t fprintf(int fd, const char * fmt, ...) {
     char buf[FBUFSZ];
     va_start(ap, fmt);
     size_t n = vsnprintf(buf, FBUFSZ, fmt, ap);
-    _print(buf);
+    _write(fd, buf, n);
     va_end(ap);
     return n;
 }
@@ -568,7 +568,7 @@ void test_fs_race(int argc, char * argv[]) {
     int proc_idx = 0;
 
     if (argc < 3) {
-        fprintf(CONSOLEOUT, "USAGE: %s [NUM_FORKS] [NUM_ITERS] [MOUNTPOINT (c)]\r\n", argv[0]);
+        fprintf(CONSOLEOUT, "USAGE: %s [NUM_FORKS] [NUM_ITERS] [MOUNTPOINT (c)] [SAVE_FILES...] \r\n", argv[0]);
         return;
     }
 
@@ -577,6 +577,12 @@ void test_fs_race(int argc, char * argv[]) {
 
     if (argc >= 4)
         mp = argv[3];
+
+    // open files to avoid deleting them
+    for (int i = 4; i < argc; i++) {
+        snprintf(path, 26, "%s%s", mp, argv[i]);
+        _open(-1, path);
+    }
 
     snprintf(path, 26, "%stestfile", mp);
     _delete(path);

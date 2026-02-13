@@ -206,14 +206,13 @@ int ngfs_open_file(struct ngfs * fs, const char * name, struct io ** ioptr) {
     struct ngfs_io * fio;
     struct ngfs_file * f;
     struct ngfs_dir_entry * root_dir = &fs->root_dir;
-    struct ngfs_file * files_list = fs->files_list;
     trace("%s(%s,%p)", __func__, name, ioptr);
 
     if (strcmp(name, root_dir->name) == 0)
         return -EACCESS;
 
     rwlock_acquire(&fs->fs_lock, 1);
-    for(f = files_list; f != NULL; f = f->next) 
+    for(f = fs->files_list; f != NULL; f = f->next) 
         if (strcmp(name, f->dentry.name) == 0)
             break;
 
@@ -283,7 +282,6 @@ long ngfs_fetch(
     block = fio->block;
     offset = pos % NGFS_BLKSZ;
     for (remaining_len = bufsz; remaining_len > 0; ) {
-        debug("Block is now %u", block);
         assert(block != NGFS_BLOCK_END);
         
         read_len = MIN(remaining_len, NGFS_BLKSZ - offset);
@@ -349,13 +347,12 @@ long ngfs_store(
 
 int ngfs_create(struct filesystem * fs, const char * name) {
     trace("%s(%s)", __func__, name);
-    uint32_t file_idx;
+    uint32_t init_size, file_idx;
     struct ngfs_file * f;
     struct ngfs_dir_entry * root_entries;
     struct ngfs * ngfs = (void *)fs;
     struct cache * cache = ngfs->cache;
     struct ngfs_dir_entry * root_dir = &ngfs->root_dir;
-    uint32_t curr_size = root_dir->size;
 
     if (strlen(name) > NGFS_MAX_FILENAME_LEN || strlen(name) == 0)
         return -EINVAL;
@@ -372,19 +369,18 @@ int ngfs_create(struct filesystem * fs, const char * name) {
         }
     }
 
-    file_idx = (curr_size % NGFS_BLKSZ) / DENTRYSZ;
+    init_size = root_dir->size;
+    file_idx = (init_size % NGFS_BLKSZ) / DENTRYSZ;
 
-    if (update_size(ngfs, root_dir, curr_size + DENTRYSZ)) {
+    if (update_size(ngfs, root_dir, init_size + DENTRYSZ)) {
         rwlock_release(&ngfs->fs_lock);
         return -ENOMEM;
     }
 
-    debug("Creating file %s at index %d", name, curr_size / DENTRYSZ);
-
     root_entries = 
         get_cache_from_block(cache, 
         IDX_TO_ABS(blockno_to_block(cache, 
-        root_dir, curr_size / NGFS_BLKSZ)));
+        root_dir, init_size / NGFS_BLKSZ)));
 
     // Add to root directory
     root_entries[file_idx].size = 0;
@@ -463,8 +459,6 @@ int ngfs_delete(struct filesystem * fs, const char * name) {
         if (strcmp(name, dentry->name) == 0) {
             memcpy(dentry, &last_dentry, DENTRYSZ);
             free_associated_cache_block(cache, dentry, CACHE_DIRTY);
-            debug("Deleted file %s at index %d (replaced by %s)", 
-                name, idx, last_dentry.name);
             break;
         }
     }
@@ -694,7 +688,6 @@ uint32_t get_free_data_block(struct ngfs * fs) {
                 cache_flush(fs->cache);
 
                 free_block = fat_block * NGFS_FAT_ENTRIES_PER_BLOCK + idx;
-                debug("Allocated data block %lu", free_block);
                 return (free_block < fs->size / NGFS_BLKSZ - fs->num_fat_blocks) ?
                     free_block : NGFS_BLOCK_END;
             }
@@ -735,7 +728,6 @@ void free_blocks(struct cache * cache, uint32_t start) {
         assert(cur != NGFS_BLOCK_FREE);
         next = get_next_data_block(cache, cur);
         set_next_data_block(cache, cur, NGFS_BLOCK_FREE);
-        debug("Freed data block %lu", cur);
         cur = next;
     }
 }
