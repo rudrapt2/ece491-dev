@@ -19,6 +19,7 @@ OBJS = \
 	board/qvirt.o \
 	dev/uart.o \
 	dev/rtc.o \
+	dev/vioblk.o \
 	dev/virtio.o \
 	dev/viorng.o \
 	games/rule30-mp2.o \
@@ -59,6 +60,8 @@ QEMUOPTS = -global virtio-mmio.force-legacy=false
 QEMUOPTS += -machine virt -nographic
 QEMUOPTS += -object rng-random,filename=/dev/urandom,id=rng0
 QEMUOPTS += -device virtio-rng-device,rng=rng0
+QEMUOPTS += -drive file=ngfs.raw,id=blk0,if=none,format=raw,readonly=false
+QEMUOPTS += -device virtio-blk-device,drive=blk0
 QEMUOPTS += -bios bios/osbi181q.bin
 QEMUOPTS += -serial mon:stdio
 QEMUOPTS += -serial pty
