@@ -62,8 +62,10 @@ void handle_smode_exception(unsigned int cause, struct trap_frame* tfr) {
             case RISCV_SCAUSE_LOAD_PAGE_FAULT:
             case RISCV_SCAUSE_STORE_PAGE_FAULT:
 #ifndef MP2
+#ifndef MP3CP1
                 int handled = handle_umode_page_fault(tfr, csrr_stval());
                 if(handled)break; //If not handled just keep going until you hit the panic
+#endif
 #endif
             case RISCV_SCAUSE_INSTR_PAGE_FAULT:
             case RISCV_SCAUSE_LOAD_ADDR_MISALIGNED:
@@ -89,6 +91,7 @@ void handle_smode_exception(unsigned int cause, struct trap_frame* tfr) {
 }
 
 #ifndef MP2
+#ifndef MP3CP1
 void handle_umode_exception(unsigned int cause, struct trap_frame * tfr) {
 #ifdef STUDENT
     // YOUR CODE HERE
@@ -145,4 +148,5 @@ void handle_umode_exception(unsigned int cause, struct trap_frame * tfr) {
     process_exit();
 #endif // STUDENT
 }
+#endif // MP3CP1
 #endif // MP2

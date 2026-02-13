@@ -4,18 +4,18 @@
 // SPDX-License-identifier: NCSA
 //
 
-#include "../io.h"
-#include "../ioimpl.h"
-#include "../intr.h"
-#include "../heap.h"
-#include "../conf.h"
-#include "../misc.h"
-#include "../error.h"
-#include "../device.h"
-#include "../thread.h"
-#include "../string.h"
-#include "../console.h"
-#include "../memory.h"
+#include "io.h"
+#include "ioimpl.h"
+#include "intr.h"
+#include "heap.h"
+#include "conf.h"
+#include "misc.h"
+#include "error.h"
+#include "device.h"
+#include "thread.h"
+#include "string.h"
+#include "console.h"
+#include "memory.h"
 #include "virtio.h"
 
 #include <limits.h>

@@ -284,70 +284,13 @@ int rand(void) {
 #endif
 
 #if defined (AEE31)
-#include "usr/uio.h"
-#include "kernel/string.h"
-
-static char getchar(void);
+#include "usr/io.h"
 
 static unsigned long rndst = 0;
-static struct uio *uio_trek;
+static struct io_term io_trek;
 
-// long uio_read(struct io * io, void * buf, long bufsz) {
-//     // no assert :(
-// 	if (io == NULL) {
-// 		printf("Error: passed I/O pointer is NULL\n");
-// 		return -1;
-// 	}
-	
-// 	if (io->intf == NULL) {
-// 		printf("Error: I/O interface of passed I/O pointer is NULL");
-// 		return -1;
-// 	}
-
-//     if (io->intf->read == NULL)
-//         return -1;
-    
-//     if (bufsz < 0)
-//         return -1;
-    
-//     return io->intf->read(io, buf, bufsz);
-// }
-
-// long iowrite(struct io * io, const void * buf, long len) {
-// 	long bufpos = 0; // position in buffer for next write
-//     long n; // result of last write
-
-// 	// no assert :(
-// 	if (io == NULL) {
-// 		printf("Error: passed I/O pointer is NULL\n");
-// 		return -1;
-// 	}
-	
-// 	if (io->intf == NULL) {
-// 		printf("Error: I/O interface of passed I/O pointer is NULL");
-// 		return -1;
-// 	}
-    
-//     if (io->intf->write == NULL)
-//         return -1;
-
-//     if (len < 0)
-//         return -1;
-    
-//     do {
-//         n = io->intf->write(io, buf+bufpos, len-bufpos);
-
-//         if (n <= 0)
-//             return (n < 0) ? n : bufpos;
-
-//         bufpos += n;
-//     } while (bufpos < len);
-
-//     return bufpos;
-// }
-
-void main(struct uio *uio) {
-	uio_trek = uio;
+void main(struct io *io) {
+    ioterm_init(&io_trek, io);
 	extern void trek_main(void);
 #ifndef RAND_SEED
 	asm ("rdtime\t%0" : "=r"(rndst));
@@ -357,82 +300,20 @@ void main(struct uio *uio) {
 	trek_main();
 }
 
-char gluegetc(void) {
-	return uio_getc(uio_trek);
-}
-
-void glueputc(char c) {
-	uio_putc(uio_trek, c);
-}
-
 void printf(const char * fmt, ...) {
-	extern size_t vgprintf (
-		void (*putcfn)(char, void*), void * aux,
-		const char * fmt, va_list ap);
-
 	va_list ap;
 
 	va_start(ap, fmt);
-	vgprintf((void *)putchar, NULL, fmt, ap);
+    iovprintf(&io_trek.io, fmt, ap);
 	va_end(ap);
 }
 
 void puts(const char * s) {
-	const char * start;
-
-	// Try to minimize the number of device_write calls by writing multiple
-	// characters that are not \n at once.
-
-	if (s != NULL) {
-		for (;;) {
-			start = s;
-			while (*s != '\0' && *s != '\n')
-				s += 1;
-			if (s != start)
-				uio_write(uio_trek, start, s - start);
-			uio_write(uio_trek, "\r\n", 2);
-			if (*s == '\0')
-				break;
-			s += 1;
-		}
-	}
+    ioputs(&io_trek.io, s);
 }
 
 char * getsn(char * buf, size_t n) {
-	char * p = buf;
-	char c;
-
-	for (;;) {
-		c = getchar();
-
-		switch (c) {
-		case '\r':
-			break;		
-		case '\n':
-			putchar('\n');
-			*p = '\0';
-			return buf;
-		case '\b':
-		case '\177':
-			if (p != buf) {
-				putchar('\b');
-				putchar(' ');
-				putchar('\b');
-
-				p -= 1;
-				n += 1;
-			}
-			break;
-		default:
-			if (n > 1) {
-				putchar(c);
-				*p++ = c;
-				n -= 1;
-			} else
-				putchar('\a'); // bell
-			break;
-		}
-	}
+    return ioterm_getsn(&io_trek, buf, n);
 }
 
 int rand(void) {
@@ -441,30 +322,8 @@ int rand(void) {
 	return (rndst >> 12) % (RAND_MAX + 1);
 }
 
-char getchar(void) {
-	static char cprev = '\0';
-	char c;
-
-	// Convert \r followed by any number of \n to just \n
-
-	do {
-		c = gluegetc();
-	} while (c == '\n' && cprev == '\r');
-	
-	cprev = c;
-
-	if (c == '\r')
-		return '\n';
-	else
-		return c;
-}
-
 void putchar(char c) {
-	// Convert \n to \r\n
-
-	if (c == '\n')
-		glueputc('\r');
-	glueputc(c);
+	ioputc(&io_trek.io, c);
 }
 #endif
 
@@ -484,7 +343,7 @@ void main(void) {
 #else
 	rndst = RAND_SEED;
 #endif
-    _open(2, "dev/uart1");
+    _open(2, "/dev/uart1");
 	trek_main();
 }
 

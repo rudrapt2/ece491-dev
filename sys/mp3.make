@@ -11,6 +11,8 @@ OBJCOPY=$(PREFIX)objcopy
 OBJDUMP=$(PREFIX)objdump
 UNIFDEF=unifdef
 
+CP1=0
+
 OBJS = \
 	start.o \
 	main.o \
@@ -28,6 +30,7 @@ OBJS = \
 	thread.o \
 	thrasm.o \
 	trap.o \
+	io.o \
 	filesys.o \
 	trap.o \
 	excp.o \
@@ -36,13 +39,12 @@ OBJS = \
 	misc.o \
 	device.o \
 	elf.o \
-	memory.o \
-	process.o \
 	cache.o \
 	timer.o \
 	device.o \
 	sbi.o \
-	fs/ngfs.o
+	fs/ngfs.o \
+	fs/ktfs.o
 
 CFLAGS = -Wall -Werror=implicit-function-declaration -Wno-unused-function
 CFLAGS += -fno-omit-frame-pointer -ggdb3 -gdwarf-2
@@ -52,15 +54,27 @@ CFLAGS += -fno-asynchronous-unwind-tables -mno-riscv-attribute
 CFLAGS += -I.
 
 # CFLAGS += -DDEBUG -DTRACE # Everything!
+
 # CFLAGS += -DMEMORY_DEBUG -DMEMORY_TRACE
 # CFLAGS += -DHEAP_DEBUG -DHEAP_TRACE
-# CFLAGS += -DPROCESS_DEBUG -DPROCESS_TRACE
-# CFLAGS += -DMAIN_DEBUG -DMAIN_TRACE
-# CFLAGS += -DSYSCALL_DEBUG -DSYSCALL_TRACE
+
 # CFLAGS += -DTHREAD_DEBUG -DTHREAD_TRACE
-# CFLAGS += -DTIMER_DEBUG -DTIMER_TRACE
-# CFLAGS += -DCACHE_DEBUG -DCACHE_TRACE
+# CFLAGS += -DLOCK_DEBUG -DLOCK_TRACE
+# CFLAGS += -DPROCESS_DEBUG -DPROCESS_TRACE
+# CFLAGS += -DSYSCALL_DEBUG -DSYSCALL_TRACE
 # CFLAGS += -DELF_DEBUG -DELF_TRACE
+
+# CFLAGS += -DIO_DEBUG -DIO_TRACE
+# CFLAGS += -DVIRTIO_DEBUG -DVIRTIO_TRACE
+# CFLAGS += -DTIMER_DEBUG -DTIMER_TRACE
+# CFLAGS += -DVIOGPU_DEBUG -DVIOGPU_TRACE
+# CFLAGS += -DVIOBLK_DEBUG -DVIOBLK_TRACE
+
+# CFLAGS += -DCACHE_DEBUG -DCACHE_TRACE
+# CFLAGS += -DKTFS_DEBUG -DKTFS_TRACE
+# CFLAGS += -DNGFS_DEBUG -DNGFS_TRACE
+
+# CFLAGS += -DMAIN_DEBUG -DMAIN_TRACE
 
 
 ASFLAGS = -march=rv64imazicsr
@@ -76,10 +90,25 @@ QEMUOPTS += -serial mon:stdio
 QEMUOPTS += -serial pty
 QEMUOPTS += -serial pty
 QEMUOPTS += -device virtio-blk-device,drive=blk0
-QEMUOPTS += -drive file=ngfs.raw,id=blk0,if=none,format=raw,readonly=false
+QEMUOPTS += -drive file=fs/ngfs.raw,id=blk0,if=none,format=raw,readonly=false
+QEMUOPTS += -device virtio-blk-device,drive=blk1
+QEMUOPTS += -drive file=fs/ktfs.raw,id=blk1,if=none,format=raw,readonly=false
 
 VIDEO_QEMUOPTS = $(QEMUOPTS)
 VIDEO_QEMUOPTS += -device virtio-gpu-device -display gtk
+VIDEO_QEMUOPTS += -device virtio-keyboard-device -device virtio-tablet-device
+
+ifeq ($(CP1), 1)
+	CFLAGS += -DMP3CP1
+    ASFLAGS += -defsym MP3CP1=1
+else
+    OBJS += \
+    dev/viogpu.o \
+    dev/viohi.o \
+	memory.o \
+	process.o \
+	syscall.o 
+endif
 
 all: kernel.elf
 

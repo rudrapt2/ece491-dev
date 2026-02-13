@@ -12,7 +12,7 @@ OBJDUMP=$(TOOLPREFIX)objdump
 UMODE := 1
 
 ULIB_OBJS = \
-	uio.o \
+	io.o \
 	heap.o \
 	error.o \
 	string.o \

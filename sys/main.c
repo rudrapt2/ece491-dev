@@ -6,6 +6,7 @@
 
 #include "conf.h"
 #include "console.h"
+#include "elf.h"
 #include "intr.h"
 #include "plic.h"
 #include "device.h"
@@ -26,7 +27,12 @@
 #endif
 
 #ifndef MP2
+#ifndef MP3CP1
 #define INITEXE "shell"
+#else
+#define INITEXE "trek-cp1"
+#define CONSOLEDEV "uart1"
+#endif
 
 #define CMNTNAME "c" // ngfs
 #define DMNTNAME "d" // ktfs
@@ -58,8 +64,10 @@ void main(unsigned int hartid, void * dtb) {
 
 #ifndef MP2
     // MP3 stuff
+#ifndef MP3CP1
     memory_init();
     procmgr_init();
+#endif
     fsmgr_init();
 #endif
 
@@ -103,7 +111,6 @@ void mount_drive(char * mntname, char * devname,
 
 #ifndef MP2
 void exec_init() {
-    char * argv[] = { NULL };
     struct io * initexe;
     int result;
     
@@ -114,11 +121,42 @@ void exec_init() {
         halt();
     }
 
-    // Make descriptor 0 be a null uio object, which the shell will need
+#ifdef MP3CP1
+    void (*entry)(void);
+    int tid;
+    struct io * uartio;
+    result = open_device(CONSOLEDEV, &uartio);
+
+    if (result != 0) {
+        kprintf(CONSOLEDEV ": %s; terminating\n", error_name(result));
+        halt();
+    }
+
+    // load the executable into memory
+    result = elf_load(initexe, &entry);
+
+    if (result != 0) {
+        kprintf(INITEXE ": %s; terminating\n", error_name(result));
+        halt();
+    }
+
+    // launch the executable
+    tid = spawn_thread(INITEXE, entry, uartio);
+
+    if (tid < 0) {
+        kprintf("spawn thread: %s; terminating\n", error_name(result));
+        halt();
+    }
+
+    join_thread(tid);
+#else
+    char * argv[] = { NULL };
+    // Make descriptor 0 be a null io object, which the shell will need
 
     current_process()->iotab[0] = create_nullio();
 
     process_exec(initexe, 0, argv);
+#endif
 }
 #endif
 

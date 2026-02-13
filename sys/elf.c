@@ -126,9 +126,11 @@ int elf_load(struct io * io, void (**eptr)(void)) {
     unsigned long long size;
     unsigned long long pos;
     long result;
-    int pte_flags;
     int entry_ok = 0;
+#ifndef MP3CP1
+    int pte_flags;
     size_t memsz;
+#endif
 
     trace("%s(elfio=%p,eptr=%p)", __func__, io, eptr);
 
@@ -225,16 +227,6 @@ int elf_load(struct io * io, void (**eptr)(void)) {
             continue;
         }
 
-        if (phdr.p_vaddr < UMEM_START_VMA || UMEM_END_VMA <= phdr.p_vaddr) {
-            debug("p_vaddr out of range");
-            return -EBADFMT;
-        }
-
-        if (UMEM_END_VMA - phdr.p_vaddr < phdr.p_memsz) {
-            debug("p_memsz out of range");
-            return -EBADFMT;
-        }
-
         if (phdr.p_memsz < phdr.p_filesz) {
             debug("p_filesz larger than p_memsz");
             return -EBADFMT;
@@ -242,19 +234,10 @@ int elf_load(struct io * io, void (**eptr)(void)) {
 
         // Alignment must be a multiple of PAGE_SIZE
 
-        if (phdr.p_align == 0 || phdr.p_align % PAGE_SIZE) {
-            debug("p_align not a multiple of page size (%lu)", PAGE_SIZE);
-            return -EBADFMT;
-        }
-
         if (phdr.p_vaddr % phdr.p_align) {
             debug("p_vaddr not %lu-byte aligned (p_align)", phdr.p_align);
             return -EBADFMT;
         }
-
-        // Round up p_memsz to page boundary boundary
-
-        memsz = (phdr.p_memsz + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
 
         // Check flags. All regions should be readable.
 
@@ -262,14 +245,6 @@ int elf_load(struct io * io, void (**eptr)(void)) {
             debug("Program region with neither PF_R nor PF_X flags set");
             return -EBADFMT;
         }
-
-        pte_flags = PTE_U;
-        if (phdr.p_flags & PF_R)
-            pte_flags |= PTE_R;
-        if (phdr.p_flags & PF_W)
-            pte_flags |= PTE_W;
-        if (phdr.p_flags & PF_X)
-            pte_flags |= PTE_X;
         
         // Check if entry is in current region and the region is executable.
 
@@ -284,7 +259,35 @@ int elf_load(struct io * io, void (**eptr)(void)) {
             entry_ok = 1;
         }
 
+#ifndef MP3CP1 // vmem checks
+        if (phdr.p_vaddr < UMEM_START_VMA || UMEM_END_VMA <= phdr.p_vaddr) {
+            debug("p_vaddr out of range");
+            return -EBADFMT;
+        }
+
+        if (UMEM_END_VMA - phdr.p_vaddr < phdr.p_memsz) {
+            debug("p_memsz out of range");
+            return -EBADFMT;
+        }
+
+        if (phdr.p_align == 0 || phdr.p_align % PAGE_SIZE) {
+            debug("p_align not a multiple of page size (%lu)", PAGE_SIZE);
+            return -EBADFMT;
+        }
+        // Round up p_memsz to page boundary boundary
+
+        memsz = (phdr.p_memsz + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
+
+        pte_flags = PTE_U;
+        if (phdr.p_flags & PF_R)
+            pte_flags |= PTE_R;
+        if (phdr.p_flags & PF_W)
+            pte_flags |= PTE_W;
+        if (phdr.p_flags & PF_X)
+            pte_flags |= PTE_X;
+
         alloc_and_map_range(phdr.p_vaddr, memsz, PTE_R | PTE_W | PTE_U);
+#endif
 
         if (phdr.p_filesz != 0) {
             debug("PH[%d] Loading %d bytes at address %p from file offset 0x%lx",
@@ -313,8 +316,10 @@ int elf_load(struct io * io, void (**eptr)(void)) {
                 phdr.p_memsz - phdr.p_filesz);
         }
 
+#ifndef MP3CP1 
         if (pte_flags != (PTE_R | PTE_W | PTE_U))
             set_range_flags((void*)phdr.p_vaddr, memsz, pte_flags);
+#endif
     }
 
     if (!entry_ok) {

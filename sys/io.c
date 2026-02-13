@@ -474,7 +474,7 @@ int memio_ioctl(struct io * io, int op, void * arg) {
 #endif
 }
 #ifndef MP2
-
+#ifndef MP3CP1
 
 // IOPIPE INTERNAL TYPE DEFINITIONS
 //
@@ -644,4 +644,5 @@ void iopipe_reclaim(struct iopipe * p) {
     free_phys_page(p->buf);
     kfree(p);
 }
+#endif // MP3CP1
 #endif // MP2

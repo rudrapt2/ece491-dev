@@ -115,6 +115,8 @@ static int find_evictable(struct cache * cache);
 
 static void cache_writeback_thrfn(struct cache * cache);
 
+extern char _kimg_blob_start[]; // TEMPORARY
+
 // EXPORTED FUNCTION DEFINITIONS
 //
 
@@ -143,8 +145,12 @@ struct cache * create_cache(struct io * bkgio, unsigned long cache_blksz) {
     condition_init(&cache->writable, "cache.writable");
     condition_init(&cache->nodirty, "cache.nodirty");
 
+#ifndef MP3CP1
     cache->blkbuf = alloc_phys_pages (
         (CACHE_CAPACITY * cache_blksz + PAGE_SIZE-1) / PAGE_SIZE);
+#else
+    cache->blkbuf = _kimg_blob_start;
+#endif
 
     for (i = 0; i < CACHE_CAPACITY; i++)
         cache->entries[i].pos = -1ULL;
@@ -157,7 +163,9 @@ struct cache * create_cache(struct io * bkgio, unsigned long cache_blksz) {
         "cache_writeback", (void(*)(void))&cache_writeback_thrfn, cache);
     
     assert (0 <= cache->wtid);
+#ifndef MP3CP1
     thread_attach_process(cache->wtid, NULL);
+#endif
 
     return cache;
 }

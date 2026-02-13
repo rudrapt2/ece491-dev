@@ -1,190 +1,226 @@
-/*! @file uio.c
-    @brief Uniform I/O object
-    @copyright Copyright (c) 2024-2025 University of Illinois
-    @license SPDX-License-identifier: NCSA
-    
-*/
-#include "uio.h"
-#include "error.h"
+// io.c - Generic I/O objects
+//
+// Copyright (c) 2026 University of Illinois
+// SPDX-License-identifier: NCSA
+//
 
-#include <stddef.h>
+#include "io.h"
+#include "error.h"
 
 // INTERNAL TYPE DEFINITIONS
 //
 
-struct uiovprintf_state {
-    struct uio * uio;
+struct iovprintf_state {
+    struct io * io;
     int err;
 };
 
 // INTERNAL FUNCTION DECLARATIONS
 //
 
-/**
- * @brief Closes the "raw" Uniform I/O object
- * @param uio The Uniform I/O abstraction to interact with
- * @return None
- */
-static void uioterm_close(struct uio * uio);
+static void ioterm_reclaim(struct io * io);
+static long ioterm_read(struct io * io, void * buf, long len);
+static long ioterm_write(struct io * io, const void * buf, long len);
+static int ioterm_ioctl(struct io * io, int cmd, void * arg);
+static void iovprintf_putc(char c, void * aux);
 
-/**
- * @brief Reads from the "raw" Uniform I/O object with input CRLF normalization
- * @param uio The Uniform I/O abstraction to interact with
- * @param buf Buffer to copy data into
- * @param len Size of passed buffer in bytes
- * @return Number of bytes read
- */
-static long uioterm_read(struct uio * uio, void * buf, unsigned long len);
-
-/**
- * @brief Writes to the "raw" Uniform I/O object with output CRLF normalization
- * @param uio The Uniform I/O abstraction to interact with
- * @param buf Buffer to copy data from
- * @param len Size of passed buffer in bytes
- * @return Number of bytes written
- */
-static long uioterm_write(struct uio * uio, const void * buf, unsigned long len);
-
-/**
- * @brief Passes fcntls through to the backing "raw" Uniform I/O interface
- * @param uio The Uniform I/O abstraction to interact with
- * @param cmd Operation to perform
- * @param arg Additional argument for operation (if needed)
- * @return Output of _ioctl_ if successfully called, negative error code otherwise 
- */
-static int uioterm_cntl(struct uio * uio, int cmd, void * arg);
-
-/**
- * @brief Writes a character to the backing Uniform I/O if it is not in error state
- * @param c The character to be written
- * @param arg Pointer holding reference to the Uniform I/O abstraction and it's error state
- * @return None
- */
-static void uio_vprintf_putc(char c, void * aux);
-
-// EXPORTED FUNCTION DEFINITIONS
+// IO EXPORTED FUNCTION DEFINITIONS
 //
 
-unsigned long uio_refcnt(const struct uio * uio) {
-    return uio->refcnt;
+struct io * ioinit (
+    struct io * io,
+    const struct iointf * intf,
+    unsigned int blksz,
+    unsigned int refcnt)
+{
+    io->intf = intf;
+    io->blksz = blksz;
+    io->refcnt = refcnt;
+    return io;
 }
 
-int uio_addref(struct uio * uio) {
-    return ++uio->refcnt;
+unsigned int ioblksz(const struct io * io) {
+    return io->blksz;
 }
 
-void uio_close(struct uio * uio) {
-  if (uio->refcnt > 0)
-  {
-    uio->refcnt--;
-  }
-
-  if (uio->refcnt == 0 && uio->intf->close != NULL)
-  {
-    uio->intf->close(uio);
-  }
+unsigned int iorefcnt(const struct io * io) {
+    return io->refcnt;
 }
 
-long uio_read(struct uio * uio, void * buf, unsigned long bufsz) {
-    if (uio->intf->read != NULL) {
-        if (0 <= (long)bufsz)
-            return uio->intf->read(uio, buf, bufsz);
-        else
-            return -EINVAL;
-    } else
+struct io * ioaddref(struct io * io) {
+    io->refcnt += 1;
+    return io;
+}
+
+void iodropref(struct io * io) {
+	if (io->refcnt == 0) {
+        return;
+    }
+
+    io->refcnt -= 1;
+
+    if (io->refcnt == 0 && io->intf->reclaim != NULL)
+        io->intf->reclaim(io);
+}
+
+long ioread(struct io * io, void * buf, long bufsz) {
+    if (io->intf->read == NULL)
         return -ENOTSUP;
+    
+    if (bufsz < 0)
+        return -EINVAL;
+    
+    if (bufsz != 0 && bufsz < io->blksz)
+        return -EINVAL;
+    
+    return io->intf->read(io, buf, (bufsz / io->blksz) * io->blksz);
 }
 
-long uio_write(struct uio * uio, const void * buf, unsigned long buflen) {
-    if (uio->intf->write != NULL) {
-        if (0 <= (long)buflen)
-            return uio->intf->write(uio, buf, buflen);
-        else
-            return -EINVAL;
-    } else
+long iofill(struct io * io, void * buf, long bufsz) {
+    (void)io;
+    (void)buf;
+    (void)bufsz;
+    return -ENOTSUP;
+}
+
+long iowrite(struct io * io, const void * buf, long buflen) {
+    if (io->intf->write == NULL)
         return -ENOTSUP;
+    
+    if (buflen < 0)
+        return -EINVAL;
+    
+    if (buflen != 0 && buflen < io->blksz)
+        return -EINVAL;
+    
+    return io->intf->write(io, buf, (buflen / io->blksz) * io->blksz);
 }
 
-int uio_cntl(struct uio * uio, int op, void * arg) {
-    if (uio->intf->cntl != NULL)
-        return uio->intf->cntl(uio, op, arg);
+long iofetch(struct io * io, unsigned long long pos, void * buf, long buflen) {
+    if (io->intf->fetch == NULL)
+        return -ENOTSUP;
+    
+    if (buflen < 0)
+        return -EINVAL;
+    
+    if (buflen != 0 && buflen < io->blksz)
+        return -EINVAL;
+    
+    if (pos % io->blksz != 0 || buflen % io->blksz != 0)
+        return -EINVAL;
+    
+    return io->intf->fetch(io, pos, buf, buflen);
+}
+
+long iostore(struct io * io, unsigned long long pos, const void * buf, long buflen) {
+    if (io->intf->fetch == NULL)
+        return -ENOTSUP;
+    
+    if (buflen < 0)
+        return -EINVAL;
+    
+    if (buflen != 0 && buflen < io->blksz)
+        return -EINVAL;
+    
+    if (pos % io->blksz != 0 || buflen % io->blksz != 0)
+        return -EINVAL;
+    
+    return io->intf->store(io, pos, buf, buflen);
+}
+
+int ioctl(struct io * io, int op, void * arg) {
+    if (op == IOC_GETBLKSZ)
+        return io->blksz;
+    
+    if (io->intf->ioctl != NULL)
+        return io->intf->ioctl(io, op, arg);
     else
         return -ENOTSUP;
 }
 
-int uio_puts(struct uio * uio, const char * s) {
+int ioctl_u(struct io * io, int op, uintptr_t u_arg) {
+    if (op == IOC_GETBLKSZ)
+        return io->blksz;
+    
+    if (io->intf->ioctl_u != NULL)
+        return io->intf->ioctl_u(io, op, u_arg);
+    else
+        return -ENOTSUP;
+}
+
+int ioputs(struct io * io, const char * s) {
     const char nl = '\n';
     size_t slen;
     long wlen;
 
     slen = strlen(s);
 
-    wlen = uio_write(uio, s, slen);
+    wlen = iowrite(io, s, slen);
     if (wlen < 0)
         return wlen;
 
     // Write newline
 
-    wlen = uio_write(uio, &nl, 1);
+    wlen = iowrite(io, &nl, 1);
     if (wlen < 0)
         return wlen;
     
     return 0;
 }
 
-long uio_printf(struct uio * uio, const char * fmt, ...) {
+long ioprintf(struct io * io, const char * fmt, ...) {
 	va_list ap;
 	long result;
 
 	va_start(ap, fmt);
-	result = uio_vprintf(uio, fmt, ap);
+	result = iovprintf(io, fmt, ap);
 	va_end(ap);
 	return result;
 }
 
-long uio_vprintf(struct uio * uio, const char * fmt, va_list ap) {
+long iovprintf(struct io * io, const char * fmt, va_list ap) {
     // state.nout is number of chars written or negative error code
-    struct uiovprintf_state state = { .uio = uio, .err = 0 };
+    struct iovprintf_state state = { .io = io, .err = 0 };
     size_t nout;
 
-	nout = vgprintf(uio_vprintf_putc, &state, fmt, ap);
+	nout = vgprintf(iovprintf_putc, &state, fmt, ap);
     return state.err ? state.err : nout;
 }
 
-struct uio * uioterm_init(struct uioterm * uiot, struct uio * rawuio) {
-    static const struct uio_intf ops = {
-        .close = uioterm_close,
-        .read = uioterm_read,
-        .write = uioterm_write,
-        .cntl = uioterm_cntl
+struct io * ioterm_init(struct io_term * iot, struct io * rawio) {
+    static const struct iointf ops = {
+        .reclaim = ioterm_reclaim,
+        .read = ioterm_read,
+        .write = ioterm_write,
+        .ioctl = ioterm_ioctl
     };
 
-    uiot->uio.intf = &ops;
-    uiot->rawuio = rawuio;
-    uiot->cr_out = 0;
-    uiot->cr_in = 0;
+    ioinit(&iot->io, &ops, 1, 1);
+    iot->rawio = rawio;
+    iot->cr_out = 0;
+    iot->cr_in = 0;
 
-    return &uiot->uio;
+    return &iot->io;
 };
 
-char * uioterm_getsn(struct uioterm * uiot, char * buf, size_t n) {
+char * ioterm_getsn(struct io_term * iot, char * buf, size_t n) {
     char * p = buf;
     int result;
     char c;
 
     for (;;) {
-        c = uio_getc(&uiot->uio); // already CRLF normalized
+        c = iogetc(&iot->io); // already CRLF normalized
 
         switch (c) {
         case '\133': // escape
-            uiot->cr_in = 0;
+            iot->cr_in = 0;
             break;
         case '\r': // should not happen      
         case '\n':
-            result = uio_putc(uiot->rawuio, '\r');
+            result = ioputc(iot->rawio, '\r');
             if (result < 0)
                 return NULL;
-            result = uio_putc(uiot->rawuio, '\n');
+            result = ioputc(iot->rawio, '\n');
             if (result < 0)
                 return NULL;
             *p = '\0';
@@ -195,15 +231,15 @@ char * uioterm_getsn(struct uioterm * uiot, char * buf, size_t n) {
                 p -= 1;
                 n += 1;
                 
-                result = uio_putc(uiot->rawuio, '\b');
+                result = ioputc(iot->rawio, '\b');
                 if (result < 0)
                     return NULL;
-                result = uio_putc(uiot->rawuio, ' ');
+                result = ioputc(iot->rawio, ' ');
                 if (result < 0)
                     return NULL;
-                result = uio_putc(uiot->rawuio, '\b');
+                result = ioputc(iot->rawio, '\b');
             } else
-                result = uio_putc(uiot->rawuio, '\a'); // beep
+                result = ioputc(iot->rawio, '\a'); // beep
             
             if (result < 0)
                 return NULL;
@@ -211,11 +247,11 @@ char * uioterm_getsn(struct uioterm * uiot, char * buf, size_t n) {
 
         default:
             if (n > 1) {
-                result = uio_putc(uiot->rawuio, c);
+                result = ioputc(iot->rawio, c);
                 *p++ = c;
                 n -= 1;
             } else
-                result = uio_putc(uiot->rawuio, '\a'); // beep
+                result = ioputc(iot->rawio, '\a'); // beep
             
             if (result < 0)
                 return NULL;
@@ -223,22 +259,22 @@ char * uioterm_getsn(struct uioterm * uiot, char * buf, size_t n) {
     }
 }
 
-void uioterm_close(struct uio * uio) {
-    struct uioterm * const uiot = (void*)uio - offsetof(struct uioterm, uio);
-    uio_close(uiot->rawuio);
+void ioterm_reclaim(struct io * io) {
+    struct io_term * const iot = (void*)io - offsetof(struct io_term, io);
+    iodropref(iot->rawio);
 }
 
-long uioterm_read(struct uio * uio, void * buf, unsigned long len) {
-    struct uioterm * const uiot = (void*)uio - offsetof(struct uioterm, uio);
+long ioterm_read(struct io * io, void * buf, long len) {
+    struct io_term * const iot = (void*)io - offsetof(struct io_term, io);
     char * rp;
     char * wp;
     long cnt;
     char ch;
 
     do {
-        // Fill buffer using backing uio interface
+        // Fill buffer using backing io interface
 
-        cnt = uio_read(uiot->rawuio, buf, len);
+        cnt = ioread(iot->rawio, buf, len);
 
         if (cnt < 0)
             return cnt;
@@ -260,22 +296,22 @@ long uioterm_read(struct uio * uio, void * buf, unsigned long len) {
         while ((void*)rp < buf+cnt) {
             ch = *rp++;
 
-            if (uiot->cr_in) {
+            if (iot->cr_in) {
                 switch (ch) {
                 case '\r':
                     *wp++ = '\n';
                     break;
                 case '\n':
-                    uiot->cr_in = 0;
+                    iot->cr_in = 0;
                     break;
                 default:
-                    uiot->cr_in = 0;
+                    iot->cr_in = 0;
                     *wp++ = ch;
                 }
             } else {
                 switch (ch) {
                 case '\r':
-                    uiot->cr_in = 1;
+                    iot->cr_in = 1;
                     *wp++ = '\n';
                     break;
                 default:
@@ -292,8 +328,8 @@ long uioterm_read(struct uio * uio, void * buf, unsigned long len) {
     return (wp - (char*)buf);
 }
 
-long uioterm_write(struct uio * uio, const void * buf, unsigned long len) {
-    struct uioterm * const uiot = (void*)uio - offsetof(struct uioterm, uio);
+long ioterm_write(struct io * io, const void * buf, long len) {
+    struct io_term * const iot = (void*)io - offsetof(struct io_term, io);
     long acc = 0; // how many bytes from the buffer have been written
     const char * wp;  // everything up to /wp/ in buffer has been written out
     const char * rp;  // position in buffer we're reading
@@ -305,10 +341,10 @@ long uioterm_write(struct uio * uio, const void * buf, unsigned long len) {
     // are not modified. We can't modify the buffer, so mwe may need to do
     // partial writes.
     // The strategy we want to implement is:
-    // if cr_out = 0 and ch == '\r': output \r\n to rawuio, cr_out <- 1;
-    // if cr_out = 0 and ch == '\n': output \r\n to rawuio;
-    // if cr_out = 0 and ch != '\r' and ch != '\n': output ch to rawuio;
-    // if cr_out = 1 and ch == '\r': output \r\n to rawuio;
+    // if cr_out = 0 and ch == '\r': output \r\n to rawio, cr_out <- 1;
+    // if cr_out = 0 and ch == '\n': output \r\n to rawio;
+    // if cr_out = 0 and ch != '\r' and ch != '\n': output ch to rawio;
+    // if cr_out = 1 and ch == '\r': output \r\n to rawio;
     // if cr_out = 1 and ch == '\n': no ouput, cr_out <- 0;
     // if cr_out = 1 and ch != '\r' and ch != '\n': output ch, cr_out <- 0.
 
@@ -323,12 +359,12 @@ long uioterm_write(struct uio * uio, const void * buf, unsigned long len) {
             // from the buffer so far, then write \n, and then continue.
             if ((void*)rp < buf+len && *rp == '\n') {
                 // The easy case: buffer already contains \r\n, so keep going.
-                uiot->cr_out = 0;
+                iot->cr_out = 0;
                 rp += 1;
             } else {
                 // Next character is not '\n' or we're at the end of the buffer.
                 // We need to write out what we have so far and add a \n.
-                cnt = uio_write(uiot->rawuio, wp, rp - wp);
+                cnt = iowrite(iot->rawio, wp, rp - wp);
                 if (cnt < 0)
                     return cnt;
                 else if (cnt == 0)
@@ -338,11 +374,11 @@ long uioterm_write(struct uio * uio, const void * buf, unsigned long len) {
                 wp += cnt;
 
                 // Now output \n, which does not count toward /acc/.
-                cnt = uio_putc(uiot->rawuio, '\n');
+                cnt = ioputc(iot->rawio, '\n');
                 if (cnt < 0)
                     return cnt;
                 
-                uiot->cr_out = 1;
+                iot->cr_out = 1;
             }
                 
             break;
@@ -352,8 +388,8 @@ long uioterm_write(struct uio * uio, const void * buf, unsigned long len) {
             // the beginning of the buffer, because we check for a \n after a
             // \r, except if \r is the last character in the buffer. Since we're
             // at the start of the buffer, we don't have to write anything out.
-            if (uiot->cr_out) {
-                uiot->cr_out = 0;
+            if (iot->cr_out) {
+                iot->cr_out = 0;
                 wp += 1;
                 break;
             }
@@ -363,7 +399,7 @@ long uioterm_write(struct uio * uio, const void * buf, unsigned long len) {
             // out what we have so far, up to, but not including the \n we're
             // processing.
             if (wp != rp-1) {
-                cnt = uio_write(uiot->rawuio, wp, rp-1 - wp);
+                cnt = iowrite(iot->rawio, wp, rp-1 - wp);
                 if (cnt < 0)
                     return cnt;
                 else if (cnt == 0)
@@ -372,23 +408,23 @@ long uioterm_write(struct uio * uio, const void * buf, unsigned long len) {
                 wp += cnt;
             }
             
-            cnt = uio_putc(uiot->rawuio, '\r');
+            cnt = ioputc(iot->rawio, '\r');
             if (cnt < 0)
                 return cnt;
             
             // wp should now point to \n. We'll write it when we drain the
             // buffer later.
 
-            uiot->cr_out = 0;
+            iot->cr_out = 0;
             break;
             
         default:
-            uiot->cr_out = 0;
+            iot->cr_out = 0;
         }
     }
 
     if (rp != wp) {
-        cnt = uio_write(uiot->rawuio, wp, rp - wp);
+        cnt = iowrite(iot->rawio, wp, rp - wp);
 
         if (cnt < 0)
             return cnt;
@@ -400,23 +436,23 @@ long uioterm_write(struct uio * uio, const void * buf, unsigned long len) {
     return acc;
 }
 
-int uioterm_cntl(struct uio * uio, int cmd, void * arg) {
-    struct uioterm * const uiot = (void*)uio - offsetof(struct uioterm, uio);
+int ioterm_ioctl(struct io * io, int cmd, void * arg) {
+    struct io_term * const iot = (void*)io - offsetof(struct io_term, io);
 
-    // Pass ufcntls through to backing uio interface. Seeking is not supported,
+    // Pass ioctls through to backing io interface. Seeking is not supported,
     // because we maintain state on the characters output so far.
-    if (cmd != FCNTL_SETPOS)
-        return uio_cntl(uiot->rawuio, cmd, arg);
+    if (cmd != IOC_SETPOS)
+        return ioctl(iot->rawio, cmd, arg);
     else
         return -ENOTSUP;
 }
 
-void uio_vprintf_putc(char c, void * aux) {
-    struct uiovprintf_state * const state = aux;
+void iovprintf_putc(char c, void * aux) {
+    struct iovprintf_state * const state = aux;
     int result;
 
     if (state->err == 0) {
-        result = uio_putc(state->uio, c);
+        result = ioputc(state->io, c);
         if (result < 0)
             state->err = result;
     }

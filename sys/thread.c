@@ -26,7 +26,7 @@
 #include "misc.h"
 #include "timer.h"
 
-#ifndef MP2
+#if !(defined(MP2) || defined(MP3CP1))
 #include "process.h"
 #include "memory.h"
 #endif
@@ -354,7 +354,7 @@ void exit_running_thread(void) {
 #endif // STUDENT
 }
 
-#ifndef MP2
+#if !(defined(MP2) || defined(MP3CP1))
 void submit_running_thread(void) {
 #ifdef STUDENT
     // YOUR CODE HERE
@@ -369,7 +369,7 @@ void submit_running_thread(void) {
         yield_running_thread();
 #endif // STUDENT
 }
-#endif // MP2
+#endif // NOVMEM
 
 void yield_running_thread(void) {
     extern void switch_running_thread(struct thread *); // thrasm.s
@@ -445,7 +445,7 @@ void yield_running_thread(void) {
     
     set_thread_state(next_thread, THREAD_RUNNING);
 
-#ifndef MP2
+#if !(defined(MP2) || defined(MP3CP1))
     // If the thread to be resumed has an associated process, switch to its
     // memory space. Otherwise, switch to the main thread's memory space. If
     // there is no process associated with the main thread, then virtual address
@@ -464,7 +464,7 @@ void yield_running_thread(void) {
             switch_mspace(next_mtag);
         }
     }
-#endif // !defined(MP2)
+#endif // !NOVMEM
 
     trace("Thread <%s:%d> calling switch_running_thread(<%s:%d>)",
         TP->name, TP->id, next_thread->name, next_thread->id);
@@ -576,7 +576,7 @@ int join_thread(int u_tid) {
 #endif
 }
 
-#ifndef MP2
+#if !(defined(MP2) || defined(MP3CP1))
 struct process * thread_process(int tid) {
     assert (0 <= tid && tid < NTHR);
     assert (thrtab[tid] != NULL);
@@ -774,7 +774,7 @@ void init_main_thread(void) {
 
     time_now = rdtime();
 
-#ifndef MP2
+#if !(defined(MP2) || defined(MP3CP1))
     // Most of the main thread structure is initialized statically (near the top
     // of this file). What's left is to initialize the main thread stack anchor
     // to point to the main thread structure itself (a circular reference), and
@@ -837,7 +837,7 @@ struct thread * create_thread(const char * name) {
 
     thr = kcalloc(1, sizeof(struct thread));
 
-#ifndef MP2
+#if !(defined(MP2) || defined(MP3CP1))
     stkmem = alloc_phys_page();
     anchor = stkmem + PAGE_SIZE;
 #else
@@ -848,7 +848,7 @@ struct thread * create_thread(const char * name) {
     anchor -= 1; // anchor is at base of stack
     thr->stack_lowest = stkmem;
     thr->stack_anchor = anchor;
-#ifndef MP2
+#if !(defined(MP2) || defined(MP3CP1))
     anchor->ktp = thr;
     anchor->kgp = NULL;
 #endif
@@ -865,7 +865,7 @@ struct thread * create_thread(const char * name) {
 
 void reclaim_thread_stack(struct thread * thr) {
     assert (thr->stack_lowest != NULL);
-#ifndef MP2
+#if !(defined(MP2) || defined(MP3CP1))
     free_phys_page(thr->stack_lowest);
 #else
     kfree(thr->stack_lowest);
