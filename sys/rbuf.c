@@ -48,18 +48,22 @@ int rbuf_full(const struct rbuf * rb) {
 }
 
 int rbuf_getc(struct rbuf * rb) {
-    assert (!rbuf_empty(rb));
-    return (unsigned char)rb->buf[rb->rpos++ & rb->mask];
+    if (!rbuf_empty(rb))
+        return (unsigned char)rb->buf[rb->rpos++ & rb->mask];
+    else
+        return -1;
 }
 
 int rbuf_peek(struct rbuf * rb) {
-    assert (!rbuf_empty(rb));
-    return (unsigned char)rb->buf[rb->rpos & rb->mask];
+    if (!rbuf_empty(rb))
+        return (unsigned char)rb->buf[rb->rpos & rb->mask];
+    else
+        return -1;
 }
 
 void rbuf_putc(struct rbuf * rb, char c) {
-    assert (!rbuf_full(rb));
-    rb->buf[rb->wpos++ & rb->mask] = c;
+    if (!rbuf_full(rb))
+        rb->buf[rb->wpos++ & rb->mask] = c;
 }
 
 unsigned int rbuf_read (

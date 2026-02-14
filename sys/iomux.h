@@ -10,6 +10,10 @@
 #include "misc.h"
 #include "string.h"
 
+#define CTLSYNC     0x00
+#define CTLSYNCREQ  0x40
+#define CTLFLOW     0xC0
+
 struct iomux4_chan {
     struct io io;
     struct rbuf rxbuf;
@@ -24,13 +28,14 @@ enum iomux4_state {
 struct iomux4 {
     struct io * bkgio;
     unsigned char txen;
-    unsigned char rxbusy;
+    char rxbusy;
+    char txbusy;
     signed char state;
     unsigned char remcnt;
     unsigned short unsync_bytecnt;
     short err; // negative or 1=EOF
-    struct rwlock txlock;
     struct condition rxupdt;
+    struct condition txupdt;
     struct rbuf rxbuf;
     struct iomux4_chan ch[4];
 };
@@ -41,8 +46,8 @@ void iomux4_init(struct iomux4 * mux, struct io * bkgio) {
     memset(mux, 0, sizeof(*mux));
     mux->bkgio = bkgio;
 
-    rwlock_init(&mux->txlock, "iomux4.txlock");
     condition_init(&mux->rxupdt, "iomux4.rxupdt");
+    condition_init(&mux->txupdt, "iomux4.txupdt");
     rbuf_init(&mux->rxbuf, /* buf */ NULL, /* capacity */ 64);
 
     for (i = 0; i < 4; i++) {
@@ -55,8 +60,15 @@ long iomux4_chan_read(struct iomux4 * mux, int chno, void * buf, long bufsz) {
     struct iomux4_chan * const ch = mux->ch+chno;
     int result;
 
-    while (rbuf_empty(&ch->rxbuf) && mux->state != IOM4_ERR)
-        iomux4_rxframe(mux);
+    if (mux->state == IOM4_UNSYNC)
+        iomux4_synchronize(mux);
+
+    while (rbuf_empty(&ch->rxbuf) && mux->state != IOM4_ERR) {
+        if (mux->rxbusy)
+            condition_wait(&mux->rxupdt);
+        else
+            iomux4_recv_frame(mux);
+    }
 
     if (mux->state == IOM4_ERR)
         return mux->err;
@@ -64,40 +76,95 @@ long iomux4_chan_read(struct iomux4 * mux, int chno, void * buf, long bufsz) {
     return rbuf_read(&ch->rxbuf, buf, bufsz);
 }
 
-void iomux4_rxframe(struct iomux4 * mux) {
-    struct rbuf * const rxbuf = &mux->rxbuf;
-    int chno, len;
-    long rlen;
+void iomux4_synchronize(struct iomux4 * mux) {
+    char buf[72];
+    unsigned int bufpos;
+    long result;
 
-    while (mux->state != IOM4_ERR && mux->rxbusy)
-        condition_wait(&mux->rxupdt);
+    while (mux->state == IOM4_UNSYNC && (mux->txbusy || mux->rxbusy))
+        condition_wait(&mux->txupdt);
     
-    if (mux->state == IOM4_ERR)
+    if (mux->state != IOM4_UNSYNC)
         return;
+    
+    rbuf_reset(&mux->rxbuf);
 
-    assert (!mux->rxbusy);
+    memset(buf, CTLSYNC, sizeof(buf)-1);
+    buf[sizeof(buf)-1] = CTLSYNCREQ;
+    bufpos = 0;
+
+    mux->txbusy = 1;
     mux->rxbusy = 1;
+    
+    while (bufpos != sizeof(buf)) {
+        result = iowrite(mux->bkgio, buf + bufpos, sizeof(buf) - bufpos);
 
-    if (rbuf_empty(rxbuf))
-        iomux4_rxbytes(mux);
-
-    if (mux->state == IOM4_ERR)
-        return;
-
-    len = rbuf_getc(rxbuf);
-    chno = len >> 6;
-    len &= 0x3f;
-
-    if (len != 0) {
-        while (rbuf_readable(rxbuf) < len && mux->state != IOM4_ERR)
-            iomux4_rxbytes(mux);
+        if (result < 0)
+            goto iomux4_synchronize_error;
         
-        // We now have a full frame in mux->rxbuf. Copy it to channel rxbuf.
+        bufpos -= result;
+    }
 
-        rbuf_move(&mux->ch[chno].rxbuf, rxbuf);
+
+
+iomux4_synchronize_error:
+    mux->err = result;
+    mux->state = IOM4_ERR;
+iomux4_synchronize_done:
+    mux->txbusy = 0;
+    mux->rxbusy = 0;
+
 }
 
-void iomux4_rxbytes(struct iomux4 * mux) {
+void iomux4_recv_frame(struct iomux4 * mux) {
+    struct rbuf * const rxbuf = &mux->rxbuf;
+    int chno, blklen, cntl;
+
+    if (mux->state == IOM4_ERR || mux->rxbusy)
+        return;
+
+    mux->rxbusy = 1;
+
+    if (rbuf_empty(rxbuf)) {
+        iomux4_recv_bytes(mux);
+
+        if (mux->state == IOM4_ERR)
+            goto iomux4_recv_frame_done;
+    }
+
+    cntl = rbuf_getc(rxbuf);
+    chno = cntl >> 6;
+    cntl &= 0x3f;
+
+    if (blklen != 0) {
+        struct rbuf * const chrxbuf = &mux->ch[chno].rxbuf;
+        unsigned int chrxlen;
+
+        while (rbuf_readable(rxbuf) < blklen && mux->state != IOM4_ERR)
+            iomux4_recv_bytes(mux);
+        
+        chrxlen = rbuf_move(chrxbuf, rxbuf, blklen);
+        rbuf_consumed(chrxbuf, blklen - chrxlen);
+
+    } else {
+        switch (cntl) {
+        case 0x00:
+            break;
+        case 0x40:
+            // sync request
+        case 0x80:
+            // reserved
+        case 0xC0:
+            // flow control
+        }
+    }
+
+iomux4_recv_frame_done:
+    mux->rxbusy = 0;
+    return;
+}
+
+void iomux4_recv_bytes(struct iomux4 * mux) {
     struct rbuf * const rxbuf = &mux->rxbuf;
     void * wptr;
     unsigned int wmax;
