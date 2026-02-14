@@ -1,6 +1,6 @@
 /*! @file viorng.c 
     @brief VirtIO rng device
-    @copyright Copyright (c) 2024-2025 University of Illinois
+    @copyright Copyright (c) 2024-2026 University of Illinois
 
 */
 
@@ -182,9 +182,6 @@ int viorng_open(struct io ** ioptr, void * aux) {
     struct viorng_device * vrng = aux;
 
     vrng->regs->status |= VIRTIO_STAT_ACKNOWLEDGE;
-
-    vrng->vq.avail.idx = 0;
-    vrng->vq.used.idx = 0;
 
     virtio_enable_virtq(vrng->regs, 0);
     enable_intr_source(vrng->irqno, VIORNG_INTR_PRIO, &viorng_isr, vrng);

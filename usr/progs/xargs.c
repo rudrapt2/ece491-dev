@@ -1,36 +1,28 @@
 #include "../syscall.h"
 #include "../string.h"
 #include "../shell.h"
+#include "../error.h"
 #include "../heap.h"
 
 #define BUFSZ 512
 
-void exec(int c, char** v) {
-	char path[256];
-	int fd, result;
-
-	// Null-terminate the argument array
-	v[c] = NULL;
+int exec(int argc, char* argv[]) {
+	char path[BUFSZ];
+	int fd;
 
 	// If path doesn't start with '/', prepend '/c/' for relative paths
-	if (strncmp(v[0], "/", 1) != 0 && strncmp(v[0], "c/", 2) != 0) {
-		snprintf(path, sizeof(path), "/c/%s", v[0]);
+	if (strncmp(argv[0], "/", 1) != 0 && strncmp(argv[0], "c/", 2) != 0) {
+		snprintf(path, sizeof(path), "/c/%s", argv[0]);
+        fd = _open(-1, path);
 	}
 	else {
-		strncpy(path, v[0], sizeof(path) - 1);
+	    fd = _open(-1, argv[0]);
 	}
 
-	// Open the executable file
-	fd = _open(-1, path);
+	if (fd < 0)
+		return fd;
 
-	if (fd < 0) {
-		printf("Unable to access %s (Error Code: %d)\n", path, fd);
-		_exit();
-	}
-
-	result = _exec(fd, c, v);
-	printf("Failed to exec file (Error Code: %d)", result);
-	_exit();
+	return _exec(fd, argc, argv);
 }
 
 void main (int argc, char** argv)
@@ -45,7 +37,7 @@ void main (int argc, char** argv)
     int result;
 
     if (argc < 2) {
-        printf("Usage: xargs [cmd] [...] < argfile\n");
+        printf("Usage: %s [cmd] [...] < argfile\n", argv[0]);
         return;
     }
 
@@ -66,7 +58,8 @@ void main (int argc, char** argv)
             result = _read(STDIN, &read, 1);
 
             if (result < 0) {
-                printf("Read failed!\n");
+                printf("%s: failed to read (%s)\n", 
+                    argv[0], error_desc(result));
                 return;
             }
 
@@ -78,7 +71,7 @@ void main (int argc, char** argv)
             if (read == '\n') continue;
 
             if (read == (char)3) {
-                printf("Program Killed\n");
+                printf("Killed\n");
                 return;
             }
 
@@ -86,7 +79,8 @@ void main (int argc, char** argv)
             buf[num_read++] = read;
             
             if (num_read == BUFSZ - 1) {
-                printf("Input line %d too long\n", c - argc + 2);
+                printf("%s: could not read line %d (%s)\n", 
+                    c - argc + 2, "Input line too long");
                 return;
             }
         }
@@ -102,5 +96,7 @@ void main (int argc, char** argv)
     }
 
     v[c] = NULL;
-    exec(c, v);
+    result = exec(c, v);
+    printf("%s: failed to exec %s (%s)\n", 
+        argv[0], argv[1], error_name(result));
 }

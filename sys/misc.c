@@ -12,6 +12,7 @@
 #include "console.h"
 #include "sbi.h" // for sbi_shutdown()
 #include "intr.h"
+#include "thread.h"
 
 // EXPORTED FUNCTION DEFINITIONS
 //
@@ -26,7 +27,8 @@ void panic_actual(const char* filename, int lineno, const char* msg) {
 }
 
 void assert_failed(const char* filename, int lineno, const char* stmt) {
-    kprintf("ASSERT FAILED at %s:%d (%s)\n", filename, lineno, stmt);
+    kprintf("ASSERT FAILED at %s:%d in thread <%s %d> (%s)\n", 
+        filename, lineno, running_thread_name(), running_thread(), stmt);
     halt();
 }
 
@@ -37,7 +39,7 @@ void debug_actual(const char* filename, int lineno, const char* fmt, ...) {
     va_start(ap, fmt);
     pie = disable_interrupts();
 
-    kprintf("DEBUG at %s:%d: ", filename, lineno);
+    kprintf("<%s %d> DEBUG at %s:%d: ", running_thread_name(), running_thread(), filename, lineno);
     kvprintf(fmt, ap);
     kprintf("\n");
 
@@ -52,7 +54,7 @@ void trace_actual(const char* filename, int lineno, const char* fmt, ...) {
     va_start(ap, fmt);
     pie = disable_interrupts();
 
-    kprintf("TRACE at %s:%d: ", filename, lineno);
+    kprintf("<%s %d> TRACE at %s:%d: ", running_thread_name(), running_thread(), filename, lineno);
     kvprintf(fmt, ap);
     kprintf("\n");
 

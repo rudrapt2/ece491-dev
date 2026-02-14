@@ -25,8 +25,6 @@
 #include "io.h"
 #include "console.h"
 
-#define CACHE_CAPACITY 64 // must be power of two
-
 // INTERNAL TYPE DEFINITIONS
 //
 
@@ -63,6 +61,7 @@ struct cache {
     unsigned short evictable_cnt; // number of evictable entries
     unsigned short dirty_cnt; // number of dirty blocks in cache
     int wtid; // writer thread id (we don't actually use it for anything)
+    unsigned long blksz;
     void * blkbuf; // all block are in a single contiguous buffer
     struct cache_entry entries[CACHE_CAPACITY];
 };
@@ -116,25 +115,29 @@ static int find_evictable(struct cache * cache);
 
 static void cache_writeback_thrfn(struct cache * cache);
 
+extern char _kimg_blob_start[]; // TEMPORARY
+
 // EXPORTED FUNCTION DEFINITIONS
 //
 
-struct cache * create_cache(struct io * bkgio) {
+struct cache * create_cache(struct io * bkgio, unsigned long cache_blksz) {
     struct cache * cache;
     unsigned int blksz;
     int i;
 
-    trace("%s(%p)", __func__, disk);
+    trace("%s(%p)", __func__, bkgio);
 
     assert (bkgio != NULL);
 
     blksz = ioblksz(bkgio);
 
-    if (CACHE_BLKSZ % blksz != 0)
+    if (cache_blksz % blksz != 0)
         panic("Cache size not a multiple if backing device block size");
 
 
     cache = kcalloc(1, sizeof(struct cache));
+
+    cache->blksz = cache_blksz;
 
     cache->bkgio = bkgio;
     condition_init(&cache->unlocked, "cache.unlocked");
@@ -142,8 +145,12 @@ struct cache * create_cache(struct io * bkgio) {
     condition_init(&cache->writable, "cache.writable");
     condition_init(&cache->nodirty, "cache.nodirty");
 
+#ifndef MP3CP1
     cache->blkbuf = alloc_phys_pages (
-        (CACHE_CAPACITY * CACHE_BLKSZ + PAGE_SIZE-1) / PAGE_SIZE);
+        (CACHE_CAPACITY * cache_blksz + PAGE_SIZE-1) / PAGE_SIZE);
+#else
+    cache->blkbuf = _kimg_blob_start;
+#endif
 
     for (i = 0; i < CACHE_CAPACITY; i++)
         cache->entries[i].pos = -1ULL;
@@ -156,7 +163,9 @@ struct cache * create_cache(struct io * bkgio) {
         "cache_writeback", (void(*)(void))&cache_writeback_thrfn, cache);
     
     assert (0 <= cache->wtid);
+#ifndef MP3CP1
     thread_attach_process(cache->wtid, NULL);
+#endif
 
     return cache;
 }
@@ -168,7 +177,7 @@ int cache_fetch(struct cache * cache, unsigned long long pos, void ** pptr) {
 
     trace("%s(0x%llx)", __func__, pos);
 
-    if (pos % CACHE_BLKSZ != 0)
+    if (pos % cache->blksz != 0)
         return -EINVAL;
 
     for (;;) {
@@ -260,7 +269,7 @@ int cache_fetch(struct cache * cache, unsigned long long pos, void ** pptr) {
 
     *pptr = blkidx_to_blkptr(cache, i);
     debug("Reading block from 0x%llx into cache at %d (pblk = %lp)", pos, i, *pptr);
-    rcnt = iofetch(cache->bkgio, pos, *pptr, CACHE_BLKSZ);
+    rcnt = iofetch(cache->bkgio, pos, *pptr, cache->blksz);
 
     debug("%08lx: "
         "%02x %02x %02x %02x %02x %02x %02x %02x "
@@ -291,7 +300,7 @@ int cache_fetch(struct cache * cache, unsigned long long pos, void ** pptr) {
     if (rcnt < 0)
         return rcnt;
     
-    if (rcnt != CACHE_BLKSZ)
+    if (rcnt != cache->blksz)
         return -EIO;
     
     return 0;
@@ -366,13 +375,13 @@ int cache_flush(struct cache * cache) {
 //
 
 void * blkidx_to_blkptr(const struct cache * cache, unsigned long idx) {
-    return cache->blkbuf + idx * CACHE_BLKSZ;
+    return cache->blkbuf + idx * cache->blksz;
 }
 
 unsigned long blkptr_to_blkidx(const struct cache * cache, void * pblk) {
     assert (cache->blkbuf <= pblk);
-    assert (pblk < cache->blkbuf + CACHE_CAPACITY * CACHE_BLKSZ);
-    return (pblk - cache->blkbuf) / CACHE_BLKSZ;
+    assert (pblk < cache->blkbuf + CACHE_CAPACITY * cache->blksz);
+    return (pblk - cache->blkbuf) / cache->blksz;
 }
 
 int find_evictable(struct cache * cache) {
@@ -422,9 +431,9 @@ void cache_writeback_thrfn(struct cache * cache) {
                 debug("Writing dirty block 0x%llx to storage", ents[i].pos);
 
                 wcnt = iostore(cache->bkgio,
-                    ents[i].pos, blkidx_to_blkptr(cache, i), CACHE_BLKSZ);
+                    ents[i].pos, blkidx_to_blkptr(cache, i), cache->blksz);
                 
-                if (wcnt != CACHE_BLKSZ) {
+                if (wcnt != cache->blksz) {
                     kprintf("ERROR Cache write-back failed: %s",
                         (wcnt < 0) ? error_name(wcnt) : "short write");
                 }

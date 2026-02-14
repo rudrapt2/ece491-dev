@@ -48,10 +48,6 @@ extern void devmgr_init(void);
 // On return devmgr_init() guarantees:
 // - /devmgr_initialized/ is 1.
 
-#ifndef NO_FS
-extern struct filesystem devfs;
-#endif
-
 typedef int (*device_openfn_t)(struct io ** ioptr, void * aux);
 
 // Device open callback type.
@@ -116,5 +112,9 @@ extern int open_device(const char * name, struct io ** ioptr);
 //
 // On return open_device() guarantees (on success):
 // - *ioptr points to a valid I/O object with a non-zero reference count.
+
+#ifndef MP2
+extern int mount_devfs(const char * mpname);
+#endif
 
 #endif

@@ -61,6 +61,12 @@ void handle_smode_exception(unsigned int cause, struct trap_frame* tfr) {
         switch (cause) {
             case RISCV_SCAUSE_LOAD_PAGE_FAULT:
             case RISCV_SCAUSE_STORE_PAGE_FAULT:
+#ifndef MP2
+#ifndef MP3CP1
+                int handled = handle_umode_page_fault(tfr, csrr_stval());
+                if(handled)break; //If not handled just keep going until you hit the panic
+#endif
+#endif
             case RISCV_SCAUSE_INSTR_PAGE_FAULT:
             case RISCV_SCAUSE_LOAD_ADDR_MISALIGNED:
             case RISCV_SCAUSE_STORE_ADDR_MISALIGNED:
@@ -85,6 +91,7 @@ void handle_smode_exception(unsigned int cause, struct trap_frame* tfr) {
 }
 
 #ifndef MP2
+#ifndef MP3CP1
 void handle_umode_exception(unsigned int cause, struct trap_frame * tfr) {
 #ifdef STUDENT
     // YOUR CODE HERE
@@ -92,13 +99,14 @@ void handle_umode_exception(unsigned int cause, struct trap_frame * tfr) {
     const char * name = NULL;
     int handled = 0;
     trace("%s(cause=%d, tfr=%p)", __func__, cause, tfr);
+    unsigned long stval = csrr_stval();
 
     enable_interrupts(); // we can enable interrupts now
 
     switch (cause) {
     case RISCV_SCAUSE_LOAD_PAGE_FAULT:
     case RISCV_SCAUSE_STORE_PAGE_FAULT:
-        handled = handle_umode_page_fault(tfr, csrr_stval());
+        handled = handle_umode_page_fault(tfr, stval);
         break;
     case RISCV_SCAUSE_ECALL_FROM_UMODE:
         handle_syscall(tfr);
@@ -121,7 +129,7 @@ void handle_umode_exception(unsigned int cause, struct trap_frame * tfr) {
         case RISCV_SCAUSE_INSTR_PAGE_FAULT:
             kprintf (
                 "%s at %p for %p in thread <%s:%d>\n",
-                name, (void*)tfr->sepc, (void*)csrr_stval(),
+                name, (void*)tfr->sepc, (void*)stval,
                 running_thread_name(), running_thread());
             break;
         default:
@@ -140,4 +148,5 @@ void handle_umode_exception(unsigned int cause, struct trap_frame * tfr) {
     process_exit();
 #endif // STUDENT
 }
+#endif // MP3CP1
 #endif // MP2

@@ -117,7 +117,7 @@ long syscall(const struct trap_frame * tfr) {
     case SYSCALL_IOCTL:
         return sysioctl(tfr->a0, tfr->a1, tfr->a2);
     case SYSCALL_PIPE:
-        return syspipe((int *)tfr->a0, (int *)tfr->a0);
+        return syspipe((int *)tfr->a0, (int *)tfr->a1);
     case SYSCALL_CREATE:
         return syscreate((char *)tfr->a0);
     case SYSCALL_DELETE:
@@ -306,18 +306,14 @@ int sysopen(int fd, const char * path) {
 
     pathlen = strlen(path);
 
-    if (pathlen == 0 || PATH_MAX < pathlen)
+    if (PATH_MAX < pathlen)
         return -EINVAL;
     
-    pathbuf = kmalloc(pathlen+1);
+    pathbuf = kcalloc(pathlen+1, 1);
     memcpy(pathbuf, path, pathlen+1);
     parse_path(pathbuf, &mpname, &flname);
 
-    if (*mpname == '\0')
-        result = -EINVAL;
-
-    if (result == 0)
-        result = open_file(mpname, flname, &io);
+    result = open_file(mpname, flname, &io);
 
     if (result == 0)
         self->iotab[fd] = io;
@@ -395,7 +391,7 @@ long syswrite(int fd, const void *buf, size_t len) {
 int sysioctl(int fd, int op, uintptr_t arg_uma) {
     struct process * self;
 
-    trace("%s(%d,%d,%p)", __func__, fd, op, arg);
+    trace("%s(%d,%d,%p)", __func__, fd, op, arg_uma);
 
     if (fd < 0 || PROC_IOMAX <= fd)
         return -EBADF;
@@ -431,12 +427,12 @@ int syspipe(int * wfdptr, int * rfdptr) {
 
     // Find two free file descriptor slots
 
-    wfd = allocfd(self, /* reqfd */ -1, /* notfd */ -1);
+    wfd = allocfd(self, /* reqfd */ *wfdptr, /* notfd */ -1);
 
     if (wfd < 0)
         return wfd;
     
-    rfd = allocfd(self, /* reqfd */ -1, /* notfd */ wfd);
+    rfd = allocfd(self, /* reqfd */ *rfdptr, /* notfd */ wfd);
 
     if (rfd < 0)
         return rfd;
@@ -445,6 +441,8 @@ int syspipe(int * wfdptr, int * rfdptr) {
     *rfdptr = rfd;
 
     create_iopipe(&self->iotab[wfd], &self->iotab[rfd]);
+
+    return 0;
 }
 
 int sysiodup(int oldfd, int newfd) {

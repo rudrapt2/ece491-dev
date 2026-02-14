@@ -1,8 +1,8 @@
-#include "../string.h"
-#include "../heap.h"
-#include "../syscall.h"
-#include "../uio.h"
-#include "../shell.h"
+#include "../usr/string.h"
+#include "../usr/heap.h"
+#include "../usr/syscall.h"
+#include "../usr/io.h"
+#include "../usr/shell.h"
 #include "after_dark.h"
 #include <stdint.h>
 
@@ -244,7 +244,7 @@ void main(void) {
         _exit();
     }
 
-    result = _fcntl(gpu_fd, FCNTL_MMAP, &rgbx32_fbuf);
+    result = _ioctl(gpu_fd, /*IOC_MAPBUF*/ 8, &rgbx32_fbuf);
     if (result < 0) {
         printf("failed to map frame buffer: %d", result);
         _exit();

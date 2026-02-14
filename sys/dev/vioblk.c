@@ -1,6 +1,6 @@
 // vioblk.c - VirtIO block device
 //
-// Copyright (c) 2024-2025 University of Illinois
+// Copyright (c) 2024-2026 University of Illinois
 // SPDX-License-identifier: NCSA
 //
 
@@ -91,7 +91,7 @@ struct vioblk_device {
     volatile struct virtio_mmio_regs * regs;
     int irqno;
 
-    struct io io;
+    struct seekio io;
 
     unsigned long long bytecap;
     unsigned long long blkcnt;
@@ -143,7 +143,10 @@ static const struct iointf vioblk_intf = {
     .reclaim = &vioblk_reclaim,
     .fetch = &vioblk_fetch,
     .store = &vioblk_store,
-    .ioctl = &vioblk_ioctl
+    .read = &seekio_read,
+    .write = &seekio_write,
+    .ioctl = &vioblk_ioctl,
+    .ioctl_u = (int(*)(struct io*, int, uintptr_t))&vioblk_ioctl
 };
 
 // EXPORTED FUNCTION DEFINITIONS
@@ -259,7 +262,7 @@ void vioblk_attach(volatile struct virtio_mmio_regs * regs, int irqno) {
     // Register device
 
     register_device(VIOBLK_NAME, instcnt++, &vioblk_open, vb);
-    ioinit(&vb->io, &vioblk_intf, blksz, 0);
+    ioinit(&vb->io.base, &vioblk_intf, blksz, 0);
     
     // Signal initialization complete
 
@@ -274,7 +277,7 @@ int vioblk_open(struct io ** ioptr, void * aux) {
 #else
     struct vioblk_device * const vb = aux;
 
-	trace("%s(%d,{regs=%p})", __func__, instno, vb->regs);
+	trace("%s(%d,{regs=%p})", __func__, vb->irqno, vb->regs);
     
     vb->vq.avail.idx = 0;
     vb->vq.used.idx = 0;
@@ -282,7 +285,7 @@ int vioblk_open(struct io ** ioptr, void * aux) {
     virtio_enable_virtq(vb->regs, 0);
     enable_intr_source(vb->irqno, VIOBLK_INTR_PRIO, vioblk_isr, vb);
 
-    *ioptr = ioaddref(&vb->io);
+    *ioptr = ioaddref(&vb->io.base);
 
     return 0;
 #endif
@@ -316,7 +319,7 @@ long vioblk_fetch (
     unsigned long long blkpos;
     int pie;
 
-    trace("%s(%lld,%ld)", __func__, pos, bytecnt);
+    trace("%s(%lld,%ld)", __func__, bytepos, bytecnt);
 
     if (vb->bytecap < bytepos || vb->bytecap - bytepos < bytecnt)
         return -EINVAL;
@@ -450,6 +453,9 @@ int vioblk_ioctl(struct io * io, int op, void * arg) {
     case IOC_GETEND:
         *(unsigned long long*)arg = vb->bytecap;
         return 0;
+    case IOC_GETPOS:
+    case IOC_SETPOS:
+        return seekio_ioctl(io, op, arg);
     default:
         return -ENOTSUP;
     }

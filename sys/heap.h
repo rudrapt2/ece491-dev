@@ -24,7 +24,9 @@
 
 #include <stddef.h>
 
+#ifndef MP2
 #include "memory.h"
+#endif
 
 #define HEAP_ALLOC_MAX 4032 // Maximum allocation request size (in bytes)
 

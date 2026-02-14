@@ -12,22 +12,13 @@ void main (int argc, char** argv)
         return;
     }
     
-    while (--argc) {
-        argv++;
-        result = _fsdelete(argv[0]);
+    for (int i = 1; i < argc; i++) {
+        result = _delete(argv[i]);
 
         if (result < 0) {
-            printf("Failed to delete file %s: ", argv[0]);
-            switch (result) {
-                case -ENOENT:
-                    printf("No such file or directory\n");
-                    break;
-                default:
-                    printf("Failed to remove file\n");
-                    break;
-            }
+            printf("%s: failed to delete %s (%s)\n", 
+                argv[0], argv[i], error_desc(result));
             continue;
         }
-        dprintf(STDOUT, "Successfully removed %s\n", argv[0]);
     }
 }

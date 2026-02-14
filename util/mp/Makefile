@@ -5,7 +5,7 @@
 # =========================
 
 SRC_DIR     := /home/rudrapt2/sp26_ece391/glycine-max
-TARGET_DIR  := /home/rudrapt2/sp26_ece391/mp2-sp26/release
+TARGET_DIR  := /home/rudrapt2/sp26_ece391/mp2-sp26/gold
 
 # List of files to copy.
 # Format: "source:destination" OR "path" (if source and dest are same)
@@ -138,7 +138,7 @@ preprocess_assembly: check_clean copy_files
 UNIFDEF_FILES := $(filter %.c %.h,$(TARGET_FILES)) $(TARGET_ASM_PREPROCESSING_FILES)
 
 mp2_gold: preprocess_assembly
-	$(call run-unifdef,-DMP2 -t)
+	$(call run-unifdef,-DMP2 -USTUDENT -t)
 
 mp2_release: preprocess_assembly
 	$(call run-unifdef,-DMP2 -DSTUDENT -t)

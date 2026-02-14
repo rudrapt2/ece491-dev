@@ -1,37 +1,49 @@
 #include "../syscall.h"
-#include "../string.h"
 #include "../shell.h"
+#include "../error.h"
 
 #define BUFSZ 512
 
-void main (int argc, char** argv)
-{
-    int fd, result;
-    char buffer[BUFSZ+1];
-    buffer[BUFSZ] = '\0';
-    
-    if (argc != 2) {
-        printf("Usage: cat [file]\n");
-        return;
-    }
-    
-    fd = _open(-1, argv[1]);
-    if (fd < 0) {
-        printf("%s: File Not Found\n", argv[1]);
-        return;
-    }
-    
-    while (1) {
+static int cat_stream(int fd) {
+    char buffer[BUFSZ];
+    int result;
+
+    for (;;) {
         result = _read(fd, buffer, BUFSZ);
-        if (result < 0) {
-            printf("Read failed!\n");
-            return;
+        if (result <= 0) 
+            return result;
+        if (buffer[result] == 3 && fd == STDIN) {
+            printf("Killed\n");
+            return 0;
         }
-        if (result == 0) {
-            printf("\r\n");
-            return;
+        _write(STDOUT, buffer, result);
+    }
+}
+
+void main(int argc, char** argv)
+{
+    int result;
+    // no args, read from STDIN
+    if (argc == 1) {
+        result = cat_stream(STDIN);
+        if (result)
+            printf("%s: failed to read from STDIN (%s)\n", 
+                argv[0], error_desc(result));
+        return;
+    }
+
+    // one or more files
+    for (int i = 1; i < argc; i++) {
+        int fd = _open(-1, argv[i]);
+        if (fd < 0) {
+            printf("%s: could not open %s (%s)\n", 
+                argv[0], argv[i], error_desc(fd));
+            continue;
         }
-        buffer[result] = '\0'; 
-        dprintf(STDOUT, buffer);
+        result = cat_stream(fd);
+        if (result)
+            printf("%s: failed to read %s (%s)\n", 
+                argv[0], argv[i], error_desc(result));
+        _close(fd);
     }
 }

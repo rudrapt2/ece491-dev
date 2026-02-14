@@ -13,6 +13,11 @@
 #define ROUND_UP(n, k) (((n) + (k) - 1) / (k) * (k))
 #define ROUND_DOWN(n, k) ((n) / (k) * (k))
 
+// The CEIL macro evaluates the ceiling of /n/ divided by /k/. Argument /k/ is
+// evaluated multiple times.
+
+#define CEIL(n, k) (((n) + (k) - 1) / (k))
+
 // The MIN and MAX macros find the minumum and maximum between /a/ and /b/
 // respectively.
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))

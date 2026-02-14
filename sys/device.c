@@ -12,6 +12,7 @@
 #include "conf.h"
 #include "error.h"
 #ifndef MP2
+#include "filesys.h"
 #include "fsimpl.h"
 #endif
 #include "heap.h"
@@ -56,7 +57,7 @@ struct device_record * find_device(const char * name);
 char devmgr_initialized = 0;
 
 #ifndef MP2
-struct filesystem devfs = {
+static struct filesystem devfs = {
     .implname = "devfs",
     .openfile = &devfs_open_file
 };
@@ -139,6 +140,10 @@ extern int open_device(const char * name, struct io ** ioptr) {
 //
 
 #ifndef MP2
+int mount_devfs(const char * mpname) {
+    return mount_filesys(mpname, &devfs);
+}
+
 int devfs_open_file (
     struct filesystem * fs,
     const char * name,
@@ -151,7 +156,7 @@ int devfs_open_file (
     assert (fs == &devfs);
     assert (ioptr != NULL);
 
-    if (name != NULL)
+    if (name != NULL && *name != '\0')
         return open_device(name, ioptr);
     
     // If /name/ is NULL, open a device listing.

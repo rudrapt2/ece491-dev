@@ -12,29 +12,13 @@ void main (int argc, char** argv)
         return;
     }
 
-    while (--argc) {
-        argv++;
-    
-        result = _fscreate(argv[0]);
+    for (int i = 1; i < argc; i++) {
+        result = _create(argv[0]);
 
         if (result < 0) {
-            printf("Failed to create file %s: ", argv[0]);
-            switch (result) {
-                case -EINVAL:
-                    printf("File Name Invalid\n");
-                    break;
-                case -EMFILE:
-                    printf("File Already Exists\n");
-                    break;
-                case -ENOINODEBLKS:
-                    printf("No Inode Blocks\n");
-                    break;
-                default:
-                    printf("Failed to Create File\n");
-                    break;
-            }
+            printf("%s: failed to create %s (%s)\n", 
+                argv[0], argv[i], error_desc(result));
             continue;
         }
-        dprintf(STDOUT, "Successfully created %s\n", argv[0]);
     }
 }

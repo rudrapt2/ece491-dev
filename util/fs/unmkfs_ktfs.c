@@ -2,7 +2,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <sys/stat.h>
-#include "../../sys/ktfs.h"
+#include "../../sys/fs/ktfs.h"
 
 uint32_t num_starter_blocks;
 

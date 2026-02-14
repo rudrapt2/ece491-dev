@@ -6,6 +6,7 @@
 
 #include "conf.h"
 #include "console.h"
+#include "elf.h"
 #include "intr.h"
 #include "plic.h"
 #include "device.h"
@@ -18,10 +19,36 @@
 #include "io.h"
 
 #ifndef MP2
+#include "fs/ngfs.h"
+#include "fs/ktfs.h"
+#include "fs/tarfs.h"
+#include "filesys.h"
+#include "process.h"
+#endif
+
+#ifndef MP2
+#ifndef MP3CP1
+#define INITEXE "shell"
+#else
+#define INITEXE "trek-cp1"
+#define CONSOLEDEV "uart1"
+#endif
+
+#define CMNTNAME "c" // ngfs
+#define DMNTNAME "d" // ktfs
+#define DEVMNTNAME "dev"
+#define CDEVNAME "vioblk1"
+#define DDEVNAME "vioblk0"
+
+#ifndef NUART // number of UARTs
+#define NUART 3
+#endif
 #endif
 
 #ifndef MP2
 static void exec_init();
+static void mount_drive(char * mntname, char * devname,
+    int (*mount)(const char * mpname, struct io * bkgio));
 #else
 static void run_games(void);
 #endif // MP2
@@ -37,18 +64,101 @@ void main(unsigned int hartid, void * dtb) {
 
 #ifndef MP2
     // MP3 stuff
+#ifndef MP3CP1
+    memory_init();
+    procmgr_init();
+#endif
+    fsmgr_init();
 #endif
 
     attach_devices();
-
     enable_interrupts();
 
 #ifndef MP2
+    mount_devfs(DEVMNTNAME);
+    mount_drive(CMNTNAME, CDEVNAME, mount_ngfs);
+    mount_drive(DMNTNAME, DDEVNAME, mount_ktfs);
     exec_init();
 #else
     run_games();
 #endif
 }
+
+#ifndef MP2
+void mount_drive(char * mntname, char * devname, 
+    int (*mount)(const char * mpname, struct io * bkgio)) {
+    
+    struct io * hd;
+    int result;
+
+    result = open_device(devname, &hd);
+
+    if (result < 0) {
+        kprintf("Failed to open storage device %s: %s\n", 
+            devname, error_desc(result));
+        halt();
+    }
+
+    result = mount(mntname, hd);
+
+    if (result != 0) {
+        kprintf("mount(%s, bkgio(%s)) failed: %s\n",
+            mntname, devname, error_desc(result));
+        halt();
+    }
+}
+#endif
+
+#ifndef MP2
+void exec_init() {
+    struct io * initexe;
+    int result;
+    
+    result = open_file(CMNTNAME, INITEXE, &initexe);
+
+    if (result != 0) {
+        kprintf(INITEXE ": %s; terminating\n", error_name(result));
+        halt();
+    }
+
+#ifdef MP3CP1
+    void (*entry)(void);
+    int tid;
+    struct io * uartio;
+    result = open_device(CONSOLEDEV, &uartio);
+
+    if (result != 0) {
+        kprintf(CONSOLEDEV ": %s; terminating\n", error_name(result));
+        halt();
+    }
+
+    // load the executable into memory
+    result = elf_load(initexe, &entry);
+
+    if (result != 0) {
+        kprintf(INITEXE ": %s; terminating\n", error_name(result));
+        halt();
+    }
+
+    // launch the executable
+    tid = spawn_thread(INITEXE, entry, uartio);
+
+    if (tid < 0) {
+        kprintf("spawn thread: %s; terminating\n", error_name(result));
+        halt();
+    }
+
+    join_thread(tid);
+#else
+    char * argv[] = { NULL };
+    // Make descriptor 0 be a null io object, which the shell will need
+
+    current_process()->iotab[0] = create_nullio();
+
+    process_exec(initexe, 0, argv);
+#endif
+}
+#endif
 
 #ifdef MP2
 #define TREK_TERM_NAME "uart1"

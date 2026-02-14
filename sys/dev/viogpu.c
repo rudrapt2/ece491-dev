@@ -1,18 +1,22 @@
-// WRITTEN BY AHAN GOEL FOR ECE391 GROUP 3 ONLY
+// viogpu.c - VirtIO gpu device
+//
+// Copyright (c) 2025-2026 University of Illinois
+// SPDX-License-identifier: NCSA
+//
 
-#include "uio.h"
+#include "io.h"
+#include "ioimpl.h"
 #include "intr.h"
 #include "heap.h"
 #include "conf.h"
 #include "misc.h"
 #include "error.h"
-#include "virtio.h"
 #include "device.h"
 #include "thread.h"
 #include "string.h"
 #include "console.h"
 #include "memory.h"
-#include "assert.h"
+#include "virtio.h"
 
 #include <limits.h>
 #include <stddef.h>
@@ -103,6 +107,16 @@ enum virtio_gpu_formats {
     VIRTIO_GPU_FORMAT_R8G8B8X8_UNORM  = 134,
 };
 
+struct video_mode {
+    unsigned int width, height;
+    unsigned int horiz_stride;
+    unsigned int vert_stride;
+    unsigned char bytes_per_pixel;
+    unsigned char rshift, rdepth;
+    unsigned char gshift, gdepth;
+    unsigned char bshift, bdepth;
+};
+
 struct virtio_gpu_ctrl_hdr {
     uint32_t type;
     uint32_t flags;
@@ -172,7 +186,7 @@ struct virtio_gpu_resource_unref {
 };
 
 struct viogpu_device {
-    struct video base;
+    struct io base;
     volatile struct virtio_mmio_regs *regs;
     int irqno;
     int instno;
@@ -206,9 +220,10 @@ struct viogpu_device {
 };
 
 
-static int  viogpu_open(struct video * vid, int mode, void ** fbptr);
-static void viogpu_flush(struct video * vid);
-static void viogpu_close(struct video * vid);
+static int  viogpu_open(struct io ** ioptr, void * aux);
+static int viogpu_ioctl(struct io * io, int op, void * arg);
+static long viogpu_write(struct io * io, const void * buf, long len);
+static void viogpu_reclaim(struct io * io);
 static void viogpu_isr(int irqno, void * aux);
 
 static int viogpu_create_resource_2d (struct viogpu_device * viogpu);
@@ -218,16 +233,18 @@ static int viogpu_transfer_to_host   (struct viogpu_device * viogpu);
 static int viogpu_cmd_flush          (struct viogpu_device * viogpu);
 static int viogpu_detach_backing     (struct viogpu_device * viogpu);
 static int viogpu_resource_unref     (struct viogpu_device * viogpu);
-static int viogpu_map_buffer         (struct viogpu_device * viogpu, void **fbuf_vma_out);
+static int viogpu_map_buffer         (struct viogpu_device * viogpu);
 
 void viogpu_attach(volatile struct virtio_mmio_regs *regs, int irqno) {
+    static unsigned short instcnt = 0; // number of vioblk devices
     if (!regs) return;
 
-    static const struct video_intf viogpu_intf = {
-        .open  = &viogpu_open,
-        .close = &viogpu_close,
-        .cntl  = &viogpu_cntl,
-        .flush = &viogpu_flush,
+    static const struct iointf viogpu_intf = {
+        .implname = "viogpu",
+        .reclaim = &viogpu_reclaim,
+        .ioctl = &viogpu_ioctl,
+        .ioctl_u = (int(*)(struct io*, int, uintptr_t))&viogpu_ioctl,
+        .write = &viogpu_write,
     };
 
     struct viogpu_device * viogpu = kcalloc(1, sizeof(*viogpu));
@@ -252,8 +269,9 @@ void viogpu_attach(volatile struct virtio_mmio_regs *regs, int irqno) {
                         (uint64_t)&viogpu->vq.used,
                         (uint64_t)&viogpu->vq.avail);
 
-    video_init(&viogpu->base, &viogpu_intf);
-    viogpu->instno = register_device(VIOGPU_NAME, DEV_VIDEO, viogpu) + 1;
+    viogpu->instno = instcnt++;
+    register_device(VIOGPU_NAME, viogpu->instno, &viogpu_open, viogpu);
+    ioinit(&viogpu->base, &viogpu_intf, 1, 0);
 
     viogpu->regs->status |= VIRTIO_STAT_DRIVER_OK;
     __sync_synchronize();
@@ -265,14 +283,13 @@ void viogpu_attach(volatile struct virtio_mmio_regs *regs, int irqno) {
     trace("%p: Virtio GPU device initialized (instance %d)\n", regs, viogpu->instno);
 }
 
-static int viogpu_open(struct video *vid, int mode, void **fbptr) {
-    (void)mode;
-    if (!vid || !fbptr) return -EINVAL;
+static int viogpu_open(struct io ** ioptr, void * aux) {
+    if (!ioptr || !aux) return -EINVAL;
 
-    struct viogpu_device * const viogpu =
-        (void*)vid - offsetof(struct viogpu_device, base);
+    struct viogpu_device * const viogpu = aux;
 
-    viogpu->framebuffer_resource_id = (uint32_t)viogpu->instno;
+    /* QEMU virtio-gpu rejects resource_id 0 (VIRTIO_GPU_RESP_ERR_INVALID_RESOURCE_ID) */
+    viogpu->framebuffer_resource_id = (uint32_t)viogpu->instno + 1;
 
     viogpu->regs->config.gpu.num_scanouts = 1;
     viogpu->regs->config.gpu.events_clear = 0;
@@ -289,16 +306,17 @@ static int viogpu_open(struct video *vid, int mode, void **fbptr) {
     virtio_enable_virtq(viogpu->regs, 0);
     enable_intr_source(viogpu->irqno, VIOGPU_IRQ_PRIO, viogpu_isr, viogpu);
 
-    int res = viogpu_map_buffer(viogpu, fbptr);
+    int res = viogpu_map_buffer(viogpu);
     if (res) return res;
 
+    *ioptr = ioaddref(&viogpu->base);
     return 0;
 }
 
-static void viogpu_close(struct video *vid) {
-    if (!vid) return;
+static void viogpu_reclaim(struct io * io) {
+    if (!io) return;
     struct viogpu_device * const viogpu =
-        (void*)vid - offsetof(struct viogpu_device, base);
+        (void*)io - offsetof(struct viogpu_device, base);
 
     viogpu_detach_backing(viogpu);
     viogpu_resource_unref(viogpu);
@@ -312,13 +330,13 @@ static void viogpu_close(struct video *vid) {
     viogpu->fbuf_vma = 0;
 }
 
-static int viogpu_cntl(struct video *vid, int op, void *arg) {
-    if (!vid) return -EINVAL;
+static int viogpu_ioctl(struct io * io, int op, void *arg) {
+    if (!io) return -EINVAL;
     struct viogpu_device * const viogpu =
-        (void*)vid - offsetof(struct viogpu_device, base);
+        (void*)io - offsetof(struct viogpu_device, base);
 
     switch (op) {
-    case FCNTL_MMAP:              
+    case IOC_MAPBUF:
         if (!arg) return -EINVAL;
         *(void **)arg = (void*)viogpu->fbuf_vma;
         return 0;
@@ -328,12 +346,14 @@ static int viogpu_cntl(struct video *vid, int op, void *arg) {
     }
 }
 
-static void viogpu_flush(struct video *vid) {
+static long viogpu_write(struct io * io, const void * buf, long len) {
     struct viogpu_device * const d =
-        (void*)vid - offsetof(struct viogpu_device, base);
+        (void*)io - offsetof(struct viogpu_device, base);
+    if (buf != NULL && len != 0) return -EINVAL;
 
     if (viogpu_transfer_to_host(d) == 0)
         (void)viogpu_cmd_flush(d);
+    return 0;
 }
 
 
@@ -581,7 +601,7 @@ static int viogpu_resource_unref(struct viogpu_device * viogpu) {
     return 0;
 }
 
-static int viogpu_map_buffer(struct viogpu_device * viogpu, void **fbuf_vma_out) {
+static int viogpu_map_buffer(struct viogpu_device * viogpu) {
     viogpu->fbuf_sz = (uint64_t)viogpu->conf.width *
                  (uint64_t)viogpu->conf.height *
                  (uint64_t)viogpu->conf.bytes_per_pixel;
@@ -591,8 +611,6 @@ static int viogpu_map_buffer(struct viogpu_device * viogpu, void **fbuf_vma_out)
     viogpu->fbuf_pma = alloc_phys_pages(viogpu->fbuf_sz / PAGE_SIZE);
     viogpu->fbuf_vma = (uintptr_t) map_range(viogpu->fbuf_vma, viogpu->fbuf_sz, viogpu->fbuf_pma, PTE_U | PTE_R | PTE_W);
     if (!viogpu->fbuf_pma) return -ENOMEM;
-
-    if (fbuf_vma_out) *fbuf_vma_out = (void*)viogpu->fbuf_vma;
 
     // Create resource, attach backing, set scanout
     int res;

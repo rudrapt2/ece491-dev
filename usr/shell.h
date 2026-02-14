@@ -15,5 +15,3 @@
 #define STDIN 0
 #define STDOUT 1
 #define CONSOLEOUT 2
-
-extern void exec(int c, char** v);

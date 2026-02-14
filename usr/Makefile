@@ -12,10 +12,11 @@ OBJDUMP=$(TOOLPREFIX)objdump
 UMODE := 1
 
 ULIB_OBJS = \
-	uio.o \
+	io.o \
+	heap.o \
+	error.o \
 	string.o \
 	syscall.o \
-	heap.o
 
 ULIB_LD = no_umode.ld
 
@@ -24,19 +25,7 @@ ifeq ($(UMODE), 1)
 	ULIB_LD = umode.ld
 endif
 
-ALL_TARGETS = \
-	wc \
-	rm \
-	ls \
-	cat \
-	echo \
-	date \
-	hello \
-	shell \
-	touch \
-	xargs \
-	printf \
-	append 
+ALL_TARGETS := $(basename $(notdir $(wildcard progs/*.c)))
 
 CFLAGS = -Wall -fno-omit-frame-pointer -ggdb -gdwarf-2
 CFLAGS += -mcmodel=medany -fno-pie -no-pie -march=rv64g -mabi=lp64d

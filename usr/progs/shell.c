@@ -1,154 +1,207 @@
 #include "../syscall.h"
 #include "../string.h"
 #include "../shell.h"
+#include "../error.h"
+#include "../io.h"
 
-#define BUFSIZE 1024
-#define MAXARGS 8
+#define BUFSIZE 256
+#define MAXARGS 64
 
-void exec(int c, char** v) {
-	char path[256];
+#define SKIP_SPACES(buf) while(*buf == ' ') buf++
+
+void exec(int argc, char* argv[]) {
+	char full_path[BUFSIZE];
 	int fd, result;
+    char * path = argv[0];
 
-	// Null-terminate the argument array
-	v[c] = NULL;
-
-	// If path doesn't start with '/', prepend '/c/' for relative paths
-	if (strncmp(v[0], "/", 1) != 0 && strncmp(v[0], "c/", 2) != 0) {
-		snprintf(path, sizeof(path), "/c/%s", v[0]);
-	}
-	else {
-		strncpy(path, v[0], sizeof(path) - 1);
+	// If path doesn't contain '/', prepend '/c/' for relative paths
+	if (strchr(argv[0], '/') == NULL) {
+		snprintf(full_path, sizeof(full_path), "/c/%s", argv[0]);
+        path = full_path;
 	}
 
-	// Open the executable file
-	fd = _open(-1, path);
+    fd = _open(-1, path);
 
 	if (fd < 0) {
-		printf("Unable to access %s (Error Code: %d)\n", path, fd);
-		_exit();
+		printf("Unable to access %s (%s)\n", path, error_desc(fd));
+		return;
 	}
 
-	result = _exec(fd, c, v);
-	printf("Failed to exec file (Error Code: %d)", result);
-	_exit();
+	result = _exec(fd, argc, argv);
+	printf("Failed to exec %s (%s)", path, error_desc(result));
 }
 
-char* find_terminator(char* buf) {
-	char* p = buf;
-	while(*p) {
-		switch(*p) {
-			case ' ':
-			case '\0':
-			case FIN:
-			case FOUT:
-			case PIPE:
-				return p;
-			default:
-				p++;
-				break;
-		}
-	}
-	return p;
+static int handle_file_input(char* file) {
+    int res;
+    _close(STDIN);
+    res = _open(STDIN, file);
+    if (res < 0) printf("Failed to open file %s (%s)\n", file, error_desc(res));
+    return res;
 }
 
-int parse_and_open(int fd, char** filename, int create) {
-	int result;
-	char temp;
-	char* start = *filename + 1;
-	char* end;
-
-	while(*start == ' ') start++;
-	end = find_terminator(start);
-	temp = *end;
-	*end = '\0';
-	if (create) _fscreate(start);
-	result = _open(fd, start);
-	if (result < 0) {
-		printf("Could not open file: %s\n", start);
-		return result;
-	}
-	*end = temp;
-	*filename = end;
-	return 0;
+static int handle_file_output(char* file) {
+    int res;
+    _close(STDOUT);
+    res = _open(STDOUT, file);
+    if (res < 0) {
+        res = _create(file);
+        if (res < 0) {
+            printf("Failed to create file %s (%s)\n", file, error_desc(res));
+            return res;
+        }
+        res = _open(STDOUT, file);
+    }
+    else { // file exists, clear it out
+        unsigned long long end = 0;
+        _ioctl(STDOUT, IOC_SETEND, &end);
+    }
+    if (res < 0) printf("Failed to open file %s (%s)\n", file, error_desc(res));
+    return res;
 }
 
-int parse(char* buf, char** v) {
-	int c = 0;
-	char temp;
-	int wpipe, rpipe;
+static int handle_pipe() {
+    int wtid;
+    int wpipe = -1;
+    int rpipe = -1;
+    int res = _pipe(&wpipe, &rpipe);
 
-	while(1) {
-		while(*buf == ' ') buf++;
-		v[c++] = buf;
-		buf = find_terminator(buf);
-		for(;;) {
-			temp = *buf;
-			*buf = '\0';
-			switch(temp) {
-				case '\0':
-					return (v[c-1][0] == '\0' ? c-1 : c); // remove terminating char
+    if (res < 0) {
+        printf("Failed to create pipe (%s)\n", error_desc(res));
+        return res;
+    }
 
-				case FOUT:
-					_close(STDOUT);
-					if (parse_and_open(STDOUT, &buf, 1) < 0) return -1; 
-					continue;
-					
-				case FIN:
-					_close(STDIN);
-					if (parse_and_open(STDIN, &buf, 0) < 0) return -1;
-					continue;
+    res = _fork();
 
-				case PIPE:
-					wpipe = -1;
-					rpipe = -1;
-					if (_pipe(&wpipe, &rpipe) < 0) {
-						printf("failed to create pipe\n");
-						return -1;
-					}
-					if (_fork()) { // reader
-						_close(STDIN);
-						_close(wpipe);
-						_uiodup(rpipe, STDIN);
-						if (rpipe != STDIN)
-							_close(rpipe);
-						c = 0;
-						buf++;
-						break;
-					}
-					else { // writer
-						_close(STDOUT);
-						_close(rpipe);
-						_uiodup(wpipe, STDOUT);
-						if (wpipe != STDOUT)
-							_close(wpipe);
-						exec(c, v);
-					}
+    if (res < 0) {
+        printf("Failed to fork (%s)\n", error_desc(res));
+        return res;
+    }
 
-				case ' ':
-					while(*(++buf) == ' ') ;
-					continue;
+    if (res) { // writer
+        _close(rpipe);
 
-				default:
-					*buf = temp;
-					break;
-			}
-			break;
-		}
-	}
+        // to make sure everything exits properly, we need a 
+        // waiter proc to ensure the main proc sleeps until
+        // all child threads are done executing.
+        wtid = _fork();
+        if (wtid > 0) {
+            _close(wpipe);
+            _wait(wtid);
+            _wait(res);
+            _exit();
+        }
+
+        _close(STDOUT);
+        _iodup(wpipe, STDOUT);
+        _close(wpipe);
+    }
+    else { // reader
+        _close(wpipe);
+        _close(STDIN);
+        _iodup(rpipe, STDIN);
+        _close(rpipe);
+    }
+
+    return res;
+}
+
+static int is_terminator(char c) {
+    switch (c) {
+        case ' ':
+        case '\0':
+        case FIN:
+        case FOUT:
+        case PIPE:
+            return 1;
+        default:
+            return 0;
+    }
+}
+
+static char find_terminator(char* head, char** end) {
+    *end = head;
+    while (!is_terminator(**end)) (*end)++;
+    return **end;
+}
+
+void parse_and_exec(char* head) {
+    int argc;
+    char* argv[MAXARGS + 1]; // +1 for NULL termination
+    char* end;
+    char term;
+    int res;
+
+    SKIP_SPACES(head);
+
+    // handle args
+    for (argc = 0; argc < MAXARGS;) {
+        term = find_terminator(head, &end);
+        *end = '\0';
+        
+        if (head != end)
+            argv[argc++] = head;
+        
+        if (term != ' ') break;
+
+        end++;
+        SKIP_SPACES(end);
+        head = end;
+    }
+
+    if (argc == 0) return; // nothing to do
+
+	// Null-terminate the argument array
+	argv[argc] = NULL;
+
+    // at this point, anything remaining should be redirection
+    while (term != '\0') {
+        head = end + 1;
+        SKIP_SPACES(head);
+        switch (term) {
+            case FIN:
+                term = find_terminator(head, &end);
+                *end = '\0';
+                res = handle_file_input(head);
+                if (res < 0) return;
+                break;
+            case FOUT:
+                term = find_terminator(head, &end);
+                *end = '\0';
+                res = handle_file_output(head);
+                if (res < 0) return;
+                break;
+            case PIPE:
+                res = handle_pipe();
+                if (res < 0) return;
+                if (res)
+                    exec(argc, argv); // writer
+                else 
+                    parse_and_exec(head); // reader
+                return;
+        }
+
+        if (term == ' ') {
+            end++;
+            SKIP_SPACES(end);
+            term = *end;
+        }
+    }
+
+    exec(argc, argv);
 }
 
 void main()
 {
     char buf[BUFSIZE];
-	int c;
-	char* v[MAXARGS + 1]; 
-	int child;
+    int child;
 
-	_open(CONSOLEOUT, "/dev/uart1");	// console device
-	_close(STDIN);              		// close any existing stdin
-	_uiodup(CONSOLEOUT, STDIN);       // stdin from console
-	_close(STDOUT);              		// close any existing stdout
-	_uiodup(CONSOLEOUT, STDOUT);      // stdout to console
+    buf[BUFSIZE-1] = '\0'; // terminate
+
+	_open(CONSOLEOUT, "/dev/uart1");    // console device
+	_close(STDIN);              	    // close any existing stdin
+	_iodup(CONSOLEOUT, STDIN);          // stdin from console
+	_close(STDOUT);                     // close any existing stdout
+	_iodup(CONSOLEOUT, STDOUT);         // stdout to console
 
 	printf("Starting 391 Shell\n");
 
@@ -161,15 +214,13 @@ void main()
 
 		child = _fork();
 		if (child) {
-			// Parent process: just wait for child
+			// Parent process: wait for all children
 			_wait(child);
 		}
 		else {
 			// Child process: parse and execute
-			c = parse(buf, v);
-			if (c <= 0)
-				return;
-			exec(c, v);
+            parse_and_exec(buf);
+            _exit();
 		}
 	}
 }

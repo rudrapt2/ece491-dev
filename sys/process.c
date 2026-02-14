@@ -172,11 +172,12 @@ int process_fork(const struct trap_frame * tfr) {
 
     condition_init(&done, "fork_child_done");
     ctid = spawn_thread("fork_child", (void*)&fork_func, &done, tfr);
-    thread_attach_process(ctid, child);
 
+    // this has a memory leak since we never free the child
     if (ctid < 0)
         return ctid;
     
+    thread_attach_process(ctid, child);
     condition_wait(&done);
 
     return ctid;
@@ -197,8 +198,10 @@ void process_exit(void) {
 
     trace("%s() in %s", __func__, thread_name(running_thread()));
 
-    if (running_thread() == 0)
+    if (running_thread() == 0) {
+        flush_all_filesys();
         shutdown();
+    }
 
     discard_active_mspace();
 

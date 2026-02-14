@@ -11,11 +11,9 @@
 
 struct cache; // opaque decl.
 
-#define CACHE_BLKSZ 512
-
 // extern struct cache * create_cache(struct io * bkgio, unsigned int capacity);
 
-extern struct cache * create_cache(struct io * bkgio);
+extern struct cache * create_cache(struct io * bkgio, unsigned long cache_blksz);
 
 extern unsigned int cache_blksz(const struct cache * ca);
 

@@ -258,7 +258,7 @@ long uart_write(struct io * io, const void * buf, long buflen) {
     long n = 0; // number of bytes written so far
     int pie;
    
-    trace("%s(%ld)", __func__, len);
+    trace("%s(%ld)", __func__, buflen);
 
     if (buflen == 0)
         return 0;

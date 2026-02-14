@@ -162,6 +162,8 @@ int ioctl(struct io * io, int op, void * arg);
 #define IOC_GETPOS 6 // arg is unsigned long long *
 #define IOC_SETPOS 7 // arg is const unsigned long long *
 
+#define IOC_MAPBUF 8 // arg is const void **
+
 // Performs a special operation on an I/O object. The /op/ parameter specifies
 // the operation, one of the IOC-prefixed constants defined above. The operation
 // may take an optional argument, whis is passed via /arg/.

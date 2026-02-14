@@ -1,13 +1,13 @@
 #ifndef UMODE // cp1
-    #include "uio.h"
-    void main(struct uio * uio) {
-        uio_printf(uio, "Hello, world!\n");
+    #include "../io.h"
+    void main(struct io * termio) {
+        // outputs to termio
+        ioprintf(termio, "Hello, world!\n");
     }
-#endif
-
-#ifdef UMODE // cp2&3
+#else  // cp2&3
     #include "string.h"
     void main(void) {
+        // outputs to io in fd2
         printf("Hello, world!\n");
     }
 #endif

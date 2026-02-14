@@ -46,8 +46,10 @@ static inline struct process * current_process(void);
 // INLINE FUNCTION DEFINITIONS
 //
 
+#ifndef MP2
 static inline struct process * current_process(void) {
     return running_thread_process();
 }
+#endif
 
 #endif  // _PROCESS_H_

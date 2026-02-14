@@ -3,7 +3,7 @@ CC = gcc
 CFLAGS = -Wall -Werror=implicit-function-declaration
 LDFLAGS = -lm
 
-all: mkfs_ktfs unmkfs_ktfs
+all: mkfs_ktfs unmkfs_ktfs mkfs_ngfs unmkfs_ngfs
 
 mkfs_ktfs: mkfs_ktfs.c
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
@@ -11,5 +11,11 @@ mkfs_ktfs: mkfs_ktfs.c
 unmkfs_ktfs: unmkfs_ktfs.c
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
+mkfs_ngfs: mkfs_ngfs.c
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+unmkfs_ngfs: unmkfs_ngfs.c
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
 clean:
-	rm -rf *.o *.elf *.asm mkfs_ktfs unmkfs_ktfs
+	rm -rf *.o *.elf *.asm mkfs_ktfs unmkfs_ktfs mkfs_ngfs unmkfs_ngfs

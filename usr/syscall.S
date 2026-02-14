@@ -57,17 +57,17 @@ _open:
         ecall
         ret
 
-        .global _fscreate
-        .type   _fscreate, @function
-_fscreate:
-        li      a7, SYSCALL_FSCREATE
+        .global _create
+        .type   _create, @function
+_create:
+        li      a7, SYSCALL_CREATE
         ecall
         ret
 
-        .global _fsdelete
-        .type   _fsdelete, @function
-_fsdelete:
-        li      a7, SYSCALL_FSDELETE
+        .global _delete
+        .type   _delete, @function
+_delete:
+        li      a7, SYSCALL_DELETE
         ecall
         ret
 
@@ -92,10 +92,10 @@ _write:
         ecall
         ret
 
-        .global _fcntl
-        .type   _fcntl, @function
-_fcntl:
-        li      a7, SYSCALL_FCNTL
+        .global _ioctl
+        .type   _ioctl, @function
+_ioctl:
+        li      a7, SYSCALL_IOCTL
         ecall
         ret
 
@@ -106,10 +106,10 @@ _pipe:
         ecall
         ret
 
-        .global _uiodup
-        .type   _uiodup, @function
-_uiodup:
-        li      a7, SYSCALL_UIODUP
+        .global _iodup
+        .type   _iodup, @function
+_iodup:
+        li      a7, SYSCALL_IODUP
         ecall
         ret
 
