@@ -66,7 +66,7 @@ void rbuf_putc(struct rbuf * rb, char c) {
         rb->buf[rb->wpos++ & rb->mask] = c;
 }
 
-unsigned int rbuf_read (
+unsigned int rbuf_getb (
     struct rbuf * rb, void * buf, unsigned int bufsz)
 {
     unsigned int const ridx = rb->rpos & rb->mask;
@@ -91,7 +91,7 @@ unsigned int rbuf_read (
     return len;
 }
 
-unsigned int rbuf_write (
+unsigned int rbuf_putb (
     struct rbuf * rb, const void * buf, unsigned int buflen)
 {
     // ...
@@ -129,6 +129,8 @@ void rbuf_produced(struct rbuf * rb, unsigned int n) {
 
 unsigned int rbuf_move(struct rbuf * dst, struct rbuf * src, unsigned int n) {
     unsigned int m = 0;
+
+    // TODO Rewrite this to not use getc/putc
 
     while (n != 0 && !rbuf_full(dst) && !rbuf_empty(src)) {
         rbuf_putc(dst, rbuf_getc(src));

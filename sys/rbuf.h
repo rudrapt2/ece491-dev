@@ -28,10 +28,10 @@ extern int rbuf_getc(struct rbuf * rb);
 extern void rbuf_putc(struct rbuf * rb, char c);
 extern int rbuf_peek(struct rbuf * rb);
 
-extern unsigned int rbuf_read (
+extern unsigned int rbuf_getb (
     struct rbuf * rb, void * buf, unsigned int bufsz);
 
-extern unsigned int rbuf_write (
+extern unsigned int rbuf_putb (
     struct rbuf * rb, const void * buf, unsigned int buflen);
 
 extern const void * rbuf_rptr(struct rbuf * rb, unsigned int * lenptr);

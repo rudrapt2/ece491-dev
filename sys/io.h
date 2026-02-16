@@ -156,7 +156,7 @@ extern long iostore(struct io * io, unsigned long long pos, const void * buf, lo
 int ioctl(struct io * io, int op, void * arg);
 
 #define IOC_GETBLKSZ 0 // no arg, return value is block size
-#define IOC_RESET    1 // no arg
+#define IOC_RESET    1 // no arg, return value 0 or -ENOTSUP
 
 #define IOC_GETEND 4 // arg is unsigned long long *
 #define IOC_SETEND 5 // arg is const unsigned long long *
