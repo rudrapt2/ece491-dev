@@ -545,7 +545,7 @@ int _ptab_reset(unsigned int lvl, struct pte * pt, int keep_global) {
 		    pt[i] = null_pte();
                 } else {
                     assert (!PTE_LEAF(pt[i]));
-                    int entry_empty = _ptab_reset(lvl - 1, pp, keep_global);
+                    entry_empty = _ptab_reset(lvl - 1, pp, keep_global);
                     if(entry_empty)pt[i] = null_pte();
                     empty &= entry_empty;
                 }

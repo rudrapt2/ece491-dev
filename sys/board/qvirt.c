@@ -61,12 +61,13 @@ extern void attach_uart(void * mmio_base, int irqno); // dev/uart.c
 extern void attach_virtio(void * mmio_base, int irqno); // dev/virtio.c
 extern void attach_rtc(void * mmio_base); // dev/rtc.c
 
+extern char _kimg_end[]; // from kernel.ld
+
 void board_init(unsigned int hartid, void * dtb) {    
     console_init();
     plic_init((void*)PLIC_MMIO_BASE);
     timer_init(TIMER_FREQ);
 
-    extern char _kimg_end[]; // from kernel.ld
     #ifndef MP2
     memory_init();
     #endif

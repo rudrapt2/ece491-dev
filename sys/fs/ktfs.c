@@ -134,6 +134,7 @@ static const struct iointf file_intf = {
     .implname = "ktfs_fileio",
     .reclaim = &ktfs_close,
     .ioctl = &ktfs_cntl,
+    .ioctl_u = (int(*)(struct io*, int, uintptr_t))&ktfs_cntl,
     .read = &seekio_read,
     .write = &seekio_write,
     .fetch = &ktfs_fetch,
@@ -579,27 +580,17 @@ int ktfs_cntl(struct io *io, int cmd, void *arg) {
     // struct ktfs_file * f = (struct ktfs_file *)io;
     struct ktfs_file* f = (void*) io - offsetof(struct ktfs_file, io);
     int file_opened = f->flag & FILE_OPENED;
-    int result;
     if (!file_opened) {
         return -EACCESS;
     }
 
     switch (cmd) {
     case IOC_GETEND:
-        result = ktfs_getend(f, arg);
-        if (result) return result;
-        return seekio_ioctl(io, cmd, arg);
+        return ktfs_getend(f, arg);
     case IOC_SETEND:
-        result = ktfs_setend(f, arg);
-        if (result) return result;
-        return seekio_ioctl(io, cmd, arg);
+        return ktfs_setend(f, arg);
     case IOC_SETPOS:
-        result = ktfs_setpos(f, arg);
-        if (result) return result;
-        return seekio_ioctl(io, cmd, arg);
     case IOC_GETPOS:
-        result = ktfs_getpos(f, arg);
-        if (result) return result;
         return seekio_ioctl(io, cmd, arg);
     default:
         return -EINVAL;
@@ -665,32 +656,6 @@ int ktfs_setend(struct ktfs_file *fd, void *arg) {
 
         arbitrary_write(inode_number_to_absolute_position(fd->dentry.inode), &(fd->file_size), sizeof(uint32_t));
     }
-
-    return 0;
-}
-
-/**
- * @brief Get the current position in a file and pass it back through arg
- * @param fd The pointer of the file to inspect the current position of
- * @param arg The pointer to a unsigned long variable where the current position of the file to be written to
- * @return 0 if successful, negative value if not
- */
-int ktfs_getpos(struct ktfs_file * fd, void * arg){
-    if(arg == NULL)
-        return -EINVAL;
-
-    return 0;
-}
-
-/**
- * @brief Set the current position in a file to provided argument
- * @param fd The pointer of the file to set the position of
- * @param arg The pointer to an unsigned long which represents the new position we want to set for the file
- * @return 0 if successful, negative value if not
- */
-int ktfs_setpos(struct ktfs_file * fd, void * arg){
-    if(arg == NULL)
-        return -EINVAL;
 
     return 0;
 }
