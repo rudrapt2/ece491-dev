@@ -14,7 +14,7 @@ struct io; // extern decl.
 
 extern int mount_ngfs(const char * mpname, struct io * bkgio);
 
-#define NGFS_BLKSZ                  4096UL
+#define NGFS_BLKSZ                  512UL
 #define NGFS_DENSZ                  32UL
 #define NGFS_MAX_FILENAME_LEN       (NGFS_DENSZ  - sizeof(uint8_t) - 2*sizeof(uint32_t))
 #define NGFS_FAT_ENTRIES_PER_BLOCK  (NGFS_BLKSZ / sizeof(uint32_t))
