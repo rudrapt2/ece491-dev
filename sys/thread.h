@@ -232,7 +232,7 @@ extern int join_thread(int u_tid);
 // - The returned TID is is a child of the calling thread and the child has
 //   exited but has not yet been joined.
 //
-// See also: thread_exit().
+// See also: exit_running_thread().
 
 
 #ifndef MP2

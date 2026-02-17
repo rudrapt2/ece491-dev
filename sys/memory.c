@@ -160,7 +160,7 @@ static struct page_chunk * free_chunk_list;
 // EXPORTED FUNCTION DECLARATIONS
 //
 
-void memory_init(void) {
+void memory_init() {
     const void * const text_start = _kimg_text_start;
     const void * const text_end = _kimg_text_end;
     const void * const rodata_start = _kimg_rodata_start;
@@ -244,7 +244,7 @@ void memory_init(void) {
 
     // Initialize heap memory manager
 
-    heap_init(heap_start, heap_end - heap_end);
+    heap_init(heap_start, heap_end - heap_start);
 
     debug("Heap allocator: [%p,%p): %zu KB free", heap_start, heap_end,
           (heap_end - heap_start) / 1024);
@@ -385,15 +385,13 @@ int validate_vptr(const void * vp, size_t len, int rwxu_flags) {
 
     // Check if pointer is well-formed and region does not wrap around zero
 
-    if (vp == NULL || !wellformed(vma) || vma + len < vma)
+    if (vp == NULL || !wellformed(vma) || vma + len < vma || vma < UMEM_START_VMA || vma + len > UMEM_END_VMA)
         return -EINVAL;
     
     ptab = active_space_ptab();
 
     for (vpn = VPN(vma); vpn <= VPN(vma+len-1); vpn++) {
         pte = ptab_fetch(ptab, vpn);
-        if (pte == NULL || !PTE_VALID(*pte))
-            return -EACCESS;
         if ((pte->flags & rwxu_flags) != rwxu_flags)
             return -EACCESS;
     }
@@ -530,6 +528,7 @@ int handle_umode_page_fault(struct trap_frame * tfr, uintptr_t vma) {
 
 int _ptab_reset(unsigned int lvl, struct pte * pt, int keep_global) {
     int empty = 1; // subtable contains a mapping
+    int entry_empty;
     unsigned int i;
     void * pp;
 
@@ -539,24 +538,25 @@ int _ptab_reset(unsigned int lvl, struct pte * pt, int keep_global) {
                 pp = pageptr(pt[i].ppn);
 
                 if (lvl == 0) {
-                    assert ((pt[i].flags & (PTE_W | PTE_X)) != 0);
+                    assert ((pt[i].flags & (PTE_R | PTE_W | PTE_X)) != 0);
                     // The if the page is in RAM, return it to the allocator
                     if ((void*)_kimg_end <= pp && pp < RAM_END)
                         free_phys_page(pp);
+		    pt[i] = null_pte();
                 } else {
                     assert (!PTE_LEAF(pt[i]));
-                    empty &= _ptab_reset(lvl - 1, pp, keep_global);
+                    int entry_empty = _ptab_reset(lvl - 1, pp, keep_global);
+                    if(entry_empty)pt[i] = null_pte();
+                    empty &= entry_empty;
                 }
-
-                pt[i] = null_pte();
-            
             } else
-                empty &= ~keep_global; //Mark non-empty only if keeping globals
+                empty = !(keep_global); //Mark non-empty only if keeping globals
+
         }
     }
-
-    if (empty)
+    if (empty){
         free_phys_page(pt);
+    }
     
     return empty;
 }
