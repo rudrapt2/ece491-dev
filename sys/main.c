@@ -55,7 +55,6 @@ void main(unsigned int hartid, void * dtb) {
 
 #ifndef MP2
     // MP3 stuff
-    memory_init();
     procmgr_init();
     fsmgr_init();
 #endif

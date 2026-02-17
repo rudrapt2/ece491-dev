@@ -386,15 +386,13 @@ int validate_vptr(const void * vp, size_t len, int rwxu_flags) {
 
     // Check if pointer is well-formed and region does not wrap around zero
 
-    if (vp == NULL || !wellformed(vma) || vma + len < vma)
+    if (vp == NULL || !wellformed(vma) || vma + len < vma || vma < UMEM_START_VMA || vma + len > UMEM_END_VMA)
         return -EINVAL;
     
     ptab = active_space_ptab();
 
     for (vpn = VPN(vma); vpn <= VPN(vma+len-1); vpn++) {
         pte = ptab_fetch(ptab, vpn);
-        if (pte == NULL || !PTE_VALID(*pte))
-            return -EACCESS;
         if ((pte->flags & rwxu_flags) != rwxu_flags)
             return -EACCESS;
     }

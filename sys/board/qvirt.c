@@ -67,7 +67,12 @@ void board_init(unsigned int hartid, void * dtb) {
     timer_init(TIMER_FREQ);
 
     extern char _kimg_end[]; // from kernel.ld
+    #ifndef MP2
+    memory_init();
+    #endif
+    #ifdef MP2
     heap_init(_kimg_end, RAM_END - (void*)_kimg_end);
+    #endif
 }
 
 void attach_devices(void) {
