@@ -11,13 +11,9 @@
 
 struct cache; // opaque decl.
 
-// extern struct cache * create_cache(struct io * bkgio, unsigned int capacity);
-
 extern struct cache * create_cache(struct io * bkgio, unsigned long cache_blksz);
 
 extern unsigned int cache_blksz(const struct cache * ca);
-
-// extern int cache_fetch(struct cache * ca, unsigned long long pos, void ** pptr, int exclusive);
 
 extern int cache_fetch(struct cache * ca, unsigned long long pos, void ** pptr);
 

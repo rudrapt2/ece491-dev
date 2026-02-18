@@ -20,8 +20,6 @@
 
 #ifndef MP2
 #include "fs/ngfs.h"
-#include "fs/ktfs.h"
-#include "fs/tarfs.h"
 #include "filesys.h"
 #include "process.h"
 #endif
@@ -76,7 +74,6 @@ void main(unsigned int hartid, void * dtb) {
 #ifndef MP2
     mount_devfs(DEVMNTNAME);
     mount_drive(CMNTNAME, CDEVNAME, mount_ngfs);
-    mount_drive(DMNTNAME, DDEVNAME, mount_ktfs);
     exec_init();
 #else
     run_games();

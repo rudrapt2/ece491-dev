@@ -119,6 +119,9 @@ struct elf64_phdr {
 #define  EM_RISCV   243
 
 int elf_load(struct io * io, void (**eptr)(void)) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     static const uint32_t MAGIC_LSB = 0x464c457f;
     struct elf64_ehdr ehdr;
     struct elf64_phdr phdr;
@@ -329,4 +332,5 @@ int elf_load(struct io * io, void (**eptr)(void)) {
 
     *eptr = (void (*)(void)) ehdr.e_entry;
     return 0;
+#endif
 }

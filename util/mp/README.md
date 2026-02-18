@@ -1,0 +1,1 @@
+Utilities to generate release code and gold code for different MPs. Check Makefiles for info.

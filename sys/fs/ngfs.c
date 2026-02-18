@@ -29,6 +29,8 @@
 // INTERNAL TYPE DEFINITIONS
 //
 
+#ifndef STUDENT
+
 #define IDX_TO_ABS(block)       (ngfs->num_fat_blocks+block)
 #define DENTRYSZ                (sizeof(struct ngfs_dir_entry))
 #define FAT_ENTRYSZ             (sizeof(uint32_t))
@@ -73,6 +75,8 @@ struct ngfs {
     uint32_t num_fat_blocks;
 };
 
+#endif
+
 // INTERNAL FUNCTION DECLARATIONS
 //
 
@@ -88,6 +92,8 @@ static void ngfs_flush(struct filesystem * fs);
 static int ngfs_open_file(struct ngfs * fs, const char * name, struct io ** ioptr);
 static int ngfs_open_listing(struct ngfs * fs, struct io ** ioptr);
 static long ngfs_listing_read(struct io * io, void * buf, long bufsz);
+
+#ifndef STUDENT
 
 // Interal helper functions
 static long read_from_block(struct cache * cache, uint32_t block, uint32_t offset, void* buf, long bufsz);
@@ -106,7 +112,11 @@ static int update_size(struct ngfs * ngfs, struct ngfs_dir_entry * dentry, uint3
 static void update_pos(struct ngfs * ngfs, struct ngfs_io * fio, uint32_t newpos);
 static void clear_block(struct cache * cache, uint32_t block, uint32_t offset, uint32_t len);
 
+#endif
+
 // INTERNAL GLOBAL VARIABLES
+
+#ifndef STUDENT
 
 static const struct filesystem ngfs_fs = {
     .implname = "ngfs",
@@ -133,7 +143,12 @@ static const struct iointf ngfs_listing_io_intf = {
     .read = &ngfs_listing_read
 };
 
+#endif
+
 int mount_ngfs(const char * name, struct io * bkgio) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else 
     int result;
     struct ngfs * ngfs;
     struct cache * cache;
@@ -190,7 +205,12 @@ int mount_ngfs(const char * name, struct io * bkgio) {
     ngfs->base = ngfs_fs;
 
     return mount_filesys(name, &ngfs->base);
+#endif
 }
+
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
 
 int ngfs_open(struct filesystem * fs, const char * name, struct io ** ioptr) {
     struct ngfs * ngfs = (void *)fs;
@@ -810,3 +830,5 @@ void clear_block(struct cache * cache, uint32_t block, uint32_t offset, uint32_t
     memset((uint8_t *)data + offset, 0, len);
     cache_release(cache, data, CACHE_DIRTY);
 }
+
+#endif

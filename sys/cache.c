@@ -28,6 +28,8 @@
 // INTERNAL TYPE DEFINITIONS
 //
 
+#ifndef STUDENT
+
 /** \brief An entry in a cache
  *
  * Think of a cache as an array (or linkedlist or red-black tree? Do your design) of cache entries.
@@ -87,8 +89,12 @@ static int writable(const struct cache_entry * ent) {
     return (ent->refcnt == 0) && ent->dirty;
 }
 
+#endif
+
 // INTERNAL FUNCTION DECLARATIONS
 //
+
+#ifndef STUDENT
 
 /// @brief Converts a cache block index to a block psysical pointer.
 /// @param cache The cache for which the index should be convered.
@@ -117,10 +123,15 @@ static void cache_writeback_thrfn(struct cache * cache);
 
 extern char _kimg_blob_start[]; // TEMPORARY
 
+#endif
+
 // EXPORTED FUNCTION DEFINITIONS
 //
 
 struct cache * create_cache(struct io * bkgio, unsigned long cache_blksz) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     struct cache * cache;
     unsigned int blksz;
     int i;
@@ -168,9 +179,13 @@ struct cache * create_cache(struct io * bkgio, unsigned long cache_blksz) {
 #endif
 
     return cache;
+#endif
 }
 
 int cache_fetch(struct cache * cache, unsigned long long pos, void ** pptr) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     struct cache_entry * ent; // cache entry for block
     long rcnt; // return value from fetch
     int i; // block index
@@ -304,9 +319,13 @@ int cache_fetch(struct cache * cache, unsigned long long pos, void ** pptr) {
         return -EIO;
     
     return 0;
+#endif
 }
 
 void cache_release(struct cache * cache, void * pblk, int dirty) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     struct cache_entry * ent;
     int i;
 
@@ -363,16 +382,23 @@ void cache_release(struct cache * cache, void * pblk, int dirty) {
         } else
             condition_broadcast(&cache->writable);
     }
+#endif
 }
 
 int cache_flush(struct cache * cache) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     while (cache->dirty_cnt > 0)
         condition_wait(&cache->nodirty);
     return 0;
+#endif
 }
 
 // INTERNAL FUNCTION DEFINITIONS
 //
+
+#ifndef STUDENT
 
 void * blkidx_to_blkptr(const struct cache * cache, unsigned long idx) {
     return cache->blkbuf + idx * cache->blksz;
@@ -468,3 +494,5 @@ void cache_writeback_thrfn(struct cache * cache) {
         }
     }
 }
+
+#endif
