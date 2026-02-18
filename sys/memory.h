@@ -11,6 +11,7 @@
 #include <stdint.h>
 
 #include "trap.h"  // for struct trap_frame
+#include "board/common/mem-desc.h"
 
 // EXPORTED CONSTANTS
 //
@@ -46,7 +47,7 @@ extern char memory_initialized;
  * the heap memory manager, and adds remaining memory to the free chunk list
  * @return None
  */
-extern void memory_init(void);
+extern void memory_init(struct matlas mappings);
 
 /**
  * @brief Gets the active memory space

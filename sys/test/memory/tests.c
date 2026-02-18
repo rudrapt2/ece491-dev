@@ -72,19 +72,15 @@ void test_control_n(struct io* console, int* fail, int* total){
 }
 
 //Test 3: Initialization Test
-//Checks that the chunk list is initialized with one large chunk that has a number of
-//pages equal to the free_phys_page_count, and that there are more than 0 pages.
+//Checks that the chunk list is initialized and that there are more than 0 pages.
 //
 //Returns max page count
-//
-//TODO: Do we care about the chunklist being one large chunk? I think there's some
-//allocation strategies that split it up at startup.
 unsigned long test_init(struct page_chunk* chunklist, int* fail, int* total){
 	kprintf("Test 3: Initialization Test\n");
 	(*total)++;
 	kprintf("Found %u Free Pages\n", free_phys_page_count());
 	unsigned long max = free_phys_page_count();
-	if(chunklist->pagecnt != free_phys_page_count() || chunklist->next != NULL || max <= 0){
+	if(max <= 0){
 		fail+=1;
 		kprintf("FAIL\n");
 		return 0;
@@ -198,7 +194,7 @@ void test_best_fit(struct page_chunk* chunklist, int* fail, int* total){
 	memset(viable, 0, 128*sizeof(struct page_chunk*));
 	int found = find_best_chunks(chunklist, viable, 1, 128);
 	if(found <= 0){
-		kprintf("WARN: Out of memory, skipping.\n");
+		kprintf("WARN: Out of memory (1), skipping.\n");
 		(*fail)++; //Log OOM as fail
 		return;
 	}
@@ -219,7 +215,7 @@ void test_best_fit(struct page_chunk* chunklist, int* fail, int* total){
 	memset(viable, 0, 128*sizeof(struct page_chunk*));
 	found = find_best_chunks(chunklist, viable, 4, 128);
 	if(found <= 0){
-		kprintf("WARN: Out of memory, skipping.\n");
+		kprintf("WARN: Out of memory (4), skipping.\n");
 		(*fail)++; //Log OOM as fail
 		return;
 	}
@@ -367,7 +363,7 @@ void test_reset(struct io* console, int expected, int* fail, int* total){
 	reset_active_mspace();
 	if(wait_for_user_input(console, "yYnN", "Check that only global mappings were retained Y/N\n")/2 || free_phys_page_count() != expected){
 		(*fail)++;
-		kprintf("FAIL\n");
+		kprintf("FAIL: Expected %d pages, got %d\n", expected, free_phys_page_count());
 	}
 	kprintf("PASS\n");
 }

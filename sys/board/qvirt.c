@@ -8,6 +8,7 @@
 
 #include "console.h" // console_init();
 #include "heap.h" // heap_init()
+#include "board/common/mem-desc.h"
 
 // Run-time QEMU configuration
 //
@@ -53,7 +54,6 @@
 
 // Device attach function declarations
 //
-
 extern void plic_init(void * mmio_base); // plic.c
 extern void timer_init(unsigned int freq); // timer.c
 
@@ -62,6 +62,26 @@ extern void attach_virtio(void * mmio_base, int irqno); // dev/virtio.c
 extern void attach_rtc(void * mmio_base); // dev/rtc.c
 
 extern char _kimg_end[]; // from kernel.ld
+// Memory descriptors
+//
+
+static struct mregion qvirt_ram[] = {
+    { 0x80000000, 0x0800000 }, {0x0, 0}
+};
+
+static struct mregion qvirt_mmio[] = {
+    { 0x00000000, 0x080000000 }, {0x0, 0}
+};
+
+static struct mregion qvirt_resv[] = {
+    { 0x80000000, 0x040000 }, {0x80040000, 0x020000}, {0x80600000, 0x200000}, {0x0, 0}
+};
+
+static const struct matlas qvirt_matlas = {
+    .ram = qvirt_ram,
+    .mmio = qvirt_mmio,
+    .resv = qvirt_resv
+};
 
 void board_init(unsigned int hartid, void * dtb) {    
     console_init();
@@ -69,7 +89,7 @@ void board_init(unsigned int hartid, void * dtb) {
     timer_init(TIMER_FREQ);
 
     #ifndef MP2
-    memory_init();
+    memory_init(qvirt_matlas);
     #endif
     #ifdef MP2
     heap_init(_kimg_end, RAM_END - (void*)_kimg_end);
