@@ -315,7 +315,7 @@ static void map_startup(struct mregion* regions, uint32_t size, int rwx_flags){
 				//Allocate gigapage if we need to place megapage inside
 				void* ptr = alloc_phys_page();
 				memset(ptr, 0, PAGE_SIZE);
-				main_pt2[VPN2(pp)] = ptab_pte(ptr, PTE_G);
+				main_pt2[VPN2(pp)] = ptab_pte(ptr, 0); //Not a global page
 			}
 			struct pte* pt1 = pageptr(main_pt2[VPN2(pp)].ppn);
 			if(ROUND_UP(pp, MEGA_SIZE) == pp && pp + MEGA_SIZE <= end){
@@ -327,7 +327,7 @@ static void map_startup(struct mregion* regions, uint32_t size, int rwx_flags){
 				//Allocate megapage if we need to place page inside
 				void* ptr = alloc_phys_page();
 				memset(ptr, 0, PAGE_SIZE);
-				pt1[VPN1(pp)] = ptab_pte(ptr, PTE_G);
+				pt1[VPN1(pp)] = ptab_pte(ptr, 0); //Not a global page
 			}
 			struct pte* pt0 = pageptr(main_pt2[VPN1(pp)].ppn);
 			pt0[VPN0(pp)] = leaf_pte((void*)pp, rwx_flags | PTE_G);
