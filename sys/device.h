@@ -117,4 +117,12 @@ extern int open_device(const char * name, struct io ** ioptr);
 // On return open_device() guarantees (on success):
 // - *ioptr points to a valid I/O object with a non-zero reference count.
 
+extern int device_exists(const char * name);
+
+// TODO
+
+extern int device_ioaddref_openfn(struct io ** ioptr, void * aux);
+
+// TODO
+
 #endif
