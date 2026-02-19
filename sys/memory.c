@@ -721,9 +721,8 @@ int _ptab_reset(unsigned int lvl, struct pte * pt, int keep_global) {
 
 				if (lvl == 0) {
 					assert ((pt[i].flags & (PTE_R | PTE_W | PTE_X)) != 0);
-					// The if the page is in RAM, return it to the allocator
-					if ((void*)_kimg_end <= pp && pp < RAM_END)
-						free_phys_page(pp);
+					// No guarantees which pages are in RAM
+					free_phys_page(pp);
 					pt[i] = null_pte();
 				} else {
 					assert (!PTE_LEAF(pt[i]));
