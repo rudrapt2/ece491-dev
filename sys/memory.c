@@ -142,10 +142,7 @@ static inline struct pte leaf_pte(const void * pp, uint_fast8_t rwxug_flags);
 static inline struct pte ptab_pte(const struct pte * pt, uint_fast8_t g_flag);
 static inline struct pte null_pte(void);
 
-static void map_startup(struct mregion* regions, uint32_t size, int rwx_flags);
-static void modify_startup(struct mregion* regions, uint32_t size, int rwx_flags);
 static void subdivide(struct pte* entry, uintptr_t size);
-
 static void combine(struct mregion* arr, uint32_t size);
 
 static int cmp_mregion(void * a, void * b);
@@ -168,6 +165,9 @@ static struct page_chunk * free_chunk_list;
 //ASSUMES:
 //- resv region is a strict subset of ram regions
 //- mmio region will never coincide with ram regions (pma)
+//- mmio region is gigapage aligned
+//- RAM is megapage aligned if >2MB, and gigapage aligned if >1GB
+//- Kernel is page aligned
 void memory_init(struct matlas mappings) {
 	struct mregion kernel_text = {
 		.pma = (uintptr_t)_kimg_text_start,
@@ -191,17 +191,23 @@ void memory_init(struct matlas mappings) {
 	uint32_t resv_array_size = 0;
 	uint32_t ram_array_size = 0;
 	uint32_t mmio_array_size = 0;
-	while(mappings.resv[resv_array_size++].size != 0x0);
-	while(mappings.ram[++ram_array_size].size != 0x0);
-	while(mappings.mmio[++mmio_array_size].size != 0x0);
+	while(mappings.resv[resv_array_size].size != 0x0)
+		resv_array_size++;
+	resv_array_size++; //To add the kernel in later
+	while(mappings.ram[ram_array_size].size != 0x0)
+		ram_array_size++;
+	while(mappings.mmio[mmio_array_size].size != 0x0)
+		mmio_array_size++;
+
 	//If there is no RAM, we fail. (Who's hopes and dreams did we load the kernel into and start the stack on???)
 	assert(ram_array_size > 0);
 
 	//Probably don't need to check this because elf files are guaranteed to be page aligned but I do it to be safe anyway.
+	//Add the kernel to the reserved regions (to appease the free chunk list)
 	mappings.resv[resv_array_size-1].pma = ROUND_DOWN((uintptr_t)(void*)_kimg_start, PAGE_SIZE);
 	mappings.resv[resv_array_size-1].size = ROUND_UP((uintptr_t)(void*)_kimg_end, PAGE_SIZE) - ROUND_DOWN((uintptr_t)(void*)_kimg_start, PAGE_SIZE);
 
-	//We then sort to avoid O(n^2) while initializing the free chunk list.
+	//We then sort for a much easier time while initializing the free chunk list.
 	sort((uintptr_t)(void*)mappings.resv, sizeof(struct mregion), resv_array_size, cmp_mregion);
 	sort((uintptr_t)(void*)mappings.ram, sizeof(struct mregion), ram_array_size, cmp_mregion);
 	sort((uintptr_t)(void*)mappings.mmio, sizeof(struct mregion), mmio_array_size, cmp_mregion);
@@ -211,30 +217,20 @@ void memory_init(struct matlas mappings) {
 	combine(mappings.ram, ram_array_size);
 	combine(mappings.mmio, mmio_array_size);
 
-	//Initialize free_chunk_list to start of RAM.
+	//Initialize free_chunk_list to NULL.
 	free_chunk_list = NULL;
 	struct page_chunk** curr = &free_chunk_list;
 	uintptr_t chunk_start = mappings.ram->pma; //first entry guaranteed to be non-NULL
 
 	//Build free_chunk_list
 	//ASSUME: Resv is a strict subset of RAM
+	//TODO Do we want to make students do this? I think the algorithm is interesting and forces you to think about
+	//what your mregion structs actually represent, while also not dealing with page table stuff which is new to
+	//students. I can give a mini lecture about this if needed. I'll also run office hours the whole week specifically 
+	//for conceptual memory help because this would be my fault and you can publicize that.
 	for(int ram_idx = 0, resv_idx = 0; ram_idx < ram_array_size;){
-		while(mappings.resv[resv_idx].size == 0x0 && resv_idx < resv_array_size){resv_idx++;} //Ignore NULLs
-
-		//RAM: -----------------------    ------------------------
-		//RESV:------- -- ------ -   -     -------- --- -----   - 
-		//if we take a sliding window of chunk start:
-		//set chunk start to ram start
-		//	check first reserved region is before end of RAM
-		//	yes: sz = chunk start
-		//	no: sz = ram[idx]->sz
-		//	if size is 0 don't update the linked list
-		//	else set linked list to chunk and update dptr to point to next
-		//	update start:
-		//		check first reserved region is before end of RAM
-		//		yes: start = end of the chunk, increment the resv idx
-		//		no: start = start of next RAM, increment RAM idx
-
+		while(mappings.resv[resv_idx].size == 0x0 && resv_idx < resv_array_size)
+			resv_idx++; //Ignore NULLs
 		unsigned long sz = 0;
 		uintptr_t start = chunk_start;
 		if(mappings.ram[ram_idx].pma + mappings.ram[ram_idx].size < mappings.resv[resv_idx].pma || resv_idx >= resv_array_size){
@@ -263,26 +259,153 @@ void memory_init(struct matlas mappings) {
 	//Redundant, but clear the table.
 	memset(main_pt2, 0, 4096);
 
+	uintptr_t pp;
+	uintptr_t end;
+	unsigned long align;
+
 	//Map MMIO
-	map_startup(mappings.mmio, mmio_array_size, PTE_R | PTE_W);
+	//- RAM is megapage aligned if >2MB, and gigapage aligned if >1GB
+	//- Kernel is page aligned
+	for(int i = 0; i < mmio_array_size; i++){
+		pp = mappings.mmio[i].pma;
+		align = GIGA_SIZE; //ASSUME: MMIO region is always gigapage aligned.
+		end = pp + mappings.mmio[i].size;
+		while(pp < end){
+			//Index into the main page table, then set up gigapage mappings to go
+			//1:1 from virtual to physical through the whole region
+			main_pt2[VPN2(pp)] = leaf_pte((void*)pp, PTE_R | PTE_W | PTE_G);
+			pp+=align; //This can be hardcoded to GIGA_SIZE but left as align for
+				   //consistency reasons
+		}
+	}
 
 	//Map RAM (R/W)
-	map_startup(mappings.ram, ram_array_size, PTE_R | PTE_W);
+	for(int i = 0; i < ram_array_size; i++){
+		pp = mappings.ram[i].pma;
+		if(mappings.ram[i].size < GIGA_SIZE){
+			align = MEGA_SIZE;
+			//If we are megapage aligned, allocate a
+			//page so we can map in megapages.
+			//Intermediate pages SHOULD NOT be global (so that other parts of 
+			//the region can later be allocated by other things that may not 
+			//want to share it.)
+			main_pt2[VPN2(pp)] = ptab_pte(alloc_phys_page(), 0);
+		}else align = GIGA_SIZE;
+		end = pp + mappings.ram[i].size;
+		while(pp < end){
+			switch(align){
+				case GIGA_SIZE:
+					main_pt2[VPN2(pp)] = leaf_pte((void*)pp, PTE_R | PTE_W | PTE_G);
+					break;
+				case MEGA_SIZE:
+					struct pte* pt1 = pageptr(main_pt2[VPN2(pp)].ppn);
+					//You can index into the lv 1 page table the same way that you
+					//do with the lv 2 one, just different bits of the address that
+					//go in.
+					pt1[VPN1(pp)] = leaf_pte((void*)pp, PTE_R | PTE_W | PTE_G);
+					break;
+			}
+			pp+=align;
+		}
+	}
 
-	//Map Reserved regions
-	modify_startup(mappings.resv, resv_array_size, PTE_R);
+	//Map Reserved regions (R)
+	//Assume this is a strict subset of RAM, so there will already be other mappings in this area
+	for(int i = 0; i < resv_array_size; i++){
+		if(mappings.resv[i].pma == (uintptr_t)_kimg_start) //If this is the kernel we can deal with it later
+			continue;
+		pp = mappings.resv[i].pma;
+		if(mappings.resv[i].size < GIGA_SIZE){
+			if(PTE_LEAF(main_pt2[VPN2(pp)])) //If this entry is a leaf too early, subdivide it.
+				subdivide(main_pt2 + VPN2(pp), MEGA_SIZE);
+			if(mappings.resv[i].size < MEGA_SIZE){
+				struct pte* pt1 = pageptr(main_pt2[VPN2(pp)].ppn);
+				if(PTE_LEAF(pt1[VPN1(pp)])) //Same deal as above
+					subdivide(pt1 + VPN1(pp), PAGE_SIZE);
+				align = PAGE_SIZE;
+			}else align = MEGA_SIZE;
+		}else align = GIGA_SIZE;
+		end = mappings.resv[i].pma + mappings.resv[i].size;
+		while(pp < end){
+			struct pte* pt1;
+			struct pte* pt0;
+			switch(align){
+				case GIGA_SIZE:
+					main_pt2[VPN2(pp)] = leaf_pte((void*)pp, PTE_R | PTE_G);
+					break;
+				case MEGA_SIZE:
+					pt1 = pageptr(main_pt2[VPN2(pp)].ppn);
+					//You can index into the lv 1 page table the same way that you
+					//do with the lv 2 one, just different bits of the address that
+					//go in.
+					pt1[VPN1(pp)] = leaf_pte((void*)pp, PTE_R | PTE_G);
+					break;
+				case PAGE_SIZE:
+					pt1 = pageptr(main_pt2[VPN2(pp)].ppn);
+					pt0 = pageptr(pt1[VPN1(pp)].ppn);
+					pt0[VPN0(pp)] = leaf_pte((void*)pp, PTE_R | PTE_G);
+					break;
+			}
+			pp+=align;
+		}
+	}
 
 	//Map Kernel
-	modify_startup(&kernel_text, 1, PTE_R | PTE_X);
-	modify_startup(&kernel_rodata, 1, PTE_R);
-	modify_startup(&kernel_data, 1, PTE_R | PTE_W);
+	//Text region (R/X)
+	//We assume page alignment on the kernel since it's so small.
+	pp = kernel_text.pma;
+	align = PAGE_SIZE; //ASSUME: MMIO region is always gigapage aligned.
+	end = pp + kernel_text.size;
+	while(pp < end){
+		if(PTE_LEAF(main_pt2[VPN2(pp)])) //If this entry is a leaf too early, subdivide it.
+			subdivide(main_pt2 + VPN2(pp), MEGA_SIZE);
+		struct pte* pt1 = pageptr(main_pt2[VPN2(pp)].ppn);
+		if(PTE_LEAF(pt1[VPN1(pp)])) //Same deal as above
+			subdivide(pt1 + VPN1(pp), PAGE_SIZE);
+		struct pte* pt0 = pageptr(pt1[VPN1(pp)].ppn);
+		pt0[VPN0(pp)] = leaf_pte((void*)pp, PTE_R | PTE_X | PTE_G);
+		pp+=align; //This can be hardcoded to GIGA_SIZE but left as align for
+			   //consistency reasons
+	}
+
+	//Rodata region (R)
+	pp = kernel_rodata.pma;
+	align = PAGE_SIZE; //ASSUME: MMIO region is always gigapage aligned.
+	end = pp + kernel_rodata.size;
+	while(pp < end){
+		if(PTE_LEAF(main_pt2[VPN2(pp)])) //If this entry is a leaf too early, subdivide it.
+			subdivide(main_pt2 + VPN2(pp), MEGA_SIZE);
+		struct pte* pt1 = pageptr(main_pt2[VPN2(pp)].ppn);
+		if(PTE_LEAF(pt1[VPN1(pp)])) //Same deal as above
+			subdivide(pt1 + VPN1(pp), PAGE_SIZE);
+		struct pte* pt0 = pageptr(pt1[VPN1(pp)].ppn);
+		pt0[VPN0(pp)] = leaf_pte((void*)pp, PTE_R | PTE_G);
+		pp+=align; //This can be hardcoded to GIGA_SIZE but left as align for
+			   //consistency reasons
+	}
+
+	//Data region (R/W)
+	pp = kernel_data.pma;
+	align = PAGE_SIZE; //ASSUME: MMIO region is always gigapage aligned.
+	end = pp + kernel_rodata.size;
+	while(pp < end){
+		if(PTE_LEAF(main_pt2[VPN2(pp)])) //If this entry is a leaf too early, subdivide it.
+			subdivide(main_pt2 + VPN2(pp), MEGA_SIZE);
+		struct pte* pt1 = pageptr(main_pt2[VPN2(pp)].ppn);
+		if(PTE_LEAF(pt1[VPN1(pp)])) //Same deal as above
+			subdivide(pt1 + VPN1(pp), PAGE_SIZE);
+		struct pte* pt0 = pageptr(pt1[VPN1(pp)].ppn);
+		pt0[VPN0(pp)] = leaf_pte((void*)pp, PTE_R | PTE_W | PTE_G);
+		pp+=align; //This can be hardcoded to GIGA_SIZE but left as align for
+			   //consistency reasons
+	}
 
 	// Enable paging; this part always makes me nervous.
 
 	main_mtag = ptab_to_mtag(main_pt2, 0);
 	csrw_satp(main_mtag);
 
-	//Since our RAM can be non-contiguous I just initialize with no grant and let the heap allocate
+	//Since our RAM can be non-contiguous, initialize with no grant and let the heap allocate
 	//for itself later
 	heap_init(NULL, 0);
 
@@ -296,76 +419,9 @@ void memory_init(struct matlas mappings) {
 	memory_initialized = 1;
 }
 
-//I would suggest shipping this function as part of an optimized object file so that it cannot
-//be reverse engineered easily.
-//This function should be safe to optimize. Might have to accept main_pt2 as an arg.
-//It's probably also safe to ship, though, since it doesn't actually do any remapping between
-//physical and virtual page (doesn't call alloc)
-static void map_startup(struct mregion* regions, uint32_t size, int rwx_flags){
-	for(int i = 0; i < size; i++){
-		uintptr_t pp = regions[i].pma;
-		uintptr_t end = regions[i].pma + regions[i].size;
-		while(pp < end){
-			if(ROUND_UP(pp, GIGA_SIZE) == pp && pp + GIGA_SIZE <= end){
-				main_pt2[VPN2(pp)] = leaf_pte((void*)pp, rwx_flags | PTE_G);
-				pp+=GIGA_SIZE;
-				continue;
-			}
-			if(!PTE_VALID(main_pt2[VPN2(pp)])){
-				//Allocate gigapage if we need to place megapage inside
-				void* ptr = alloc_phys_page();
-				memset(ptr, 0, PAGE_SIZE);
-				main_pt2[VPN2(pp)] = ptab_pte(ptr, 0); //Not a global page
-			}
-			struct pte* pt1 = pageptr(main_pt2[VPN2(pp)].ppn);
-			if(ROUND_UP(pp, MEGA_SIZE) == pp && pp + MEGA_SIZE <= end){
-				pt1[VPN1(pp)] = leaf_pte((void*)pp, rwx_flags | PTE_G);
-				pp+=MEGA_SIZE;
-				continue;
-			}
-			if(!PTE_VALID(pt1[VPN1(pp)])){
-				//Allocate megapage if we need to place page inside
-				void* ptr = alloc_phys_page();
-				memset(ptr, 0, PAGE_SIZE);
-				pt1[VPN1(pp)] = ptab_pte(ptr, 0); //Not a global page
-			}
-			struct pte* pt0 = pageptr(main_pt2[VPN1(pp)].ppn);
-			pt0[VPN0(pp)] = leaf_pte((void*)pp, rwx_flags | PTE_G);
-			pp+=PAGE_SIZE;
-		}
-	}
-}
-
-//Same deal as above function
-static void modify_startup(struct mregion* regions, uint32_t size, int rwx_flags){
-	for(int i = 0; i < size; i++){
-		uintptr_t pp = regions[i].pma;
-		uintptr_t end = regions[i].pma + regions[i].size;
-		while(pp < end){
-			if(ROUND_UP(pp, GIGA_SIZE) == pp && pp + GIGA_SIZE <= end && PTE_LEAF(main_pt2[VPN2(pp)])){
-				main_pt2[VPN2(pp)] = leaf_pte((void*)pp, rwx_flags | PTE_G);
-				pp+=GIGA_SIZE;
-				continue;
-			}
-			//If it's a leaf, we need to subdivide so we can generate more granular modifications
-			if(PTE_LEAF(main_pt2[VPN2(pp)]))subdivide(main_pt2 + VPN2(pp), MEGA_SIZE);
-			struct pte* pt1 = pageptr(main_pt2[VPN2(pp)].ppn);
-			if(ROUND_UP(pp, MEGA_SIZE) == pp && pp + MEGA_SIZE <= end && PTE_LEAF(pt1[VPN1(pp)])){
-				pt1[VPN1(pp)] = leaf_pte((void*)pp, rwx_flags | PTE_G);
-				pp+=MEGA_SIZE;
-				continue;
-			}
-			if(PTE_LEAF(pt1[VPN1(pp)]))subdivide(pt1 + VPN1(pp), PAGE_SIZE);
-			struct pte* pt0 = pageptr(pt1[VPN1(pp)].ppn);
-			pt0[VPN0(pp)] = leaf_pte((void*)pp, rwx_flags | PTE_G);
-			pp+=PAGE_SIZE;
-		}
-	}
-}
-
-//I would suggest handing this function out. It helps a lot when dealing
-//with higher order pages.
-//You shouldn't ever call this on global pages *except* at startup
+//Do not call this function on global pages after there can possibly have been a memory space
+//clone. That's foot shooting. I allow it syntactically, but don't do it :thumbs_up:
+//TODO make students write? Maybe a bit too integral though...
 static void subdivide(struct pte* entry, uintptr_t size){
 	assert(PTE_LEAF(*entry));
 	struct pte* internal_page = alloc_phys_page();
@@ -391,6 +447,11 @@ static void combine(struct mregion* arr, uint32_t size) {
 	}
 }
 
+//TODO make students write this? Doesn't rely on knowledge of sort syntax, but makes you think about
+//ordering mregion entries
+//Return >0 if a > b
+//Return <0 if a < b
+//Return 0 if a == b
 static int cmp_mregion(void * a, void * b){
 	if(((struct mregion*)a)->pma > ((struct mregion*)b)->pma)return 1;
 	if(((struct mregion*)a)->pma < ((struct mregion*)b)->pma)return -1;
@@ -721,13 +782,13 @@ int _ptab_reset(unsigned int lvl, struct pte * pt, int keep_global) {
 
 				if (lvl == 0) {
 					assert ((pt[i].flags & (PTE_R | PTE_W | PTE_X)) != 0);
-					// No guarantees which pages are in RAM
 					free_phys_page(pp);
 					pt[i] = null_pte();
 				} else {
 					assert (!PTE_LEAF(pt[i]));
 					int entry_empty = _ptab_reset(lvl - 1, pp, keep_global);
-					if(entry_empty)pt[i] = null_pte();
+					if(entry_empty)pt[i] = null_pte(); //Remove the mapping if
+									   //it's empty
 					empty &= entry_empty;
 				}
 			} else
@@ -737,7 +798,6 @@ int _ptab_reset(unsigned int lvl, struct pte * pt, int keep_global) {
 	if (empty){
 		free_phys_page(pt);
 	}
-
 	return empty;
 }
 
