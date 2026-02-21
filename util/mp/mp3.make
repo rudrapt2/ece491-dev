@@ -5,7 +5,7 @@
 # =========================
 
 SRC_DIR     := /home/rudrapt2/sp26_ece391/glycine-max
-TARGET_DIR  := /home/rudrapt2/sp26_ece391/mp3-sp26/gold/cp1
+TARGET_DIR  := /home/rudrapt2/sp26_ece391/mp3-sp26/gold/cp2_3
 
 # List of files to copy.
 # Format: "source:destination" OR "path" (if source and dest are same)
@@ -118,7 +118,7 @@ endef
 # Phony targets
 # =========================
 
-.PHONY: mp3_gold mp3_release copy_files preprocess_assembly check_clean
+.PHONY: mp3_gold_cp1 mp3_gold_cp2_3 mp3_release copy_files preprocess_assembly check_clean
 
 # -------------------------
 # Safety Prompt
