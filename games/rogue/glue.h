@@ -4,15 +4,11 @@
 #ifndef _GLUE_H_
 #define _GLUE_H_
 
-// #include "io.h"
+#include <cstddef>
 #include <stdint.h>
-#include "usr/string.h"
-#include "usr/syscall.h"
 
-// extern struct io_intf * stdio;
 extern const char * const termcap;
 
-// extern int printf(const char * fmt, ...);
 extern int sprintf(char * buf, const char * fmt, ... );
 extern char * strcpy(char * dst, const char * src);
 extern char * strcat(char * dst, const char * src);
@@ -25,7 +21,7 @@ extern int fread(void *ptr, size_t size, size_t nmemb, int fd);
 extern void sleep(unsigned int cnt);
 extern int putchar(int c);
 extern int getchar(void);
-extern void exit(void);
+extern inline void exit(void);
 
 extern int random_seed(void);
 

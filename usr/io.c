@@ -139,9 +139,6 @@ int ioctl(struct io * io, int op, void * arg) {
 }
 
 int ioctl_u(struct io * io, int op, uintptr_t u_arg) {
-    if (op == IOC_GETBLKSZ)
-        return io->blksz;
-    
     if (io->intf->ioctl_u != NULL)
         return io->intf->ioctl_u(io, op, u_arg);
     else

@@ -10,44 +10,44 @@ OBJCOPY=$(TOOLPREFIX)objcopy
 OBJDUMP=$(TOOLPREFIX)objdump
 
 ZORK_OBJS = \
-	actors.o \
-	ballop.o \
-	clockr.o \
-	demons.o \
-	dgame.o \
-	dinit.o \
-	dmain.o \
-	dso1.o \
-	dso2.o \
-	dso3.o \
-	dso4.o \
-	dso5.o \
-	dso6.o \
-	dso7.o \
-	dsub.o \
-	dverb1.o \
-	dverb2.o \
-	gdt.o \
-	lightp.o \
-	local.o \
-	nobjs.o \
-	np1.o \
-	np2.o \
-	np3.o \
-	np.o \
-	nrooms.o \
-	objcts.o \
-	rooms.o \
-	sobjs.o \
-	supp.o \
-	sverbs.o \
-	verbs.o \
-	villns.o \
-	glue.o \
-	string.o \
-	syscall.o \
-	heap.o \
-	start.o \
+	source/actors.o \
+	source/ballop.o \
+	source/clockr.o \
+	source/demons.o \
+	source/dgame.o \
+	source/dinit.o \
+	source/dmain.o \
+	source/dso1.o \
+	source/dso2.o \
+	source/dso3.o \
+	source/dso4.o \
+	source/dso5.o \
+	source/dso6.o \
+	source/dso7.o \
+	source/dsub.o \
+	source/dverb1.o \
+	source/dverb2.o \
+	source/gdt.o \
+	source/lightp.o \
+	source/local.o \
+	source/nobjs.o \
+	source/np1.o \
+	source/np2.o \
+	source/np3.o \
+	source/np.o \
+	source/nrooms.o \
+	source/objcts.o \
+	source/rooms.o \
+	source/sobjs.o \
+	source/supp.o \
+	source/sverbs.o \
+	source/verbs.o \
+	source/villns.o \
+	usr/string.o \
+	usr/syscall.o \
+	usr/heap.o \
+	usr/start.o \
+	glue.o
 
 # ZORK_OBJS_MP2 = $(addprefix mp2_, $(ZORK_OBJS))
 # ZORK_OBJS_MP3 = $(addprefix mp3_, $(ZORK_OBJS))
@@ -70,12 +70,6 @@ all: mp3
 
 mp3: $(ZORK_OBJS)
 	$(LD) -T umode.ld -o zork.elf $^
-
-# dtextc.o: dtextc.dat
-# 	echo .end | $(AS) $(ASFLAGS) -o $@
-# 	$(OBJCOPY) \
-# 	  --set-section-flags .dtextc=alloc,load,readonly,data \
-# 	  --add-section .dtextc=dtextc.dat $@
 
 clean:
 	rm -rf *.o *.elf

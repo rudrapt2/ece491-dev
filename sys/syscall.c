@@ -4,6 +4,7 @@
 // SPDX-License-identifier: NCSA
 //
 
+#include <stdint.h>
 #ifdef SYSCALL_TRACE
 #define TRACE
 #endif
@@ -183,7 +184,7 @@ int sysprint(const char *msg) {
 
     trace("%s(\"%s\")", __func__, msg);
 
-    kprintf("<%s:%d> %s\n",
+    kprintf("<%s:%d> USER: %s\n",
             thread_name(running_thread()), running_thread(), msg);
 
     return 0;
@@ -390,6 +391,8 @@ long syswrite(int fd, const void *buf, size_t len) {
 
 int sysioctl(int fd, int op, uintptr_t arg_uma) {
     struct process * self;
+    uint8_t flags = PTE_U;
+    int result;
 
     trace("%s(%d,%d,%p)", __func__, fd, op, arg_uma);
 
@@ -401,7 +404,28 @@ int sysioctl(int fd, int op, uintptr_t arg_uma) {
     if (self->iotab[fd] == NULL)
         return -EBADF;
 
-    return ioctl_u(self->iotab[fd], op, arg_uma);
+    switch (op) {
+    case IOC_SETPOS:
+    case IOC_SETEND:
+        flags |= PTE_W;
+
+    // fall through
+    case IOC_GETPOS:
+    case IOC_GETEND:
+        flags |= PTE_R;
+
+        result = validate_vptr(
+            (void *)arg_uma, sizeof(unsigned long long), flags);
+        if (result != 0)
+            return result;
+        
+    // fall through
+    case IOC_GETBLKSZ:
+        return ioctl(self->iotab[fd], op, (void *)arg_uma);
+
+    default: // unknown arg, let device handle
+        return ioctl_u(self->iotab[fd], op, arg_uma);
+    }
 }
 
 int syspipe(int * wfdptr, int * rfdptr) {

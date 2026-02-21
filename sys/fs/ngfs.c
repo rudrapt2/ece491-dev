@@ -15,7 +15,6 @@
 #include "ngfs.h"
 
 #include "../cache.h"
-#include "../console.h"
 #include "../device.h"
 #include "../error.h"
 #include "../filesys.h"
@@ -133,8 +132,7 @@ static const struct iointf ngfs_file_intf = {
     .write = &seekio_write,
     .fetch = &ngfs_fetch,
     .store = &ngfs_store,
-    .ioctl = &ngfs_ioctl,
-    .ioctl_u = (int(*)(struct io*, int, uintptr_t))&ngfs_ioctl
+    .ioctl = &ngfs_ioctl
 };
 
 static const struct iointf ngfs_listing_io_intf = {

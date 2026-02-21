@@ -68,10 +68,9 @@ void board_init(unsigned int hartid, void * dtb) {
     plic_init((void*)PLIC_MMIO_BASE);
     timer_init(TIMER_FREQ);
 
-    #ifndef MP2
+    #if !(defined(MP2) || defined(MP3CP1))
     memory_init();
-    #endif
-    #ifdef MP2
+    #else
     heap_init(_kimg_end, RAM_END - (void*)_kimg_end);
     #endif
 }

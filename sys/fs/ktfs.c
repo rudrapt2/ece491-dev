@@ -134,7 +134,6 @@ static const struct iointf file_intf = {
     .implname = "ktfs_fileio",
     .reclaim = &ktfs_close,
     .ioctl = &ktfs_cntl,
-    .ioctl_u = (int(*)(struct io*, int, uintptr_t))&ktfs_cntl,
     .read = &seekio_read,
     .write = &seekio_write,
     .fetch = &ktfs_fetch,

@@ -4,7 +4,7 @@
 #include <stdarg.h>
 
 #include "glue.h"
-
+#define AEE31
 #if defined AEE0 + defined AEE1 + defined AEE2 + defined AEE31 + defined AEE32 > 1
 #error "Exactly one of AEE0, AEE1, AEE2, AEE31, or AEE32 must be defined"
 #endif

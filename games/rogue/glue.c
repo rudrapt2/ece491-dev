@@ -6,13 +6,6 @@
 #include <stddef.h>
 #include <limits.h>
 
-#define STARTING_FD     3 // stdin, stdout, and uart are opened by default
-#define RAND_DEFAULT    391
-
-static int rtc_fd;
-static int rng_fd;
-static uint8_t open_devices = 0;
-
 const char * const termcap = ""
 "vt100|vt100-am|dec vt100 (w/advanced video):"
 ":am:bs:ms:xn:xo:"
@@ -29,32 +22,6 @@ const char * const termcap = ""
 ":nd=\\E[C:r2=\\E>\\E[?3l\\E[?4l\\E[?5l\\E[?7h\\E[?8h:rc=\\E8:"
 ":sc=\\E7:se=\\E[m:sf=^J:so=\\E[7m:sr=\\EM:st=\\EH:ta=^I:ue=\\E[m:"
 ":up=\\E[A:us=\\E[4m";
-
-static int time(uint64_t *timebuf);
-static void rtc_init(void);
-static void rand_init(void);
-
-void main(int argc, char *argv[]) {
-    extern int rogue_main(int argc, char *argv[]);
-    rtc_init();
-    rand_init();
-    rogue_main(argc, argv);
-    exit();
-}
-
-void exit() {
-    
-    // close devices
-    if (rtc_fd >= 0) {
-        _close(rtc_fd);
-    }
-    
-    if (rng_fd >= 0) {
-        _close(rng_fd);
-    }
-    
-    _exit();
-}
 
 int sprintf(char * buf, const char * fmt, ... ) {
     int n;
@@ -73,19 +40,31 @@ extern char * strcat(char * dst, const char * src) {
     return strncpy(dst + strlen(dst), src, 256);
 }
 
-#define NANOSECONDS_PER_SECOND  1000000000
+#define RAND_DEFAULT    391
+
+static int rng_fd;
+static void rand_init(void);
+
+void main(int argc, char *argv[]) {
+    extern int rogue_main(int argc, char *argv[]);
+    rand_init();
+    rogue_main(argc, argv);
+    exit();
+}
+
+inline void exit() {
+    _exit();
+}
+
+#define MICROSECONDS_PER_SECOND  1000000
 
 int fopen(const char *fname) {
     int result;
-    _fscreate(fname);
-    if ((result = _open(STARTING_FD + open_devices, fname)) >= 0) {
-        open_devices++;
-    }
-    return result;
+    _create(fname);
+    return _open(-1, fname);
 }
 
 int fclose(int fd) {
-    open_devices--;
     return _close(fd);
 }
 
@@ -106,15 +85,7 @@ int fread(void *ptr, size_t size, size_t nmemb, int fd) {
 }
 
 void sleep(unsigned int cnt) {
-    uint64_t time_start;
-    uint64_t time_now;
-
-    // Very hack
-
-    time(&time_start);
-    do {
-        time(&time_now);
-    } while (time_now < time_start + (uint64_t)cnt * NANOSECONDS_PER_SECOND);
+    _usleep(cnt * MICROSECONDS_PER_SECOND);
 }
 
 int putchar(int c) {
@@ -126,54 +97,25 @@ int getchar(void) {
     return getc();
 }
 
-void rtc_init(void) {
-    if ((rtc_fd = _open(STARTING_FD + open_devices, "dev/rtc0")) < 0) {
-        printf("RTC failed to open\n");
-    } else {
-        open_devices++;
-    }
-}
-
 void rand_init(void) {
-    if ((rng_fd = _open(STARTING_FD + open_devices, "dev/viorng0")) < 0) {
+    if ((rng_fd = _open(-1, "/dev/viorng0")) < 0) {
         printf("Failed to open viorng\n");
-    } else {
-        open_devices++;
     }
 }
 
 int random_seed(void) {
     int r;
-    int result;
-    uint64_t t;
 
     if (rng_fd >= 0) {
-        if ((result = _read(rng_fd, &r, sizeof(int))) >= 0) {
+        if (_read(rng_fd, &r, sizeof(int)) == sizeof(int)) 
             return r;
-        } else {
-            printf("Error getting random number");
-            return result;
-        }
-    } else {
-    #ifndef RAND_SEED
-        if (rtc_fd >= 0 && time(&t) > 0) {
-            return t << 16;
-        } else {
-            printf("Error getting random seed, defaulting to 391\n");
-            return RAND_DEFAULT;
-        }
-    #else 
-        return RAND_SEED;
-    #endif
     }
-    
-}
 
-int time(uint64_t *timebuf) {
-    if (rtc_fd > 0) {
-        return _read(rtc_fd, timebuf, 8);
-    } else {
-        printf("Error: RTC not opened\n");
-    }
-    return -1;
+    printf("Error reading random number, defaulting to set value...\n");
+#ifndef RAND_SEED
+    return RAND_DEFAULT;
+#else 
+    return RAND_SEED;
+#endif
+    
 }

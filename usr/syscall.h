@@ -56,14 +56,14 @@ extern int _usleep(unsigned long us);
 * @param path string path to file
 * @return 0 if successful else error code
 */
-extern int _delete(char * path);
+extern int _delete(const char * path);
 
 /**
 * @brief Creates a file at a specified path
 * @param path string path to file
 * @return 0 if successful else error code
 */
-extern int _create(char * path);
+extern int _create(const char * path);
 
 /**
 * @brief Opens a file at the specified file descriptor and returns error code on failure
