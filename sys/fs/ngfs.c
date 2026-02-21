@@ -146,6 +146,7 @@ static const struct iointf ngfs_listing_io_intf = {
 int mount_ngfs(const char * name, struct io * bkgio) {
 #ifdef STUDENT
     // YOUR CODE HERE
+    return 0;
 #else 
     int result;
     struct ngfs * ngfs;

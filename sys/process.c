@@ -62,6 +62,10 @@ void procmgr_init(void) {
 }
 
 int process_exec(struct io * exeio, int argc, char ** argv) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return 0;
+#else
     struct process * self;
     struct trap_frame tfr;
     void (*entry)(void);
@@ -132,9 +136,14 @@ int process_exec(struct io * exeio, int argc, char ** argv) {
     tfr.sstatus &= ~RISCV_SSTATUS_SPP;
     
     trap_frame_jump(&tfr, running_thread_stack_anchor() - sizeof(tfr));
+#endif
 }
 
 int process_fork(const struct trap_frame * tfr) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return 0;
+#else
     struct process * parent; // parent process
     struct process * child; // child process
     struct condition done; // child done using tfr
@@ -181,6 +190,7 @@ int process_fork(const struct trap_frame * tfr) {
     condition_wait(&done);
 
     return ctid;
+#endif
 }
 
 /** \brief
@@ -191,6 +201,10 @@ int process_fork(const struct trap_frame * tfr) {
  *
  */
 void process_exit(void) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return;
+#else
     struct process * self;
     int i;
 
@@ -218,6 +232,7 @@ void process_exit(void) {
     kfree(self);
 
     exit_running_thread();
+#endif
 }
 
 // INTERNAL FUNCTION DEFINITIONS
@@ -275,6 +290,10 @@ int build_stack(void * stack, int argc, char ** argv) {
 }
 
 void fork_func(struct condition * done, struct trap_frame * tfr) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return;
+#else
     void * sscratch;
 
     condition_broadcast(done); // signal parent we're done using trap frame
@@ -282,4 +301,5 @@ void fork_func(struct condition * done, struct trap_frame * tfr) {
     tfr->a0 = 0;
     sscratch = running_thread_stack_anchor() - sizeof(struct trap_frame);
     trap_frame_jump(tfr, sscratch);
+#endif
 }

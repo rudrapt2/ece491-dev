@@ -33,10 +33,8 @@
 #endif
 
 #define CMNTNAME "c" // ngfs
-#define DMNTNAME "d" // ktfs
 #define DEVMNTNAME "dev"
-#define CDEVNAME "vioblk1"
-#define DDEVNAME "vioblk0"
+#define CDEVNAME "vioblk0"
 
 #ifndef NUART // number of UARTs
 #define NUART 3
@@ -118,6 +116,14 @@ void exec_init() {
     }
 
 #ifdef MP3CP1
+#if 0
+    char * argv[] = { NULL };
+    // Make descriptor 0 be a null io object, which the shell will need
+
+    current_process()->iotab[0] = create_nullio();
+
+    process_exec(initexe, 0, argv);
+#else
     void (*entry)(void);
     int tid;
     struct io * uartio;
@@ -145,6 +151,7 @@ void exec_init() {
     }
 
     join_thread(tid);
+#endif
 #else
     char * argv[] = { NULL };
     // Make descriptor 0 be a null io object, which the shell will need

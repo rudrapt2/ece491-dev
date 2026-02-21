@@ -90,8 +90,15 @@ _smode_trap_entry:
 
         csrrw   sp, sscratch, sp
         beqz    sp, smode_trap_entry_from_smode
+.endif
+.endif
+
+.ifndef MP2
+.ifndef MP3CP1
 
 smode_trap_entry_from_umode:
+
+.ifndef STUDENT
 
         # When we're in U mode, sscratch contains a pointer to a trap frame at
         # the base of the kernel stack. This pointer, now in /sp/, is our kernel
@@ -238,8 +245,15 @@ smode_trap_entry_from_umode:
 
         j       handle_umode_interrupt # in intr.c
 
+.endif
+
+.endif
+.endif
+
 smode_trap_entry_from_smode:
 
+.ifndef MP2
+.ifndef MP3CP1
         # When we're in S mode, we continue using the kernel /sp/, /tp/, and
         # /gp/. First, recover /sp/ from sscratch and write zero to scratch to
         # indicate that we're now in S mode.
@@ -366,7 +380,6 @@ smode_trap_entry_from_smode:
         j       handle_smode_interrupt # in intr.c
 
 .ifndef MP2
-.ifndef MP3CP1
 # void __attribute__ ((noreturn)) trap_frame_jump(struct trap_frame * tfr);
 #
 # Restores CPU state from a trap frame as when returning to U mode. If indeed
@@ -432,7 +445,6 @@ trap_frame_jump:
         ld      a0, A0(a0)
 
         sret    # Punch it, Chewie!
-.endif
 .endif
 
         .end

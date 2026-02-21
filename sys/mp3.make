@@ -44,7 +44,9 @@ OBJS = \
 	device.o \
 	sbi.o \
 	fs/ngfs.o \
-	fs/ktfs.o
+	memory.o \
+	process.o \
+	syscall.o 
 
 CFLAGS = -Wall -Werror=implicit-function-declaration -Wno-unused-function
 CFLAGS += -fno-omit-frame-pointer -ggdb3 -gdwarf-2
@@ -91,8 +93,6 @@ QEMUOPTS += -serial pty
 QEMUOPTS += -serial pty
 QEMUOPTS += -device virtio-blk-device,drive=blk0
 QEMUOPTS += -drive file=fs/ngfs.raw,id=blk0,if=none,format=raw,readonly=false
-QEMUOPTS += -device virtio-blk-device,drive=blk1
-QEMUOPTS += -drive file=fs/ktfs.raw,id=blk1,if=none,format=raw,readonly=false
 
 VIDEO_QEMUOPTS = $(QEMUOPTS)
 VIDEO_QEMUOPTS += -device virtio-gpu-device -display gtk
@@ -101,13 +101,6 @@ VIDEO_QEMUOPTS += -device virtio-keyboard-device -device virtio-tablet-device
 ifeq ($(CP1), 1)
 	CFLAGS += -DMP3CP1
     ASFLAGS += -defsym MP3CP1=1
-else
-    OBJS += \
-    dev/viogpu.o \
-    dev/viohi.o \
-	memory.o \
-	process.o \
-	syscall.o 
 endif
 
 all: kernel.elf
@@ -124,12 +117,13 @@ run: kernel.elf
 debug: kernel.elf
 	$(QEMU) $(QEMUOPTS) -m 8M -kernel $< -S -s
 
+# NOTE: need to link against viogpu and viohi drivers; this won't work as it currently is
 run-video: kernel.elf
 	$(QEMU) $(VIDEO_QEMUOPTS) -m 16M -kernel $<
 
 BLOB_OBJCOPY_FLAGS = \
-	--add-section .rodata.blob=blob.raw \
-	--set-section-flags .rodata.blob=alloc,contents,load,readonly
+	--add-section .data.blob=blob.raw \
+	--set-section-flags .data.blob=alloc,contents,load,data
 
 blob.o:
 	echo .end | $(AS) $(ASFLAGS) -o blob.o

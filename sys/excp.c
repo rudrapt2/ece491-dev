@@ -96,11 +96,12 @@ void handle_smode_exception(unsigned int cause, struct trap_frame* tfr) {
 }
 
 #ifndef MP2
-#ifndef MP3CP1
 void handle_umode_exception(unsigned int cause, struct trap_frame * tfr) {
 #ifdef STUDENT
     // YOUR CODE HERE
+    return;
 #else
+#ifndef MP3CP1
     const char * name = NULL;
     int handled = 0;
     trace("%s(cause=%d, tfr=%p)", __func__, cause, tfr);
@@ -151,7 +152,7 @@ void handle_umode_exception(unsigned int cause, struct trap_frame * tfr) {
     }
 
     process_exit();
+#endif // MP3CP1
 #endif // STUDENT
 }
-#endif // MP3CP1
 #endif // MP2
