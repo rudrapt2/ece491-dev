@@ -474,8 +474,9 @@ int memio_ioctl(struct io * io, int op, void * arg) {
 
 #endif
 }
+
+
 #ifndef MP2
-#ifndef MP3CP1
 
 // IOPIPE INTERNAL TYPE DEFINITIONS
 //
@@ -522,6 +523,7 @@ void create_iopipe(struct io ** wioptr, struct io ** rioptr) {
     // YOUR CODE HERE
     return;
 #else
+#ifndef MP3CP1
     struct iopipe * p;
 
     p = kcalloc(1, sizeof(*p));
@@ -529,6 +531,7 @@ void create_iopipe(struct io ** wioptr, struct io ** rioptr) {
     *wioptr = ioinit(&p->wio, &iopipe_writer_intf, 1, 1);
     *rioptr = ioinit(&p->rio, &iopipe_reader_intf, 1, 1);
     condition_init(&p->updated, "iopipe.updated");
+#endif
 #endif
 }
 
@@ -540,10 +543,12 @@ void iopipe_wio_reclaim(struct io * io) {
     // YOUR CODE HERE
     return;
 #else
+#ifndef MP3CP1
     struct iopipe * const p = (void*)io - offsetof(struct iopipe, wio);
     condition_broadcast(&p->updated); // alert writers of broken pipe
     if (iorefcnt(&p->rio) == 0)
         iopipe_reclaim(p);
+#endif
 #endif
 }
 
@@ -552,10 +557,12 @@ void iopipe_rio_reclaim(struct io * io) {
     // YOUR CODE HERE
     return;
 #else
+#ifndef MP3CP1
     struct iopipe * const p = (void*)io - offsetof(struct iopipe, rio);
     condition_broadcast(&p->updated); // alert readers of broken pipe
     if (iorefcnt(&p->wio) == 0)
         iopipe_reclaim(p);
+#endif
 #endif
 }
 
@@ -564,6 +571,7 @@ long iopipe_write(struct io * io, const void * buf, long buflen) {
     // YOUR CODE HERE
     return 0;
 #else
+#ifndef MP3CP1
     struct iopipe * const p = (void*)io - offsetof(struct iopipe, wio);
     long bufoff = 0;
 
@@ -626,6 +634,7 @@ long iopipe_write(struct io * io, const void * buf, long buflen) {
     condition_broadcast(&p->updated);
     return bufoff;
 #endif
+#endif
 }
 
 long iopipe_read(struct io * io, void * buf, long bufsz) {
@@ -633,6 +642,7 @@ long iopipe_read(struct io * io, void * buf, long bufsz) {
     // YOUR CODE HERE
     return 0;
 #else
+#ifndef MP3CP1
     struct iopipe * const p = (void*)io - offsetof(struct iopipe, rio);
     long bufread = 0;
 
@@ -664,6 +674,7 @@ long iopipe_read(struct io * io, void * buf, long bufsz) {
     // no data left to consume. We can then return 0 to signify EOF.
     return bufread;
 #endif
+#endif
 }
 
 void iopipe_reclaim(struct iopipe * p) {
@@ -671,9 +682,10 @@ void iopipe_reclaim(struct iopipe * p) {
     // YOUR CODE HERE
     return;
 #else
+#ifndef MP3CP1
     free_phys_page(p->buf);
     kfree(p);
 #endif
+#endif
 }
-#endif // MP3CP1
 #endif // MP2

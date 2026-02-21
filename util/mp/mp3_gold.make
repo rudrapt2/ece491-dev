@@ -5,7 +5,7 @@
 # =========================
 
 SRC_DIR     := /home/rudrapt2/sp26_ece391/glycine-max
-TARGET_DIR  := /home/rudrapt2/sp26_ece391/mp3-sp26/gold/cp2_3
+TARGET_DIR  := /home/rudrapt2/sp26_ece391/mp3-sp26/gold/cp1
 
 # List of files to copy.
 # Format: "source:destination" OR "path" (if source and dest are same)
@@ -60,6 +60,7 @@ FILES_FOR_COPYING   := \
     sys/start.s \
     sys/string.c \
     sys/string.h \
+    sys/syscall.c \
     sys/thrasm.s \
     sys/thread.c \
     sys/thread.h \
@@ -85,7 +86,12 @@ FILES_FOR_COPYING   := \
     usr/syscall.h \
     usr/syscall.S \
     usr/umode.ld \
-    util/fs/mkfs_ngfs
+    util/fs/mkfs_ngfs \
+    \
+    \
+    \
+    sys/fs/ngfs.raw
+# TODO delete this
 
 # Assembly files to preprocess (Must match DESTINATION paths)
 ASSEMBLY_FILES_FOR_PREPROCESSING := \

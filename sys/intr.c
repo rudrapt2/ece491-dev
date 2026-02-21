@@ -104,7 +104,6 @@ void handle_smode_interrupt(unsigned int cause) {
 }
 
 #ifndef MP2
-#ifndef MP3CP1
 void handle_umode_interrupt(unsigned int cause) {
 #ifdef STUDENT
     // YOUR CODE HERE
@@ -116,7 +115,6 @@ void handle_umode_interrupt(unsigned int cause) {
     submit_running_thread();
 #endif // STUDENT
 }
-#endif // MP3CP1
 #endif // MP2
 
 extern long enable_interrupts(void) {

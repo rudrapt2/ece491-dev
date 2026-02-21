@@ -26,7 +26,7 @@
 #include "misc.h"
 #include "timer.h"
 
-#if !(defined(MP2) || defined(MP3CP1))
+#ifndef MP2
 #include "process.h"
 #include "memory.h"
 #endif
@@ -354,7 +354,7 @@ void exit_running_thread(void) {
 #endif // STUDENT
 }
 
-#if !(defined(MP2) || defined(MP3CP1))
+#ifndef MP2
 void submit_running_thread(void) {
 #ifdef STUDENT
     // YOUR CODE HERE
@@ -576,7 +576,7 @@ int join_thread(int u_tid) {
 #endif
 }
 
-#if !(defined(MP2) || defined(MP3CP1))
+#ifndef MP2
 struct process * thread_process(int tid) {
     assert (0 <= tid && tid < NTHR);
     assert (thrtab[tid] != NULL);

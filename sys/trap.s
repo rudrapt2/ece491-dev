@@ -380,7 +380,6 @@ smode_trap_entry_from_smode:
         j       handle_smode_interrupt # in intr.c
 
 .ifndef MP2
-.ifndef MP3CP1
 # void __attribute__ ((noreturn)) trap_frame_jump(struct trap_frame * tfr);
 #
 # Restores CPU state from a trap frame as when returning to U mode. If indeed
@@ -446,7 +445,6 @@ trap_frame_jump:
         ld      a0, A0(a0)
 
         sret    # Punch it, Chewie!
-.endif
 .endif
 
         .end
