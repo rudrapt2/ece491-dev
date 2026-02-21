@@ -106,7 +106,6 @@ static void * get_cache_from_block(struct cache * cache, uint32_t block);
 static uint32_t blockno_to_block(struct cache * cache, struct ngfs_dir_entry * file, unsigned int blockno);
 static inline long update_root_dir(struct ngfs * ngfs);
 static int iterate_dentry(struct ngfs * ngfs, uint32_t * idx, uint32_t * block, struct ngfs_dir_entry ** dentry, int dirty);
-static int free_associated_cache_block(struct cache * cache, struct ngfs_dir_entry * entry, int dirty);
 static int update_size(struct ngfs * ngfs, struct ngfs_dir_entry * dentry, uint32_t end);
 static void update_pos(struct ngfs * ngfs, struct ngfs_io * fio, uint32_t newpos);
 static void clear_block(struct cache * cache, uint32_t block, uint32_t offset, uint32_t len);
@@ -477,7 +476,7 @@ int ngfs_delete(struct filesystem * fs, const char * name) {
     {
         if (strcmp(name, dentry->name) == 0) {
             memcpy(dentry, &last_dentry, DENTRYSZ);
-            free_associated_cache_block(cache, dentry, CACHE_DIRTY);
+            cache_release(cache, dentry, CACHE_DIRTY);
             break;
         }
     }
@@ -790,7 +789,7 @@ int iterate_dentry(
     int dirty) 
 {
     if (*idx >= ngfs->root_dir.size / DENTRYSZ) {
-        free_associated_cache_block(ngfs->cache, *dentry, dirty);
+        cache_release(ngfs->cache, *dentry, dirty);
         return 0;
     }
 
@@ -800,7 +799,7 @@ int iterate_dentry(
     }
     
     if (*idx % DENTRIES_PER_BLOCK == 0) {
-        free_associated_cache_block(ngfs->cache, *dentry, dirty);
+        cache_release(ngfs->cache, *dentry, dirty);
         *block = get_next_data_block(ngfs->cache, *block);
         *dentry = get_cache_from_block(ngfs->cache, IDX_TO_ABS(*block));
     }
@@ -808,18 +807,6 @@ int iterate_dentry(
 
     (*idx)++;
     return 1;
-}
-
-int free_associated_cache_block(
-    struct cache * cache, 
-    struct ngfs_dir_entry * entry, 
-    int dirty) 
-{
-    if (entry == NULL) return -1;
-    cache_release(cache, 
-        (void *)ROUND_DOWN((uintptr_t)entry, NGFS_BLKSZ), dirty);
-    if (dirty) cache_flush(cache);
-    return 0;
 }
 
 void clear_block(struct cache * cache, uint32_t block, uint32_t offset, uint32_t len) {

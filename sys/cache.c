@@ -44,6 +44,9 @@ struct cache_entry {
     char locked; // 1 of locked, 0 otherwise
     char used; // 1 if entry accessed recently, 0 otherwise
     char dirty; // needs to be written to disk
+#ifdef MP3CP1
+    void * buf;
+#endif
 };
 
 /** \brief Literally the cache itself
@@ -64,7 +67,9 @@ struct cache {
     unsigned short dirty_cnt; // number of dirty blocks in cache
     int wtid; // writer thread id (we don't actually use it for anything)
     unsigned long blksz;
+#ifndef MP3CP1
     void * blkbuf; // all block are in a single contiguous buffer
+#endif
     struct cache_entry entries[CACHE_CAPACITY];
 };
 
@@ -121,8 +126,6 @@ static int find_evictable(struct cache * cache);
 
 static void cache_writeback_thrfn(struct cache * cache);
 
-extern char _kimg_blob_start[]; // TEMPORARY
-
 #endif
 
 // EXPORTED FUNCTION DEFINITIONS
@@ -160,12 +163,14 @@ struct cache * create_cache(struct io * bkgio, unsigned long cache_blksz) {
 #ifndef MP3CP1
     cache->blkbuf = alloc_phys_pages (
         (CACHE_CAPACITY * cache_blksz + PAGE_SIZE-1) / PAGE_SIZE);
-#else
-    cache->blkbuf = _kimg_blob_start;
 #endif
 
-    for (i = 0; i < CACHE_CAPACITY; i++)
+    for (i = 0; i < CACHE_CAPACITY; i++) {
         cache->entries[i].pos = -1ULL;
+#ifdef MP3CP1
+        cache->entries[i].buf = kmalloc(cache_blksz);
+#endif
+    }
     
     cache->evictable_cnt = CACHE_CAPACITY;
 
@@ -366,7 +371,7 @@ void cache_release(struct cache * cache, void * pblk, int dirty) {
     assert (ent->refcnt > 0);  
     debug("Releasing block %d (pos = %llx) at %p", i, ent->pos, pblk);
 
-   if (dirty && !ent->dirty) {
+    if (dirty && !ent->dirty) {
         cache->dirty_cnt += 1;
         ent->dirty = 1;
     }
@@ -404,13 +409,27 @@ int cache_flush(struct cache * cache) {
 #ifndef STUDENT
 
 void * blkidx_to_blkptr(const struct cache * cache, unsigned long idx) {
+#ifndef MP3CP1
     return cache->blkbuf + idx * cache->blksz;
+#else
+    return cache->entries[idx].buf;
+#endif
 }
 
 unsigned long blkptr_to_blkidx(const struct cache * cache, void * pblk) {
+#ifndef MP3CP1
     assert (cache->blkbuf <= pblk);
     assert (pblk < cache->blkbuf + CACHE_CAPACITY * cache->blksz);
     return (pblk - cache->blkbuf) / cache->blksz;
+#else
+    unsigned long i;
+    for (i = 0; i < CACHE_CAPACITY; i++)
+        if (cache->entries[i].pos != -1 && 
+            (cache->entries[i].buf <= pblk &&
+            pblk < cache->entries[i].buf + cache->blksz)) 
+            return i;
+    panic("Bad cache pointer");
+#endif
 }
 
 int find_evictable(struct cache * cache) {

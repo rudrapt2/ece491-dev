@@ -630,6 +630,7 @@ long iopipe_write(struct io * io, const void * buf, long buflen) {
     condition_broadcast(&p->updated);
     return bufoff;
 #endif
+    return -ENOTSUP;
 #endif
 }
 
@@ -670,6 +671,7 @@ long iopipe_read(struct io * io, void * buf, long bufsz) {
     // no data left to consume. We can then return 0 to signify EOF.
     return bufread;
 #endif
+    return -ENOTSUP;
 #endif
 }
 
