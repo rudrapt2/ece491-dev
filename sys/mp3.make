@@ -128,8 +128,8 @@ run-video: kernel.elf
 	$(QEMU) $(VIDEO_QEMUOPTS) -m 16M -kernel $<
 
 BLOB_OBJCOPY_FLAGS = \
-	--add-section .rodata.blob=blob.raw \
-	--set-section-flags .rodata.blob=alloc,contents,load,readonly
+	--add-section .data.blob=blob.raw \
+	--set-section-flags .data.blob=alloc,contents,load,data
 
 blob.o:
 	echo .end | $(AS) $(ASFLAGS) -o blob.o

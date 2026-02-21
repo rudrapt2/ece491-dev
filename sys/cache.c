@@ -131,6 +131,7 @@ extern char _kimg_blob_start[]; // TEMPORARY
 struct cache * create_cache(struct io * bkgio, unsigned long cache_blksz) {
 #ifdef STUDENT
     // YOUR CODE HERE
+    return NULL;
 #else
     struct cache * cache;
     unsigned int blksz;
@@ -185,6 +186,7 @@ struct cache * create_cache(struct io * bkgio, unsigned long cache_blksz) {
 int cache_fetch(struct cache * cache, unsigned long long pos, void ** pptr) {
 #ifdef STUDENT
     // YOUR CODE HERE
+    return 0;
 #else
     struct cache_entry * ent; // cache entry for block
     long rcnt; // return value from fetch
@@ -325,6 +327,7 @@ int cache_fetch(struct cache * cache, unsigned long long pos, void ** pptr) {
 void cache_release(struct cache * cache, void * pblk, int dirty) {
 #ifdef STUDENT
     // YOUR CODE HERE
+    return;
 #else
     struct cache_entry * ent;
     int i;

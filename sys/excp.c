@@ -100,6 +100,7 @@ void handle_smode_exception(unsigned int cause, struct trap_frame* tfr) {
 void handle_umode_exception(unsigned int cause, struct trap_frame * tfr) {
 #ifdef STUDENT
     // YOUR CODE HERE
+    return;
 #else
     const char * name = NULL;
     int handled = 0;

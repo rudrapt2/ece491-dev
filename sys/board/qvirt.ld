@@ -37,6 +37,9 @@ SECTIONS {
 
   .data : {
     PROVIDE(_kimg_data_start = .);
+    PROVIDE(_kimg_blob_start = .);
+    *(*.data.blob)
+    PROVIDE(_kimg_blob_end = .);
     *(.sdata .sdata.*)
     . = ALIGN(16);
     *(.data .data.*)

@@ -76,9 +76,14 @@ static int allocfd(struct process * proc, int reqfd, int notfd);
  */
 
 void handle_syscall(struct trap_frame * tfr) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return;
+#else
     tfr->sepc += 4;
     tfr->a0 = syscall(tfr);
     submit_running_thread();
+#endif
 }
 
 // INTERNAL FUNCTION DEFINITIONS
@@ -93,6 +98,10 @@ void handle_syscall(struct trap_frame * tfr) {
  */
 
 long syscall(const struct trap_frame * tfr) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return 0;
+#else
     switch (tfr->a7) {
     case SYSCALL_EXIT:
         return sysexit();
@@ -127,14 +136,24 @@ long syscall(const struct trap_frame * tfr) {
     default:
         return -ENOTSUP;
     }
+#endif
 }
 
 int sysexit(void) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return 0;
+#else
     trace("%s()", __func__);
     process_exit();
+#endif
 }
 
 int sysexec(int fd, int argc, char ** argv) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return 0;
+#else
     struct process * self;
     struct io * exeio;
 
@@ -155,23 +174,38 @@ int sysexec(int fd, int argc, char ** argv) {
     self->iotab[fd] = NULL;
 
     return process_exec(exeio, argc, argv);
+#endif
 }
 
 int sysfork(const struct trap_frame * tfr) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return 0;
+#else
     trace("%s()", __func__);
     return process_fork(tfr);
+#endif
 }
 
 int syswait(int tid) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return 0;
+#else
     trace("%s(%d)", __func__, tid);
 
     if (0 <= tid)
         return join_thread(tid);
     else
         return -EINVAL;
+#endif
 }
 
 int sysprint(const char *msg) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return 0;
+#else
     int result;
 
     trace("%s(%p)", __func__, msg);
@@ -187,14 +221,24 @@ int sysprint(const char *msg) {
             thread_name(running_thread()), running_thread(), msg);
 
     return 0;
+#endif
 }
 
 int sysusleep(unsigned long us) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return 0;
+#else
     sleep_us(us);
     return 0;
+#endif
 }
 
 int syscreate(const char *path) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return 0;
+#else
     size_t pathlen;
     char * pathbuf;
     char * mpname;
@@ -232,9 +276,14 @@ int syscreate(const char *path) {
 
     kfree(pathbuf);
     return result;
+#endif
 }
 
 int sysdelete(const char * path) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return 0;
+#else
     size_t pathlen;
     char * pathbuf;
     char * mpname;
@@ -272,9 +321,14 @@ int sysdelete(const char * path) {
 
     kfree(pathbuf);
     return result;
+#endif
 }
 
 int sysopen(int fd, const char * path) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return 0;
+#else
     struct process * self;
     size_t pathlen;
     char * pathbuf;
@@ -320,9 +374,14 @@ int sysopen(int fd, const char * path) {
 
     kfree(pathbuf);
     return (result != 0) ? result : fd;
+#endif
 }
 
 int sysclose(int fd) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return 0;
+#else
     struct process * self;
 
     trace("%s(%d)", __func__, fd);
@@ -338,9 +397,14 @@ int sysclose(int fd) {
     iodropref(self->iotab[fd]);
     self->iotab[fd] = NULL;
     return 0;
+#endif
 }
 
 long sysread(int fd, void * buf, size_t bufsz) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return 0;
+#else
     struct process * self;
     int result;
 
@@ -362,9 +426,14 @@ long sysread(int fd, void * buf, size_t bufsz) {
         return result;
 
     return ioread(self->iotab[fd], buf, bufsz);
+#endif
 }
 
 long syswrite(int fd, const void *buf, size_t len) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return 0;
+#else
     struct process * self;
     int result;
 
@@ -386,9 +455,14 @@ long syswrite(int fd, const void *buf, size_t len) {
         return result;
 
     return iowrite(self->iotab[fd], buf, len);
+#endif
 }
 
 int sysioctl(int fd, int op, uintptr_t arg_uma) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return 0;
+#else
     struct process * self;
 
     trace("%s(%d,%d,%p)", __func__, fd, op, arg_uma);
@@ -402,9 +476,14 @@ int sysioctl(int fd, int op, uintptr_t arg_uma) {
         return -EBADF;
 
     return ioctl_u(self->iotab[fd], op, arg_uma);
+#endif
 }
 
 int syspipe(int * wfdptr, int * rfdptr) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return 0;
+#else
     struct process * self;
     int wfd, rfd;
     int result;
@@ -443,9 +522,14 @@ int syspipe(int * wfdptr, int * rfdptr) {
     create_iopipe(&self->iotab[wfd], &self->iotab[rfd]);
 
     return 0;
+#endif
 }
 
 int sysiodup(int oldfd, int newfd) {
+#ifdef STUENT
+    // YOUR CODE HERE
+    return 0;
+#else
     struct process *self;
 
     trace("%s(oldfd=%d,newfd=%d)", __func__, oldfd, newfd);
@@ -465,8 +549,10 @@ int sysiodup(int oldfd, int newfd) {
 
     self->iotab[newfd] = ioaddref(self->iotab[oldfd]);
     return newfd;
+#endif
 }
 
+#ifndef STUDENT
 int allocfd(struct process * proc, int reqfd, int notfd) {
     int fd;
 
@@ -486,3 +572,4 @@ int allocfd(struct process * proc, int reqfd, int notfd) {
 
     return -EMFILE;
 }
+#endif

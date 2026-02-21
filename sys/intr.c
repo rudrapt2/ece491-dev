@@ -69,7 +69,7 @@ void intrmgr_init(void) {
 
     // Enable external interrupts. The timer module controls the sie.STIE bit.
 
-    csrw_sie(RISCV_SIE_SEIE);
+    csrs_sie(RISCV_SIE_SEIE);
 
     intrmgr_initialized = 1;
 }
@@ -108,6 +108,7 @@ void handle_smode_interrupt(unsigned int cause) {
 void handle_umode_interrupt(unsigned int cause) {
 #ifdef STUDENT
     // YOUR CODE HERE
+    return;
 #else
     // called from trap.s
     handle_interrupt(cause);
@@ -144,6 +145,7 @@ extern int interrupts_disabled(void) {
 void handle_interrupt(unsigned int cause) {
 #ifdef STUDENT
     // YOUR CODE HERE
+    return;
 #else
     switch (cause) {
         case RISCV_SCAUSE_STI:
@@ -162,6 +164,7 @@ void handle_interrupt(unsigned int cause) {
 void handle_extern_interrupt(void) {
 #ifdef STUDENT
     // YOUR CODE HERE
+    return;
 #else
     int srcno;
 
