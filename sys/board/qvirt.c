@@ -8,7 +8,7 @@
 
 #include "console.h" // console_init();
 #include "heap.h" // heap_init()
-#include "board/common/mem-desc.h"
+#include "memory.h" // memory_init()
 
 // Run-time QEMU configuration
 //
@@ -89,7 +89,7 @@ void board_init(unsigned int hartid, void * dtb) {
     timer_init(TIMER_FREQ);
 
     #ifndef MP2
-    memory_init(qvirt_matlas);
+    memory_init(&qvirt_matlas);
     #endif
     #ifdef MP2
     heap_init(_kimg_end, RAM_END - (void*)_kimg_end);

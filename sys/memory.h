@@ -11,7 +11,6 @@
 #include <stdint.h>
 
 #include "trap.h"  // for struct trap_frame
-#include "board/common/mem-desc.h"
 
 // EXPORTED CONSTANTS
 //
@@ -36,6 +35,20 @@
 // We refer to a memory space using an opaque memory space tag
 
 typedef unsigned long mtag_t;
+
+// EXPORTED STRUCTS
+//
+
+struct mregion {
+    unsigned long pma;
+    unsigned long size;
+};
+
+struct matlas {
+    struct mregion * ram;
+    struct mregion * mmio;
+    struct mregion * resv;
+};
 
 // EXPORTED FUNCTION DECLARATIONS
 //
