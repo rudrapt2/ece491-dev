@@ -11,7 +11,7 @@ OBJCOPY=$(PREFIX)objcopy
 OBJDUMP=$(PREFIX)objdump
 UNIFDEF=unifdef
 
-CP1=1
+CP1=0
 
 OBJS = \
 	start.o \
