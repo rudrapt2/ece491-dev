@@ -33,7 +33,6 @@
 #endif
 
 #define CMNTNAME "c" // ngfs
-#define DMNTNAME "d" // ktfs
 #define DEVMNTNAME "dev"
 #define CDEVNAME "vioblk0"
 
