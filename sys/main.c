@@ -35,8 +35,7 @@
 #define CMNTNAME "c" // ngfs
 #define DMNTNAME "d" // ktfs
 #define DEVMNTNAME "dev"
-#define CDEVNAME "vioblk1"
-#define DDEVNAME "vioblk0"
+#define CDEVNAME "vioblk0"
 
 #ifndef NUART // number of UARTs
 #define NUART 3
