@@ -218,10 +218,12 @@ void memory_init(struct matlas * mappings) {
     for (int i = 0; i < ram_array_size; i++){
         uintptr_t start = mappings->ram[i].pma;
         uintptr_t end = mappings->ram[i].pma + mappings->ram[i].size;
+
         if ((uintptr_t)_kimg_end > start && (uintptr_t)_kimg_end < end){
             ram_idx = i;
             break;
         }
+
     }
 
     //Where is the kernel???
@@ -231,8 +233,10 @@ void memory_init(struct matlas * mappings) {
     //Else use end of the RAM chunk as the end of the free chunk list
     chunklist_end = mappings->ram[ram_idx].pma + mappings->ram[ram_idx].size;
     for (int i = 0; i < resv_array_size; i++){
+
         if (mappings->resv[i].pma < chunklist_end && mappings->resv[i].pma > (uintptr_t)_kimg_end)
             chunklist_end = mappings->resv[i].pma;
+
     }    
     free_chunk_list->pagecnt = (chunklist_end - (uintptr_t)free_chunk_list)/PAGE_SIZE;
 
@@ -247,6 +251,7 @@ void memory_init(struct matlas * mappings) {
         pp = mappings->mmio[i].pma;
         align = GIGA_SIZE; //ASSUME: MMIO region is always gigapage aligned.
         end = pp + mappings->mmio[i].size;
+
         while (pp < end){
             //Index into the main page table, then set up gigapage mappings to go
             //1:1 from virtual to physical through the whole region
@@ -259,6 +264,7 @@ void memory_init(struct matlas * mappings) {
     //Map RAM (R/W)
     for (int i = 0; i < ram_array_size; i++){
         pp = mappings->ram[i].pma;
+
         if (mappings->ram[i].size < GIGA_SIZE){
             align = MEGA_SIZE;
             //If we are megapage aligned, allocate a
@@ -268,12 +274,16 @@ void memory_init(struct matlas * mappings) {
             //want to share it.)
             main_pt2[VPN2(pp)] = ptab_pte(alloc_phys_page(), 0);
         }else align = GIGA_SIZE;
+
         end = pp + mappings->ram[i].size;
         while (pp < end){
+
             switch (align){
+
                 case GIGA_SIZE:
                     main_pt2[VPN2(pp)] = leaf_pte((void *)pp, PTE_R | PTE_W | PTE_G);
                     break;
+
                 case MEGA_SIZE:
                     struct pte * pt1 = pageptr(main_pt2[VPN2(pp)].ppn);
                     //You can index into the lv 1 page table the same way that you
@@ -281,7 +291,9 @@ void memory_init(struct matlas * mappings) {
                     //go in.
                     pt1[VPN1(pp)] = leaf_pte((void *)pp, PTE_R | PTE_W | PTE_G);
                     break;
+
             }
+
             pp+=align;
         }
     }
