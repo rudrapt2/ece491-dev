@@ -402,12 +402,16 @@ struct io * create_memio (
 //
 
 void memio_reclaim(struct io * io) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     struct memio * const mio = (struct memio*)io;
 
     if (mio->reclfn != NULL)
         mio->reclfn(mio->buf, mio->end);
     
     kfree(mio);
+#endif
 }
 
 long memio_fetch(struct io * io, unsigned long long pos, void * buf, long len) {
