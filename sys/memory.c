@@ -433,27 +433,21 @@ void memory_init(struct matlas * mappings) {
 
 static void subdivide(struct pte * entry, uintptr_t size){
     assert(PTE_LEAF(*entry));
+
     struct pte * internal_page = alloc_phys_page();
-    memset((void *)internal_page, 0, PAGE_SIZE);
     uintptr_t pp = (uintptr_t)pageptr(entry->ppn);
     int flags = entry->flags;
+    
+    //Clear new internal page
+    memset((void *)internal_page, 0, PAGE_SIZE);
+
+    //Point to new page
     *entry = ptab_pte(internal_page, flags & PTE_G);
 
+    //Populate with smaller entries
     for (int i = 0; i < PAGE_SIZE/sizeof(struct pte); i++){
         internal_page[i] = leaf_pte((void *)pp, flags & (PTE_R | PTE_W | PTE_X | PTE_U | PTE_G));
         pp+=size;
-    }
-}
-
-static void combine(struct mregion * arr, uint32_t size) {
-    for (uint32_t curr = 0, nxt = 1; nxt < size; nxt++){
-        if (arr[curr].pma + arr[curr].size >= arr[nxt].pma){
-            if (arr[nxt].pma + arr[nxt].size > arr[curr].pma + arr[curr].size)
-                arr[curr].size+=(arr[nxt].pma + arr[nxt].size - (arr[curr].pma + arr[curr].size));
-            //Indicate to ignore this.
-            arr[nxt].pma = 0x0;
-            arr[nxt].size = 0x0;
-        }else curr = nxt;
     }
 }
 
