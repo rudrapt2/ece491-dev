@@ -1,14 +1,5 @@
-# setjmp.s - Minimal RISC-V64 setjmp/longjmp for bare-metal builds
-#
-# jmp_buf layout (14 registers × 8 bytes = 112 bytes):
-#   [0]  ra      [1]  sp
-#   [2]  s0      [3]  s1      [4]  s2      [5]  s3
-#   [6]  s4      [7]  s5      [8]  s6      [9]  s7
-#   [10] s8      [11] s9      [12] s10     [13] s11
-
 .text
 
-# int setjmp(jmp_buf buf)  -- a0 = buf, returns 0
 .globl setjmp
 .type  setjmp, @function
 setjmp:
@@ -29,8 +20,6 @@ setjmp:
     li  a0, 0
     ret
 
-# void longjmp(jmp_buf buf, int val)  -- a0 = buf, a1 = val
-# Restores saved context; setjmp returns val (or 1 if val == 0).
 .globl longjmp
 .type  longjmp, @function
 longjmp:
@@ -48,7 +37,7 @@ longjmp:
     ld  s9,   88(a0)
     ld  s10,  96(a0)
     ld  s11, 104(a0)
-    mv  a0, a1          # return val
+    mv  a0, a1
     bnez a0, 1f
-    li  a0, 1           # if val == 0, return 1 instead (POSIX)
+    li  a0, 1
 1:  ret
