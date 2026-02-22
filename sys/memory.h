@@ -36,6 +36,20 @@
 
 typedef unsigned long mtag_t;
 
+//EXPORTED STRUCT DEFINITIONS
+//
+
+struct mregion {
+    unsigned long pma;
+    unsigned long size;
+};
+
+struct matlas {
+    struct mregion * ram;
+    struct mregion * mmio;
+    struct mregion * resv;
+};
+
 // EXPORTED FUNCTION DECLARATIONS
 //
 
@@ -46,7 +60,7 @@ extern char memory_initialized;
  * the heap memory manager, and adds remaining memory to the free chunk list
  * @return None
  */
-extern void memory_init(void);
+extern void memory_init(const struct matlas* mappings);
 
 /**
  * @brief Gets the active memory space

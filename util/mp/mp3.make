@@ -48,7 +48,7 @@ FILES_FOR_COPYING   := \
     sys/memory.h \
     sys/misc.c \
     sys/misc.h \
-	sys/mp3.make:sys/Makefile \
+    sys/mp3.make:sys/Makefile \
     sys/plic.c \
     sys/plic.h \
     sys/process.c \
