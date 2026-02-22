@@ -100,7 +100,7 @@ VIDEO_QEMUOPTS += -device virtio-keyboard-device -device virtio-tablet-device
 
 ifeq ($(CP1), 1)
 	CFLAGS += -DMP3CP1
-    ASFLAGS += -defsym MP3CP1=1
+    	ASFLAGS += -defsym MP3CP1=1
 endif
 
 all: kernel.elf
