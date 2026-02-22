@@ -272,7 +272,10 @@ void memory_init(const struct matlas * mappings) {
             //Intermediate pages SHOULD NOT be global (so that other parts of 
             //the region can later be allocated by other things that may not 
             //want to share it.)
-            main_pt2[VPN2(pp)] = ptab_pte(alloc_phys_page(), 0);
+	    void* new_page = alloc_phys_page();
+	    memset(new_page, 0, PAGE_SIZE);
+            main_pt2[VPN2(pp)] = ptab_pte(new_page, 0);
+
         }else align = GIGA_SIZE;
 
         end = pp + mappings->ram[i].size;
