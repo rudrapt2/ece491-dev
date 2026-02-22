@@ -1,7 +1,7 @@
 // glue.c - Stuff to make rogue work with our bare-metal OS
 // 
 
-#define AEE32
+#define AEE31
 #include "glue.h"
 #include <stdarg.h>
 #include <stddef.h>
@@ -19,20 +19,20 @@ static void rand_init(void);
 static void wait_for_enter(void);
 
 #ifdef AEE31
-#include "kernel/io.h"
+#include "usr/io.h"
 #include "kernel/thread.h"
 #include "kernel/device.h"
 #include "kernel/filesys.h"
+#include "kernel/string.h"
 
-struct io * file = NULL;
-struct io * rtc_io = NULL;
-struct io * term_io;
-// struct io * file_list[] = {NULL, NULL}; // zork only opens two files
+static struct io * file = NULL;
+static struct io * rtc_io = NULL;
+static struct io_term zorkio;
 
 int main(struct io * termio) {
     extern void zork_start_game(void);
     
-    term_io = termio;
+    ioterm_init(&zorkio, termio);
     rtc_init();
     rand_init();
     wait_for_enter();  
@@ -43,6 +43,14 @@ int main(struct io * termio) {
 void exit(int result) {
     wait_for_enter(); // let user read exit message
     exit_running_thread();
+}
+
+void printf(const char * fmt, ...) {
+	va_list ap;
+
+	va_start(ap, fmt);
+    iovprintf(&zorkio.io, fmt, ap);
+	va_end(ap);
 }
 
 int fopen(const char *fname) {

@@ -31,6 +31,9 @@ extern int fclose(int fd);
 extern int fgetc(int fd);
 extern int fwrite(const void *ptr, size_t size, size_t nmemb, int fd);
 extern int fread(void *ptr, size_t size, size_t nmemb, int fd);
+#ifdef AEE31
+extern void printf(const char * fmt, ...);
+#endif
 
 extern void exit(int result);
 
