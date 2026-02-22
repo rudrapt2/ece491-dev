@@ -10,6 +10,8 @@
 #define FIN '<'
 #define FOUT '>'
 #define PIPE '|'
+#define BG '&'
+#define SQ ';'
 
 // standard file descriptors
 #define STDIN 0

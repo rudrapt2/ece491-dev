@@ -8,6 +8,13 @@
 #define MAXARGS 64
 
 #define SKIP_SPACES(buf) while(*buf == ' ') buf++
+#define RST_IO()                    \
+    do {                            \
+        _close(STDIN);              \
+        _iodup(CONSOLEOUT, STDIN);  \
+        _close(STDOUT);             \
+        _iodup(CONSOLEOUT, STDOUT); \
+    } while (0)
 
 void exec(int argc, char* argv[]) {
 	char full_path[BUFSIZE];
@@ -29,6 +36,23 @@ void exec(int argc, char* argv[]) {
 
 	result = _exec(fd, argc, argv);
 	printf("Failed to exec %s (%s)", path, error_desc(result));
+}
+
+static void handle_sq(int argc, char* argv[]) {
+    int child = _fork();
+    if (child == 0) {
+        exec(argc, argv);
+        _exit(); // something went wrong
+    }
+    _wait(child);
+}
+
+static void handle_bg(int argc, char* argv[]) {
+    int child = _fork();
+    if (child == 0) {
+        exec(argc, argv);
+        _exit(); // something went wrong
+    }
 }
 
 static int handle_file_input(char* file) {
@@ -109,6 +133,8 @@ static int is_terminator(char c) {
     switch (c) {
         case ' ':
         case '\0':
+        case SQ:
+        case BG:
         case FIN:
         case FOUT:
         case PIPE:
@@ -158,6 +184,16 @@ void parse_and_exec(char* head) {
         head = end + 1;
         SKIP_SPACES(head);
         switch (term) {
+            case SQ: // run sequentially
+                handle_sq(argc, argv);
+                RST_IO();
+                parse_and_exec(head);
+                return;
+            case BG: // run in background
+                handle_bg(argc, argv);
+                RST_IO();
+                parse_and_exec(head);
+                return;
             case FIN:
                 term = find_terminator(head, &end);
                 *end = '\0';
@@ -198,10 +234,7 @@ void main()
     buf[BUFSIZE-1] = '\0'; // terminate
 
 	_open(CONSOLEOUT, "/dev/uart1");    // console device
-	_close(STDIN);              	    // close any existing stdin
-	_iodup(CONSOLEOUT, STDIN);          // stdin from console
-	_close(STDOUT);                     // close any existing stdout
-	_iodup(CONSOLEOUT, STDOUT);         // stdout to console
+    RST_IO();
 
 	printf("Starting 391 Shell\n");
 
