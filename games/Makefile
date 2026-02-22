@@ -22,6 +22,10 @@ mp3-cp2:
 	make -C rule30 rule30-mp3-cp2
 	cp rule30/bin/rule30-mp3-cp2 $(USR_GAMES_FOLDER)/rule30
 
+	make -C zork zork-mp3cp2.elf
+	cp zork/dtextc.dat $(USR_GAMES_FOLDER)/dtextc.dat
+	cp zork/zork-mp3cp2.elf $(USR_GAMES_FOLDER)/zork
+
 	make -C ../util/fs all
 	./../util/fs/mkfs_ngfs -R ../sys/fs/ngfs.raw 32M ../usr/bin/* ../usr/games/*
 
