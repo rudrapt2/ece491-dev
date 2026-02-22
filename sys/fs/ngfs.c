@@ -38,7 +38,6 @@
 #define CACHE_CLEAN 0
 #define CACHE_DIRTY 1
 
-// TODO: add locks
 struct ngfs_file {
     struct ngfs_dir_entry dentry;
     struct ngfs * fs;
@@ -703,7 +702,7 @@ uint32_t get_free_data_block(struct ngfs * fs) {
                 // this line is needed bc it breaks otherwise
                 // i think this means theres a race condition
                 // in the cache? not sure though
-                cache_flush(fs->cache);
+                cache_flush(fs->cache); // CACHE_ISSUE
 
                 free_block = fat_block * NGFS_FAT_ENTRIES_PER_BLOCK + idx;
                 return (free_block < fs->size / NGFS_BLKSZ - fs->num_fat_blocks) ?
@@ -726,7 +725,7 @@ void set_next_data_block(struct cache * cache, uint32_t block, uint32_t next) {
         &next, sizeof(next));
     // this line is needed as well
     // i think this is also related to the cache race cond
-    cache_flush(cache);
+    cache_flush(cache); // CACHE_ISSUE
 }
 
 uint32_t get_next_data_block(struct cache * cache, uint32_t block) {
@@ -790,6 +789,7 @@ int iterate_dentry(
 {
     if (*idx >= ngfs->root_dir.size / DENTRYSZ) {
         cache_release(ngfs->cache, *dentry, dirty);
+        cache_flush(ngfs->cache); // CACHE_ISSUE
         return 0;
     }
 
@@ -800,6 +800,7 @@ int iterate_dentry(
     
     if (*idx % DENTRIES_PER_BLOCK == 0) {
         cache_release(ngfs->cache, *dentry, dirty);
+        cache_flush(ngfs->cache); // CACHE_ISSUE
         *block = get_next_data_block(ngfs->cache, *block);
         *dentry = get_cache_from_block(ngfs->cache, IDX_TO_ABS(*block));
     }
