@@ -6,6 +6,11 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <limits.h>
+#ifdef AEE31
+#include "kernel/setjmp.h"
+#else
+#include <setjmp.h>
+#endif
 
 #ifndef RAND_MAX
 #define RAND_MAX 0x7fffffff
@@ -18,29 +23,49 @@ static void rand_init(void);
 static void wait_for_enter(void);
 
 #ifdef AEE31
-#include "usr/io.h"
+#include "usr/error.h"
+#include "kernel/io.h"
 #include "kernel/thread.h"
 #include "kernel/filesys.h"
 #include "kernel/string.h"
 
-static struct io * file = NULL;
+static int file_provided;
+static struct io * file;
 static struct io * rtc_io = NULL;
+static struct io * rand_io = NULL;
 static struct io_term zorkio;
+static jmp_buf exit_jmp;
 
-int main(struct io * termio) {
+int main(struct io * termio, struct io * rand, struct io * rtc, struct io * dtext) {
     extern void zork_start_game(void);
     
     ioterm_init(&zorkio, termio);
+
+    file_provided = (dtext != NULL) ? 0 : -ENOENT;
+    
+    if (file_provided == 0) {
+        file = dtext;
+        printf("dtextc.dat opened successfully\n");
+    } else{
+        printf("dtextc.dat not provided\n");
+    }
+    
+    rtc_io = rtc;
+    rand_io = rand;
+
+    
     rtc_init();
     rand_init();
-    wait_for_enter();  
-    zork_start_game();
+    wait_for_enter();
+    if (setjmp(exit_jmp) == 0)
+        zork_start_game();
+    flush_all_filesys();
     return 0;
 }
 
 void exit(int result) {
     wait_for_enter(); // let user read exit message
-    exit_running_thread();
+    longjmp(exit_jmp, 1); // return to main()
 }
 
 void printf(const char * fmt, ...) {
@@ -60,8 +85,7 @@ void putc(char c) {
 }
 
 int fopen(const char *fname) {
-    create_file("c", fname);
-    return open_file("c", fname, &file);
+    return file_provided;
 }
 
 int ftell(int fd) {
@@ -89,7 +113,6 @@ int fgetc(int fd) {
 }
 
 int fclose(int fd) {
-    iodropref(file);
     return 0;
 }
 
@@ -106,17 +129,13 @@ int time(uint64_t *timebuf) {
 }
 
 void rtc_init(void) {
-    if (open_file("dev", "rtc", &rtc_io) < 0) {
-        printf("RTC failed to open\n");
-    }
+    return;
 }
 
 void rand_init(void) {
     uint64_t t = 0;
-    struct io * rng_fd;
-    if (open_file("dev", "viorng0", &rng_fd) == 0)
-        if (ioread(rng_fd, &rndst, sizeof(rndst)) == sizeof(rndst)) 
-            return;
+    if (ioread(rand_io, &rndst, sizeof(rndst)) == sizeof(rndst)) 
+        return;
 
     printf("Failed to read from viorng, getting random seed\n");
 #ifndef RAND_SEED

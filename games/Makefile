@@ -11,20 +11,34 @@ mp2:
 	cp trek/bin/* $(KERN_GAMES_FOLDER)
 	cp rule30/bin/* $(KERN_GAMES_FOLDER)
 
+mp3-cp1:
+	mkdir -p $(USR_GAMES_FOLDER)
+	
+	make -C trek trek-mp3-cp1
+	cp trek/bin/trek-mp3-cp1 		$(USR_GAMES_FOLDER)/trek-mp3-cp1
 
+# 	make -C rule30 rule30-mp3-cp1
+# 	cp rule30/bin/rule30-mp3-cp1 	$(USR_GAMES_FOLDER)/rule30
+
+	make -C zork zork-mp3-cp1
+	cp zork/data/dtextc.dat 		$(USR_GAMES_FOLDER)/dtextc.dat
+	cp zork/bin/zork-mp3-cp1		$(USR_GAMES_FOLDER)/zork-cp1
+
+	make -C ../util/fs all
+	./../util/fs/mkfs_ngfs -R ../sys/fs/ngfs.raw 32M ../usr/bin/* ../usr/games/*
 
 mp3-cp2:
 	mkdir -p $(USR_GAMES_FOLDER)
 	
 	make -C trek trek-mp3-cp2
-	cp trek/bin/trek-mp3-cp2 $(USR_GAMES_FOLDER)/trek
+	cp trek/bin/trek-mp3-cp2 		$(USR_GAMES_FOLDER)/trek
 
 	make -C rule30 rule30-mp3-cp2
-	cp rule30/bin/rule30-mp3-cp2 $(USR_GAMES_FOLDER)/rule30
+	cp rule30/bin/rule30-mp3-cp2 	$(USR_GAMES_FOLDER)/rule30
 
-	make -C zork zork-mp3cp2.elf
-	cp zork/dtextc.dat $(USR_GAMES_FOLDER)/dtextc.dat
-	cp zork/zork-mp3cp2.elf $(USR_GAMES_FOLDER)/zork
+	make -C zork zork-mp3-cp2
+	cp zork/data/dtextc.dat 		$(USR_GAMES_FOLDER)/dtextc.dat
+	cp zork/bin/zork-mp3-cp2		$(USR_GAMES_FOLDER)/zork
 
 	make -C ../util/fs all
 	./../util/fs/mkfs_ngfs -R ../sys/fs/ngfs.raw 32M ../usr/bin/* ../usr/games/*

@@ -73,6 +73,7 @@ void main(unsigned int hartid, void * dtb) {
     mount_devfs(DEVMNTNAME);
     mount_drive(CMNTNAME, CDEVNAME, mount_ngfs);
     exec_init();
+    flush_all_filesys();
 #else
     run_games();
 #endif
@@ -127,12 +128,31 @@ void exec_init() {
     void (*entry)(void);
     int tid;
     struct io * uartio;
-    result = open_device(CONSOLEDEV, &uartio);
+    // struct io * randio;
+    // struct io * rtcio;
+    // struct io * fileio;
 
+    result = open_device(CONSOLEDEV, &uartio);
     if (result != 0) {
         kprintf(CONSOLEDEV ": %s; terminating\n", error_name(result));
         halt();
     }
+
+    // result = open_device("viorng0", &randio);
+    // if (result != 0) {
+    //     kprintf("viorng0: %s; using default seed\n", error_name(result));
+    //     randio = NULL;
+    // }
+    // result = open_device("rtc", &rtcio);
+    // if (result != 0) {
+    //     kprintf("rtc: %s; time-based seed will be unavailable\n", error_name(result));
+    //     rtcio = NULL;
+    // }
+    // result = open_file(CMNTNAME, "dtextc.dat", &fileio);
+    // if (result != 0) {
+    //     kprintf("dtextc.dat: %s; file operations will fail\n", error_name(result));
+    //     fileio = NULL;
+    // }
 
     // load the executable into memory
     result = elf_load(initexe, &entry);
