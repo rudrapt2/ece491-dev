@@ -1,7 +1,6 @@
-// glue.c - Stuff to make rogue work with our bare-metal OS
+// glue.c - Stuff to make zork work with our bare-metal OS
 // 
 
-#define AEE31
 #include "glue.h"
 #include <stdarg.h>
 #include <stddef.h>
@@ -21,7 +20,6 @@ static void wait_for_enter(void);
 #ifdef AEE31
 #include "usr/io.h"
 #include "kernel/thread.h"
-#include "kernel/device.h"
 #include "kernel/filesys.h"
 #include "kernel/string.h"
 
@@ -51,6 +49,14 @@ void printf(const char * fmt, ...) {
 	va_start(ap, fmt);
     iovprintf(&zorkio.io, fmt, ap);
 	va_end(ap);
+}
+
+char * getsn(char * buf, size_t size) {
+    return ioterm_getsn(&zorkio, buf, size);
+}
+
+void putc(char c) {
+    iowrite(&zorkio.io, &c, 1);
 }
 
 int fopen(const char *fname) {
@@ -100,7 +106,7 @@ int time(uint64_t *timebuf) {
 }
 
 void rtc_init(void) {
-    if (open_device("rtc", &rtc_io) < 0) {
+    if (open_file("dev", "rtc", &rtc_io) < 0) {
         printf("RTC failed to open\n");
     }
 }
@@ -108,7 +114,7 @@ void rtc_init(void) {
 void rand_init(void) {
     uint64_t t = 0;
     struct io * rng_fd;
-    if (open_device("viorng0", &rng_fd) == 0)
+    if (open_file("dev", "viorng0", &rng_fd) == 0)
         if (ioread(rng_fd, &rndst, sizeof(rndst)) == sizeof(rndst)) 
             return;
 
@@ -160,7 +166,6 @@ void exit(int result) {
 }
 
 int fopen(const char *fname) {
-    int result;
     char path[32];
     snprintf(path, 32, "/c/%s", fname);
     _create(path);
@@ -207,14 +212,14 @@ int time(uint64_t *timebuf) {
 }
 
 void rtc_init(void) {
-    if ((rtc_fd = _open(-1, "rtc")) < 0) {
+    if ((rtc_fd = _open(-1, "/dev/rtc")) < 0) {
         printf("RTC failed to open\n");
     }
 }
 
 void rand_init(void) {
     uint64_t t = 0;
-    int rng_fd = _open(-1, "viorng0");
+    int rng_fd = _open(-1, "/dev/viorng0");
     if (rng_fd > 0) {
         if (_read(rng_fd, &rndst, sizeof(rndst)) == sizeof(rndst)) 
             return;

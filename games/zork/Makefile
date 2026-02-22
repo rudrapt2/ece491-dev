@@ -1,56 +1,74 @@
-# Based on xv6-riscv Makefile; see LICENSE.
+# Makefile
+# 
 
-TOOLPREFIX=riscv64-unknown-elf-
+PREFIX=riscv64-unknown-elf-
 QEMU=qemu-system-riscv64
 
-CC=$(TOOLPREFIX)gcc
-AS=$(TOOLPREFIX)as
-LD=$(TOOLPREFIX)ld
-OBJCOPY=$(TOOLPREFIX)objcopy
-OBJDUMP=$(TOOLPREFIX)objdump
+CC=$(PREFIX)gcc
+AS=$(PREFIX)as
+LD=$(PREFIX)ld
+OBJCOPY=$(PREFIX)objcopy
+OBJDUMP=$(PREFIX)objdump
+
+KERNDIR=kernel
+USRDIR=usr
+SRCDIR=source
+
+MP3CP1_PREFIX=mp3cp1
+MP3CP2_PREFIX=mp3cp2
 
 ZORK_OBJS = \
-	source/actors.o \
-	source/ballop.o \
-	source/clockr.o \
-	source/demons.o \
-	source/dgame.o \
-	source/dinit.o \
-	source/dmain.o \
-	source/dso1.o \
-	source/dso2.o \
-	source/dso3.o \
-	source/dso4.o \
-	source/dso5.o \
-	source/dso6.o \
-	source/dso7.o \
-	source/dsub.o \
-	source/dverb1.o \
-	source/dverb2.o \
-	source/gdt.o \
-	source/lightp.o \
-	source/local.o \
-	source/nobjs.o \
-	source/np1.o \
-	source/np2.o \
-	source/np3.o \
-	source/np.o \
-	source/nrooms.o \
-	source/objcts.o \
-	source/rooms.o \
-	source/sobjs.o \
-	source/supp.o \
-	source/sverbs.o \
-	source/verbs.o \
-	source/villns.o \
-	usr/string.o \
-	usr/syscall.o \
-	usr/heap.o \
-	usr/start.o \
-	glue.o
+	actors.o \
+	ballop.o \
+	clockr.o \
+	demons.o \
+	dgame.o \
+	dinit.o \
+	dmain.o \
+	dso1.o \
+	dso2.o \
+	dso3.o \
+	dso4.o \
+	dso5.o \
+	dso6.o \
+	dso7.o \
+	dsub.o \
+	dverb1.o \
+	dverb2.o \
+	gdt.o \
+	lightp.o \
+	local.o \
+	nobjs.o \
+	np1.o \
+	np2.o \
+	np3.o \
+	np.o \
+	nrooms.o \
+	objcts.o \
+	rooms.o \
+	sobjs.o \
+	supp.o \
+	sverbs.o \
+	verbs.o \
+	villns.o 
 
-# ZORK_OBJS_MP2 = $(addprefix mp2_, $(ZORK_OBJS))
-# ZORK_OBJS_MP3 = $(addprefix mp3_, $(ZORK_OBJS))
+ZORK_MP3_CP1_OBJS = \
+	$(addprefix $(SRCDIR)/$(MP3CP1_PREFIX)_, $(ZORK_OBJS)) \
+	$(USRDIR)/$(MP3CP1_PREFIX)_io.o \
+	$(KERNDIR)/$(MP3CP1_PREFIX)_thread.o \
+	$(KERNDIR)/$(MP3CP1_PREFIX)_string.o \
+	$(KERNDIR)/$(MP3CP1_PREFIX)_device.o \
+	$(KERNDIR)/$(MP3CP1_PREFIX)_filesys.o \
+	$(MP3CP1_PREFIX)_glue.o 
+
+ZORK_MP3_CP2_OBJS = \
+	$(addprefix $(SRCDIR)/$(MP3CP2_PREFIX)_, $(ZORK_OBJS)) \
+	$(USRDIR)/$(MP3CP2_PREFIX)_io.o \
+	$(USRDIR)/$(MP3CP2_PREFIX)_heap.o \
+	$(USRDIR)/$(MP3CP2_PREFIX)_start.o \
+	$(USRDIR)/$(MP3CP2_PREFIX)_string.o \
+	$(USRDIR)/$(MP3CP2_PREFIX)_syscall.o \
+	$(MP3CP2_PREFIX)_glue.o 
 
 CFLAGS = -Wall -fno-omit-frame-pointer -ggdb -gdwarf-2
 CFLAGS += -mcmodel=medany -fno-pie -no-pie -march=rv64imazicsr -mabi=lp64
@@ -66,10 +84,57 @@ CFLAGS += -Wno-unused-but-set-variable -Wno-parentheses -Wno-missing-braces
 
 ASFLAGS = -march=rv64imazicsr -mabi=lp64
 
-all: mp3
+all: zork-mp3cp2.elf
 
-mp3: $(ZORK_OBJS)
-	$(LD) -T umode.ld -o zork.elf $^
+#################################################
+## CP1
+
+# Main binary
+zork-mp3cp1.elf: $(ZORK_MP3_CP1_OBJS)
+	$(LD) -T $(USRDIR)/no_umode.ld -o $@ $^
+
+# Zork + glue binaries
+$(SRCDIR)/$(MP3CP1_PREFIX)_%.o: $(SRCDIR)/%.c
+	$(CC) $(CFLAGS) -DAEE31 -o $@ -c $<
+
+$(MP3CP1_PREFIX)_glue.o: glue.c
+	$(CC) $(CFLAGS) -DAEE31 -o $@ -c $<
+
+# Kernel binaries
+$(KERNDIR)/$(MP3CP1_PREFIX)_%.o: $(KERNDIR)/%.c
+	$(CC) $(CFLAGS) -include $(KERNDIR)/string.h -DAEE31 -DMP3CP1 -o $@ -c $<
+
+# User binaries
+$(USRDIR)/$(MP3CP1_PREFIX)_%.o: $(USRDIR)/%.c
+	$(CC) $(CFLAGS) -DAEE31 -o $@ -c $<
+
+$(USRDIR)/$(MP3CP1_PREFIX)_%.o: $(USRDIR)/%.s
+	$(CC) $(CFLAGS) -DAEE31 -o $@ -c $<
+
+#################################################
+
+#################################################
+## CP2 + CP3
+
+# Main binary
+zork-mp3cp2.elf: $(ZORK_MP3_CP2_OBJS)
+	$(LD) -T $(USRDIR)/umode.ld -o $@ $^
+
+# Zork + glue binaries
+$(SRCDIR)/$(MP3CP2_PREFIX)_%.o: $(SRCDIR)/%.c
+	$(CC) $(CFLAGS) -DAEE32 -o $@ -c $<
+
+$(MP3CP2_PREFIX)_glue.o: glue.c
+	$(CC) $(CFLAGS) -DAEE32 -o $@ -c $<
+
+# User binaries
+$(USRDIR)/$(MP3CP2_PREFIX)_%.o: $(USRDIR)/%.c
+	$(CC) $(CFLAGS) -DAEE32 -o $@ -c $<
+
+$(USRDIR)/$(MP3CP2_PREFIX)_%.o: $(USRDIR)/%.s
+	$(CC) $(CFLAGS) -DAEE32 -o $@ -c $<
+
+#################################################
 
 clean:
-	rm -rf *.o *.elf
+	rm -rf *.o *.elf kernel/*.o source/*.o usr/*.o

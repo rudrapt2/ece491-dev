@@ -33,6 +33,10 @@ extern int fwrite(const void *ptr, size_t size, size_t nmemb, int fd);
 extern int fread(void *ptr, size_t size, size_t nmemb, int fd);
 #ifdef AEE31
 extern void printf(const char * fmt, ...);
+extern char * getsn(char * buf, size_t size);
+extern void putc(char c);
+#define islower(c) ('a' <= (c) && (c) <= 'z')
+#define toupper(c) ((c) - 'a' + 'A')
 #endif
 
 extern void exit(int result);
