@@ -117,8 +117,7 @@ void draw(const char * line) {
 }
 
 void wait(void) {
-    volatile unsigned long i;
-    for (i = 0; i < 100000; i++) { }
+    _usleep(100000);
 }
 
 void main(void) {
