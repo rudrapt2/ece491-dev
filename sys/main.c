@@ -26,10 +26,10 @@
 
 #ifndef MP2
 #ifndef MP3CP1
-#define INITEXE "shell"
+    #define INITEXE "shell"
 #else
-#define INITEXE "trek-mp3-cp1"
-#define CONSOLEDEV "uart1"
+    #define INITEXE "trek-mp3-cp1"
+    #define CONSOLEDEV "uart1"
 #endif
 
 #define CMNTNAME "c" // ngfs

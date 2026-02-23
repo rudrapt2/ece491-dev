@@ -59,17 +59,12 @@ ZORK_OBJS = \
 	objcts.o \
 	sverbs.o \
 
-# $(KOBJDIR)/$(MP3CP1_PREFIX)_io.o 
-# 	$(KOBJDIR)/$(MP3CP1_PREFIX)_device.o
-# 	$(KOBJDIR)/$(MP3CP1_PREFIX)_filesys.o
-
 ZORK_MP3_CP1_OBJS = \
 	$(addprefix $(SOBJDIR)/$(MP3CP1_PREFIX)_, $(ZORK_OBJS)) \
 	$(UOBJDIR)/$(MP3CP1_PREFIX)_io.o \
 	$(UOBJDIR)/$(MP3CP1_PREFIX)_glue.o \
 	$(KOBJDIR)/$(MP3CP1_PREFIX)_string.o \
 	$(KOBJDIR)/$(MP3CP1_PREFIX)_setjmp.o \
-
 
 ZORK_MP3_CP2_OBJS = \
 	$(addprefix $(SOBJDIR)/$(MP3CP2_PREFIX)_, $(ZORK_OBJS)) \
@@ -89,8 +84,8 @@ CFLAGS += -I. # -DDEBUG -DTRACE
 ASFLAGS += -march=rv64g -mabi=lp64d
 
 # Special flags for zork
-# CFLAGS += -Wno-implicit-int -Wno-implicit-function-declaration
-# CFLAGS += -Wno-unused-variable -Wno-return-type
+CFLAGS += -Wno-implicit-int -Wno-implicit-function-declaration
+CFLAGS += -Wno-unused-variable -Wno-return-type -Wno-char-subscripts
 CFLAGS += -Wno-unused-but-set-variable -Wno-parentheses -Wno-missing-braces
 
 #################################################
@@ -126,7 +121,7 @@ zork-mp3-cp1: $(UOBJDIR)/zork_mp3_cp1.elf | $(BINDIR)
 $(UOBJDIR)/zork_mp3_cp1.elf: $(ZORK_MP3_CP1_OBJS)
 	$(LD) -T $(USRDIR)/no_umode.ld -o $@ $^
 
-# Trek + glue binaries
+# Zork + glue binaries
 $(UOBJDIR)/$(MP3CP1_PREFIX)_glue.o: glue.c | $(UOBJDIR)
 	$(CC) $(CFLAGS) -DAEE31 -o $@ -c $<
 

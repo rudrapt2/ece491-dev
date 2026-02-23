@@ -11,42 +11,42 @@ OBJCOPY=$(PREFIX)objcopy
 OBJDUMP=$(PREFIX)objdump
 UNIFDEF=unifdef
 
-CP1=1
+CP1=0
 
 OBJS = \
-	start.o \
-	main.o \
-	board/qvirt.o \
-	console.o \
-	dev/uart.o \
-	dev/rtc.o \
-	dev/virtio.o \
-	dev/viorng.o \
-	dev/vioblk.o \
-	string.o \
-	plic.o \
-	string.o \
-	error.o \
-	thread.o \
-	thrasm.o \
-	trap.o \
 	io.o \
-	filesys.o \
+	elf.o \
+	sbi.o \
+	main.o \
+	plic.o \
+	trap.o \
 	trap.o \
 	excp.o \
 	intr.o \
 	heap.o \
 	misc.o \
-	device.o \
-	elf.o \
+	start.o \
+	error.o \
 	cache.o \
 	timer.o \
+	string.o \
+	string.o \
+	thread.o \
+	thrasm.o \
 	device.o \
-	sbi.o \
-	fs/ngfs.o \
+	device.o \
 	memory.o \
+	console.o \
+	dev/rtc.o \
+	filesys.o \
+	fs/ngfs.o \
 	process.o \
-	syscall.o 
+	syscall.o \
+	dev/uart.o \
+	dev/virtio.o \
+	dev/viorng.o \
+	dev/vioblk.o \
+	board/qvirt.o \
 
 CFLAGS = -Wall -Werror=implicit-function-declaration -Wno-unused-function
 CFLAGS += -fno-omit-frame-pointer -ggdb3 -gdwarf-2
@@ -100,7 +100,7 @@ VIDEO_QEMUOPTS += -device virtio-keyboard-device -device virtio-tablet-device
 
 ifeq ($(CP1), 1)
 	CFLAGS += -DMP3CP1
-    	ASFLAGS += -defsym MP3CP1=1
+    ASFLAGS += -defsym MP3CP1=1
 endif
 
 all: kernel.elf

@@ -5,10 +5,11 @@ USR_GAMES_FOLDER 	= ../usr/games
 
 mp2:
 	mkdir -p $(KERN_GAMES_FOLDER)
+	
 	make -C trek trek-mp2
-	make -C rule30 rule30-mp2
-
 	cp trek/bin/* $(KERN_GAMES_FOLDER)
+
+	make -C rule30 rule30-mp2
 	cp rule30/bin/* $(KERN_GAMES_FOLDER)
 
 mp3-cp1:
@@ -24,8 +25,11 @@ mp3-cp1:
 	cp zork/data/dtextc.dat 		$(USR_GAMES_FOLDER)/dtextc.dat
 	cp zork/bin/zork-mp3-cp1		$(USR_GAMES_FOLDER)/zork-cp1
 
-	make -C ../util/fs all
-	./../util/fs/mkfs_ngfs -R ../sys/fs/ngfs.raw 32M ../usr/bin/* ../usr/games/*
+	make -C rogue rogue-mp3-cp1
+	cp rogue/bin/rogue-mp3-cp1		$(USR_GAMES_FOLDER)/rogue
+
+# 	make -C ../util/fs all
+# 	./../util/fs/mkfs_ngfs -R ../sys/fs/ngfs.raw 32M ../usr/bin/* ../usr/games/*
 
 mp3-cp2:
 	mkdir -p $(USR_GAMES_FOLDER)
@@ -40,8 +44,11 @@ mp3-cp2:
 	cp zork/data/dtextc.dat 		$(USR_GAMES_FOLDER)/dtextc.dat
 	cp zork/bin/zork-mp3-cp2		$(USR_GAMES_FOLDER)/zork
 
-	make -C ../util/fs all
-	./../util/fs/mkfs_ngfs -R ../sys/fs/ngfs.raw 32M ../usr/bin/* ../usr/games/*
+	make -C rogue rogue-mp3-cp2
+	cp rogue/bin/rogue-mp3-cp2		$(USR_GAMES_FOLDER)/rogue
+
+# 	make -C ../util/fs all
+# 	./../util/fs/mkfs_ngfs -R ../sys/fs/ngfs.raw 32M ../usr/bin/* ../usr/games/*
 
 clean:
 	rm -rf $(KERN_GAMES_FOLDER)

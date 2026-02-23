@@ -59,7 +59,6 @@ int main(struct io * termio, struct io * rand, struct io * rtc, struct io * dtex
     wait_for_enter();
     if (setjmp(exit_jmp) == 0)
         zork_start_game();
-    flush_all_filesys();
     return 0;
 }
 
