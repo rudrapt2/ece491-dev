@@ -47,8 +47,14 @@ mp3-cp2:
 	make -C rogue rogue-mp3-cp2
 	cp rogue/bin/rogue-mp3-cp2		$(USR_GAMES_FOLDER)/rogue
 
+	make -C nudoku nudoku-mp3-cp2
+	cp nudoku/bin/nudoku-mp3-cp2	$(USR_GAMES_FOLDER)/nudoku
+
+	make -C tetris tetris-mp3-cp2
+	cp tetris/bin/tetris-mp3-cp2	$(USR_GAMES_FOLDER)/tetris
+
 # 	make -C ../util/fs all
-# 	./../util/fs/mkfs_ngfs -R ../sys/fs/ngfs.raw 32M ../usr/bin/* ../usr/games/*
+	./../util/fs/mkfs_ngfs -R ../sys/fs/ngfs.raw 32M ../usr/bin/* ../usr/games/*
 
 clean:
 	rm -rf $(KERN_GAMES_FOLDER)
@@ -58,4 +64,5 @@ clean:
 	make -C zork clean
 	make -C rogue clean
 	make -C doom clean
+	make -C nudoku clean
 	make -C flying-toasters clean
