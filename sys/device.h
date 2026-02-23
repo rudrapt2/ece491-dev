@@ -115,6 +115,19 @@ extern int open_device(const char * name, struct io ** ioptr);
 
 #ifndef MP2
 extern int mount_devfs(const char * mpname);
+
+// Mounts the /devfs/ filesystem. Acts as an abstraction to the device manager,
+// allowing users to access devices via filesys commands. See /open_file/ in
+// filesys.h.
+//
+// On entry mount_devfs() assumes:
+// - devmgr_init() has been called and /devmgr_initialized/ is 1.
+// - /mpname/ is non-NULL and points to a NUL-terminated string.
+//
+// On return devmgr_init() guarantees (on success):
+// - devfs is added to the mountpoint list under the name /mpname/.
+// - on failure, mount_ngfs() returns a negative error code.
+
 #endif
 
 #endif

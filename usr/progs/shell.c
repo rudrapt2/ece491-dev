@@ -9,7 +9,21 @@
 
 #define SKIP_SPACES(buf) while(*buf == ' ') buf++
 
+// Executes the file in argv[0], passing in argc and argv. If argv[0] is not a
+// valid file path, it should prepend '/c/' before executing.
+//
+// On entry exec() assumes:
+// - /argc/ >= 1.
+// - /argv[0]/ is non-NULL and points to a NUL-terminated string.
+//
+// This function should not return.
+// - on success, executes argv[0], clearing the current memory space.
+// - on failure, print an error message and immediately exit.
 void exec(int argc, char* argv[]) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+    _exit();
+#else
 	char full_path[BUFSIZE];
 	int fd, result;
     char * path = argv[0];
@@ -24,42 +38,94 @@ void exec(int argc, char* argv[]) {
 
 	if (fd < 0) {
 		printf("Unable to access %s (%s)\n", path, error_desc(fd));
-		return;
+		_exit();
 	}
 
 	result = _exec(fd, argc, argv);
 	printf("Failed to exec %s (%s)", path, error_desc(result));
+    _exit();
+#endif
 }
 
-static int handle_file_input(char* file) {
+// Redirects STDIN to /path/.
+//
+// On entry handle_file_input() assumes:
+// - /path/ is non-NULL and points to a NUL-terminated string.
+//
+// On return handle_file_input() guarantees (on success):
+// - STDIN is redirected to the file in /path/.
+// - on failure, handle_file_input() returns a negative error code.
+static int handle_file_input(char* path) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return -ENOTSUP;
+#else
     int res;
     _close(STDIN);
-    res = _open(STDIN, file);
-    if (res < 0) printf("Failed to open file %s (%s)\n", file, error_desc(res));
+    res = _open(STDIN, path);
+    if (res < 0) printf("Failed to open file %s (%s)\n", path, error_desc(res));
     return res;
+#endif
 }
 
-static int handle_file_output(char* file) {
-    int res;
+// Redirects STDOUT to /path/. Attemptes to create /path/ if it does not exist.
+//
+// On entry handle_file_output() assumes:
+// - /path/ is non-NULL and points to a NUL-terminated string.
+//
+// On return handle_file_output() guarantees (on success):
+// - /path/ will exist and STDOUT will be redirected to be /path/.
+// - on failure, handle_file_output() returns a negative error code.
+static int handle_file_output(char* path) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return -ENOTSUP;
+#else
+    int open_res, create_res;
     _close(STDOUT);
-    res = _open(STDOUT, file);
-    if (res < 0) {
-        res = _create(file);
-        if (res < 0) {
-            printf("Failed to create file %s (%s)\n", file, error_desc(res));
-            return res;
+    create_res = _create(path);
+    open_res = _open(STDOUT, path);
+
+    if (open_res < 0) {
+        if (open_res == -ENOENT && create_res < 0) {
+            printf("Failed to create file %s (%s)\n", 
+                path, error_desc(create_res));
         }
-        res = _open(STDOUT, file);
+        else {
+            printf("Failed to open file %s (%s)\n", 
+                path, error_desc(open_res));
+        }
+        return open_res;
     }
-    else { // file exists, clear it out
-        unsigned long long end = 0;
-        _ioctl(STDOUT, IOC_SETEND, &end);
-    }
-    if (res < 0) printf("Failed to open file %s (%s)\n", file, error_desc(res));
-    return res;
+
+    // clear out file
+    unsigned long long end = 0;
+    _ioctl(STDOUT, IOC_SETEND, &end);
+    return 0;
+#endif
 }
 
-static int handle_pipe() {
+// Creates a pipe and a reader and writer process. The writer's STDOUT is 
+// redirected to the input of the pipe and the reader's STDIN is redirected
+// to the output of the pipe. The writer will immediately exec with argc and
+// argv, while the reader will return to continue parsing the remainder of the
+// input.
+//
+// On entry handle_file_output() assumes:
+// - /argc/ >= 1.
+// - /argv[0]/ is non-NULL and points to a NUL-terminated string.
+//
+// On return handle_file_output() guarantees (on success):
+// - The writer's STDOUT is redirected to the input of a newly created pipe and
+//   has exec'ed with /argc/ and /argv/.
+// - The reader's STDIN is redirected to the input of said pipe and has 
+//   returned.
+// - on failure, handle_pipe() exits immediately.
+static void handle_pipe(int argc, char* argv[]) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return;
+#else
     int wtid;
     int wpipe = -1;
     int rpipe = -1;
@@ -67,42 +133,44 @@ static int handle_pipe() {
 
     if (res < 0) {
         printf("Failed to create pipe (%s)\n", error_desc(res));
-        return res;
+        _exit();
     }
 
     res = _fork();
 
     if (res < 0) {
         printf("Failed to fork (%s)\n", error_desc(res));
-        return res;
+        _exit();
     }
 
-    if (res) { // writer
-        _close(rpipe);
-
-        // to make sure everything exits properly, we need a 
-        // waiter proc to ensure the main proc sleeps until
-        // all child threads are done executing.
-        wtid = _fork();
-        if (wtid > 0) {
-            _close(wpipe);
-            _wait(wtid);
-            _wait(res);
-            _exit();
-        }
-
-        _close(STDOUT);
-        _iodup(wpipe, STDOUT);
-        _close(wpipe);
-    }
-    else { // reader
+    if (res == 0) { // reader
         _close(wpipe);
         _close(STDIN);
         _iodup(rpipe, STDIN);
         _close(rpipe);
+        return;
     }
 
-    return res;
+    // writer & waiter
+    _close(rpipe);
+
+    wtid = _fork();
+    if (wtid <= 0) { // writer
+        _close(STDOUT);
+        _iodup(wpipe, STDOUT);
+        _close(wpipe);
+
+        exec(argc, argv);
+    }
+
+    // to make sure everything exits properly, we need a 
+    // waiter proc to ensure the main proc sleeps until
+    // all child threads are done executing.
+    _close(wpipe);
+    _wait(wtid);
+    _wait(res);
+    _exit();
+#endif
 }
 
 static int is_terminator(char c) {
@@ -148,7 +216,7 @@ void parse_and_exec(char* head) {
         head = end;
     }
 
-    if (argc == 0) return; // nothing to do
+    if (argc == 0) _exit(); // nothing to do
 
 	// Null-terminate the argument array
 	argv[argc] = NULL;
@@ -162,22 +230,17 @@ void parse_and_exec(char* head) {
                 term = find_terminator(head, &end);
                 *end = '\0';
                 res = handle_file_input(head);
-                if (res < 0) return;
+                if (res < 0) _exit();
                 break;
             case FOUT:
                 term = find_terminator(head, &end);
                 *end = '\0';
                 res = handle_file_output(head);
-                if (res < 0) return;
+                if (res < 0) _exit();
                 break;
             case PIPE:
-                res = handle_pipe();
-                if (res < 0) return;
-                if (res)
-                    exec(argc, argv); // writer
-                else 
-                    parse_and_exec(head); // reader
-                return;
+                handle_pipe(argc, argv);
+                parse_and_exec(head); // reader
         }
 
         if (term == ' ') {
@@ -203,15 +266,21 @@ void main()
 	_close(STDOUT);                     // close any existing stdout
 	_iodup(CONSOLEOUT, STDOUT);         // stdout to console
 
-	printf("Starting 391 Shell\n");
+    // Your starting prompt
+	printf(/* CHANGE ME */ "Starting 391 Shell\n");
 
 	for (;;) {
-		printf("LUMON OS> ");
+        // Your shell prompt
+        // Make sure your prompt ends in one of '>', '#', '$'
+		printf(/* CHANGE ME */ "LUMON OS> ");
 		getsn(buf, BUFSIZE - 1);
 
 		if (0 == strcmp(buf, "exit"))
 			return;
 
+#ifdef MP3CP1
+        parse_and_exec(buf);
+#else
 		child = _fork();
 		if (child) {
 			// Parent process: wait for all children
@@ -220,7 +289,7 @@ void main()
 		else {
 			// Child process: parse and execute
             parse_and_exec(buf);
-            _exit();
 		}
+#endif
 	}
 }
