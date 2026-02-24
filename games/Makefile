@@ -26,9 +26,6 @@ mp3-cp2:
 	cp zork/dtextc.dat $(USR_GAMES_FOLDER)/dtextc.dat
 	cp zork/zork-mp3cp2.elf $(USR_GAMES_FOLDER)/zork
 
-	make -C ../util/fs all
-	./../util/fs/mkfs_ngfs -R ../sys/fs/ngfs.raw 32M ../usr/bin/* ../usr/games/*
-
 clean:
 	rm -rf $(KERN_GAMES_FOLDER)
 	rm -rf $(USR_GAMES_FOLDER)

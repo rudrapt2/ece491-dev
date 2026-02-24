@@ -16,14 +16,15 @@
 
 #include <limits.h> // ULONG_MAX
 
-#include "fsimpl.h"
-#include "ioimpl.h"
-#include "error.h"
-#include "heap.h"
-#include "string.h"
-#include "thread.h"
-#include "cache.h"
-#include "misc.h"
+#include "../fsimpl.h"
+#include "../filesys.h"
+#include "../ioimpl.h"
+#include "../error.h"
+#include "../heap.h"
+#include "../string.h"
+#include "../thread.h"
+#include "../cache.h"
+#include "../misc.h"
 
 // INTERNAL CONSTANT DEFINITIONS
 //
@@ -142,11 +143,6 @@ int mount_tarfs(const char * mpname, struct io * bkgio) {
         return -ENOTSUP;
     }
 
-    if (CACHE_BLKSZ % TAR_BLKSZ != 0) {
-        debug("Incompatible cache block size: %d", CACHE_BLKSZ);
-        return -ENOTSUP;
-    }
-
     result = ioctl(bkgio, IOC_GETEND, &bkgcap);
 
     if (result != 0) {
@@ -207,6 +203,7 @@ int mount_tarfs(const char * mpname, struct io * bkgio) {
         memset(buf, 0, sizeof(buf));
         memcpy(buf, hdr->size, sizeof(hdr->size));
         file->size = strtoul(buf, &end, 8);
+        file->tarfs = fs;
 
         if (buf[0] == '\0' || end == NULL || *end != '\0')
             return -EBADFMT;
@@ -234,9 +231,9 @@ int mount_tarfs(const char * mpname, struct io * bkgio) {
 
     // Create a cache for the backing storage io object.
 
-    fs->cache = create_cache(bkgio);
+    fs->cache = create_cache(bkgio, TAR_BLKSZ);
 
-    if (fs->cache != 0)
+    if (fs->cache == NULL)
         panic("create_cache() failed");
     
     fs->bkgio = ioaddref(bkgio);
@@ -244,7 +241,7 @@ int mount_tarfs(const char * mpname, struct io * bkgio) {
     fs->base.openfile = &tarfs_openfile;
     fs->base.flush = &tarfs_flush;
 
-    result = mount_filesys(mpname, fs);
+    result = mount_filesys(mpname, &fs->base);
     return result;
 }
 
@@ -290,7 +287,7 @@ int tarfs_open_fileio (
     fio = kmalloc(sizeof(*fio));
     fio->file = file;
 
-    *ioptr = seekio_init(&fio->io, &tarfs_file_intf, file->size, 1, 1);
+    *ioptr = seekio_init(&fio->io, &tarfs_file_intf, 1, 1);
 
     return 0;
 }
@@ -302,7 +299,7 @@ void tarfs_file_reclaim(struct io * io) {
     kfree(fio);
 }
 
-long tarfs_file_fetch (
+long tarfs_fileio_fetch (
     struct io * io, unsigned long long pos, void * buf, long bufsz)
 {
     struct tarfs_fileio * const fio =
@@ -332,16 +329,16 @@ long tarfs_file_fetch (
     bufp = buf; // pointer into buffer where we will write next byte
         
     while (bufsz > 0) {
-        blkno = (fio->file->blkno * TAR_BLKSZ + pos) / CACHE_BLKSZ;
-        off = pos % CACHE_BLKSZ;   // offset from where we want data
+        blkno = (fio->file->blkno * TAR_BLKSZ + pos) / TAR_BLKSZ;
+        off = pos % TAR_BLKSZ;   // offset from where we want data
 
-        result = cache_fetch(cache, blkno * CACHE_BLKSZ, &blk);
+        result = cache_fetch(cache, blkno * TAR_BLKSZ, &blk);
         
         if (result < 0)
             return result;
 
-        if (CACHE_BLKSZ-off < bufsz)
-            cpycnt = CACHE_BLKSZ-off;
+        if (TAR_BLKSZ-off < bufsz)
+            cpycnt = TAR_BLKSZ-off;
         else
             cpycnt = bufsz;
         
@@ -356,7 +353,7 @@ long tarfs_file_fetch (
     return bufp - buf;
 }
 
-long tarfs_file_store (
+long tarfs_fileio_store (
     struct io * io, unsigned long long pos, const void * buf, long len)
 {
     struct tarfs_fileio * const fio =
@@ -386,16 +383,16 @@ long tarfs_file_store (
     bufp = buf; // pointer into buffer from where we will read next byte
         
     while (len > 0) {
-        blkno = (fio->file->blkno * TAR_BLKSZ + pos) / CACHE_BLKSZ;
+        blkno = (fio->file->blkno * TAR_BLKSZ + pos) / TAR_BLKSZ;
         off = pos % TAR_BLKSZ;   // offset from where we want data
 
-        result = cache_fetch(cache, blkno * CACHE_BLKSZ, &blk);
+        result = cache_fetch(cache, blkno * TAR_BLKSZ, &blk);
 
         if (result < 0)
             return result;
 
-        if (CACHE_BLKSZ-off < len)
-            cpycnt = CACHE_BLKSZ-off;
+        if (TAR_BLKSZ-off < len)
+            cpycnt = TAR_BLKSZ-off;
         else
             cpycnt = len;
         
@@ -411,9 +408,13 @@ long tarfs_file_store (
     return bufp - buf;
 }
 
-int tarfs_file_ioctl(struct io * io, int op, void * arg) {
+int tarfs_fileio_ioctl(struct io * io, int op, void * arg) {
+    struct tarfs_fileio * const fio =
+        (void*)io - offsetof(struct tarfs_fileio, io);
     switch (op) {
     case IOC_GETEND:
+        *(unsigned long long *)arg = fio->file->size;
+        return 0;
     case IOC_GETPOS:
     case IOC_SETPOS:
         return seekio_ioctl(io, op, arg);
@@ -434,8 +435,6 @@ int tarfs_open_lsio(struct tarfs * fs, struct io ** ioptr) {
 long tarfs_lsio_read(struct io * io, void * buf, long bufsz) {
     struct tarfs_lsio * const lsio =
         (void*)io - offsetof(struct tarfs_lsio, io);
-    char * const cbuf = buf;
-    struct tarfs_file * file;
 
     if (bufsz == 0 || buf == NULL || lsio->next == NULL)
         return 0;
