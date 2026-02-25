@@ -333,8 +333,12 @@ long ngfs_store(
     if (pos > UINT32_MAX) return -EINVAL;
 
     rwlock_acquire(&f->lock, 1);
-    if (pos + len > f->dentry.size) 
-        update_size(ngfs, &f->dentry, pos + len);
+
+    // store does not support resizing
+    if (pos + len > f->dentry.size) {
+        rwlock_release(&f->lock);
+        return -EINVAL;
+    }
     
     // since we cache the block, we need to be careful if it changes
     update_pos(ngfs, fio, pos);
@@ -632,7 +636,7 @@ int update_size(
 
 void update_pos(struct ngfs * ngfs, struct ngfs_io * fio, uint32_t newpos) {
     struct cache * cache = ngfs->cache;
-    if (newpos > fio->file->dentry.size) return;
+    assert(newpos <= fio->file->dentry.size);
     if (fio->write_idx != fio->file->write_idx || 
         fio->blockno > newpos / NGFS_BLKSZ)
     {

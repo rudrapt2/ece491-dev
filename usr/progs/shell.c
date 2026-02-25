@@ -1,13 +1,39 @@
+// shell.c - A basic shell for 391 OS
+//
+// Copyright (c) 2026 University of Illinois
+// SPDX-License-identifier: NCSA
+//
+
 #include "../syscall.h"
 #include "../string.h"
 #include "../shell.h"
 #include "../error.h"
 #include "../io.h"
 
+// INTERNAL CONSTANT DEFINITIONS
+//
+
 #define BUFSIZE 256
 #define MAXARGS 64
 
 #define SKIP_SPACES(buf) while(*buf == ' ') buf++
+#define RST_IO()                    \
+    do {                            \
+        _close(STDIN);              \
+        _iodup(CONSOLEOUT, STDIN);  \
+        _close(STDOUT);             \
+        _iodup(CONSOLEOUT, STDOUT); \
+    } while (0)
+
+// INTERNAL FUNCTION DECLARATIONS
+//
+static void __attribute__ ((noreturn)) exec(int argc, char* argv[]);
+static void handle_sq(int argc, char* argv[]);
+static void handle_bg(int argc, char* argv[]);
+static int handle_file_input(char* path);
+static int handle_file_output(char* path);
+static void handle_pipe(int argc, char* argv[]);
+static void __attribute__ ((noreturn)) parse_and_exec(char* head);
 
 // Executes the file in argv[0], passing in argc and argv. If argv[0] is not a
 // valid file path, it should prepend '/c/' before executing.
@@ -19,7 +45,7 @@
 // This function should not return.
 // - on success, executes argv[0], clearing the current memory space.
 // - on failure, print an error message and immediately exit.
-void exec(int argc, char* argv[]) {
+static void exec(int argc, char* argv[]) {
 #ifdef STUDENT
     // YOUR CODE HERE
     _exit();
@@ -44,6 +70,48 @@ void exec(int argc, char* argv[]) {
 	result = _exec(fd, argc, argv);
 	printf("Failed to exec %s (%s)", path, error_desc(result));
     _exit();
+#endif
+}
+
+// Execs with /argc/ and /argv/, waits for execution to complete, then 
+// returns
+//
+// On entry handle_file_output() assumes:
+// - /argc/ >= 1.
+// - /argv[0]/ is non-NULL and points to a NUL-terminated string.
+//
+// On return handle_sq() guarantees (on both success and failure):
+// - A process with /argc/ and /argv/ has been exec'd and has completed
+//   execution.
+static void handle_sq(int argc, char* argv[]) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return;
+#else
+    int child = _fork();
+    if (child == 0) 
+        exec(argc, argv);
+    _wait(child);
+#endif
+}
+
+// Execs with /argc/ and /argv/, returns immediately
+//
+// On entry handle_file_output() assumes:
+// - /argc/ >= 1.
+// - /argv[0]/ is non-NULL and points to a NUL-terminated string.
+//
+// On return handle_bg() guarantees (on both success and failure):
+// - A process with /argc/ and /argv/ has been exec'd (may not have 
+//   finished execution).
+static void handle_bg(int argc, char* argv[]) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return;
+#else
+    int child = _fork();
+    if (child == 0) 
+        exec(argc, argv);
 #endif
 }
 
@@ -111,11 +179,11 @@ static int handle_file_output(char* path) {
 // argv, while the reader will return to continue parsing the remainder of the
 // input.
 //
-// On entry handle_file_output() assumes:
+// On entry handle_pipe() assumes:
 // - /argc/ >= 1.
 // - /argv[0]/ is non-NULL and points to a NUL-terminated string.
 //
-// On return handle_file_output() guarantees (on success):
+// On return handle_pipe() guarantees (on success):
 // - The writer's STDOUT is redirected to the input of a newly created pipe and
 //   has exec'ed with /argc/ and /argv/.
 // - The reader's STDIN is redirected to the input of said pipe and has 
@@ -177,6 +245,8 @@ static int is_terminator(char c) {
     switch (c) {
         case ' ':
         case '\0':
+        case SQ:
+        case BG:
         case FIN:
         case FOUT:
         case PIPE:
@@ -192,7 +262,7 @@ static char find_terminator(char* head, char** end) {
     return **end;
 }
 
-void parse_and_exec(char* head) {
+static void parse_and_exec(char* head) {
     int argc;
     char* argv[MAXARGS + 1]; // +1 for NULL termination
     char* end;
@@ -226,21 +296,42 @@ void parse_and_exec(char* head) {
         head = end + 1;
         SKIP_SPACES(head);
         switch (term) {
-            case FIN:
-                term = find_terminator(head, &end);
-                *end = '\0';
-                res = handle_file_input(head);
-                if (res < 0) _exit();
-                break;
-            case FOUT:
-                term = find_terminator(head, &end);
-                *end = '\0';
-                res = handle_file_output(head);
-                if (res < 0) _exit();
-                break;
-            case PIPE:
-                handle_pipe(argc, argv);
-                parse_and_exec(head); // reader
+        case SQ: // run sequentially
+            handle_sq(argc, argv);
+            // prev cmd has been exec'd and finished
+            // reset any redirections and exec the rest
+            RST_IO();
+            parse_and_exec(head);
+            
+        case BG: // run in background
+            handle_bg(argc, argv);
+            // prev cmd has been exec'd, and is running in the background
+            // reset any redirections and exec the rest
+            RST_IO();
+            parse_and_exec(head);
+
+        case FIN: // file input redirection
+            term = find_terminator(head, &end);
+            *end = '\0';
+            res = handle_file_input(head);
+            if (res < 0) _exit();
+            // we may have more redirection, so we continue
+            break;
+
+        case FOUT: // file output redirection
+            term = find_terminator(head, &end);
+            *end = '\0';
+            res = handle_file_output(head);
+            if (res < 0) _exit();
+            // we may have more redirection, so we continue
+            break;
+
+        case PIPE: // set up pipe
+            RST_IO(); // any previous redirections are invalid
+            handle_pipe(argc, argv);
+            // writer has been exec'd and is writing into the pipe
+            // now parse and exec reader, who is reading from the pipe
+            parse_and_exec(head);
         }
 
         if (term == ' ') {
@@ -261,10 +352,7 @@ void main()
     buf[BUFSIZE-1] = '\0'; // terminate
 
 	_open(CONSOLEOUT, "/dev/uart1");    // console device
-	_close(STDIN);              	    // close any existing stdin
-	_iodup(CONSOLEOUT, STDIN);          // stdin from console
-	_close(STDOUT);                     // close any existing stdout
-	_iodup(CONSOLEOUT, STDOUT);         // stdout to console
+    RST_IO();
 
     // Your starting prompt
 	printf(/* CHANGE ME */ "Starting 391 Shell\n");

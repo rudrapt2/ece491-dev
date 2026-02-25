@@ -105,6 +105,7 @@ void rule30_start(struct uio *uio) {
 
 #if defined(AEE32)
 #include "usr/syscall.h"
+#include "usr/shell.h"
 
 extern void putc(char c);
 
@@ -112,7 +113,7 @@ void draw(const char * line) {
     const char *p = line;
     for (;;) {
         char c = *p++;
-        putc(c);
+        dputc(STDOUT, c);
         if (c == '\r' || c == '\n') break;
     }
 }
