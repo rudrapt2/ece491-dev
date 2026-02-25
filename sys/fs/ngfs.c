@@ -200,6 +200,8 @@ int mount_ngfs(const char * name, struct io * bkgio) {
     rwlock_init(&ngfs->fs_lock, "ngfs.lock");
 
     ngfs->base = ngfs_fs;
+    
+    debug("fs mounted");
 
     return mount_filesys(name, &ngfs->base);
 #endif
@@ -433,7 +435,7 @@ int ngfs_delete(struct filesystem * fs, const char * name) {
     struct ngfs * ngfs = (void *)fs;
     struct cache * cache = ngfs->cache;
     struct ngfs_dir_entry * root_dir = &ngfs->root_dir;
-    struct ngfs_dir_entry * dentry;
+    struct ngfs_dir_entry * dentry = NULL;
 
     if (strcmp(name, root_dir->name) == 0)
         return -EACCESS;
@@ -792,7 +794,7 @@ int iterate_dentry(
     int dirty) 
 {
     if (*idx >= ngfs->root_dir.size / DENTRYSZ) {
-        cache_release(ngfs->cache, *dentry, dirty);
+        if (*dentry != NULL) cache_release(ngfs->cache, *dentry, dirty);
         cache_flush(ngfs->cache); // CACHE_ISSUE
         return 0;
     }
