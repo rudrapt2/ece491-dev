@@ -7,7 +7,7 @@ PHDRS {
 }
 
 SECTIONS {
-  . = 0x80080000;
+  . = 0x80060000;
 
   PROVIDE(_kimg_start = .);
 

@@ -23,6 +23,8 @@ OBJS = \
 	dev/virtio.o \
 	dev/viorng.o \
 	dev/vioblk.o \
+	dev/loop.o \
+	iomux.o \
 	string.o \
 	plic.o \
 	string.o \
@@ -37,6 +39,7 @@ OBJS = \
 	intr.o \
 	heap.o \
 	misc.o \
+	rbuf.o \
 	device.o \
 	elf.o \
 	cache.o \
