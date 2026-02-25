@@ -1,6 +1,6 @@
 /*! @file shell.h
     @brief User shell constants
-    @copyright Copyright (c) 2024-2025 University of Illinois
+    @copyright Copyright (c) 2024-2026 University of Illinois
     @license SPDX-License-identifier: NCSA
 */
 #include "string.h"
