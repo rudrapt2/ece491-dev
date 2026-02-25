@@ -1,8 +1,10 @@
-// uart.c - NS8550-compatible UART
+// uart.c - NS8250-compatible UART
 //
 // Copyright (c) 2024-2026 University of Illinois
 // SPDX-License-identifier: NCSA
 //
+
+// TODO rename this file to ns8250.c
 
 #ifdef UART_TRACE
 #define TRACE
