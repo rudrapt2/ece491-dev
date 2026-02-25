@@ -89,7 +89,8 @@ struct ringbuf {
 
 struct uart_device {
     volatile struct uart_regs * regs;
-    int irqno;
+    int irqno; // interrupt source number for this UART
+    char rxoe; // OE was set on entry to ISR
 
     struct io io;
 
@@ -98,7 +99,7 @@ struct uart_device {
 #else
     struct condition rxbnotempty; // signalled when rxbuf becomes not empty
     struct condition txbnotfull;  // signalled when txbuf becomes not full
-    unsigned long rxovrcnt; // number of times OE was set on entry to ISR
+    struct rwlock txlock; // transmit exclusive access
 #endif
 
     struct ringbuf rxbuf;
@@ -112,12 +113,13 @@ static int uart_open(struct io ** ioptr, void * aux);
 static void uart_reclaim(struct io * io);
 static long uart_read(struct io * io, void * buf, long bufsz);
 static long uart_write(struct io * io, const void * buf, long len);
+static int uart_ioctl(struct io * io, int op, void * arg);
 
 static void uart_isr(int srcno, void * aux);
 
 // Ring buffer (struct rbuf) functions
 
-static void rbuf_init(struct ringbuf * rbuf);
+static void rbuf_reset(struct ringbuf * rbuf);
 static int rbuf_empty(const struct ringbuf * rbuf);
 static int rbuf_full(const struct ringbuf * rbuf);
 static void rbuf_putc(struct ringbuf * rbuf, char c);
@@ -130,7 +132,8 @@ static const struct iointf uart_intf = {
     .implname = "uart",
     .read = &uart_read,
     .write = &uart_write,
-    .reclaim = &uart_reclaim
+    .reclaim = &uart_reclaim,
+    .ioctl = &uart_ioctl
 };
 
 // EXPORTED FUNCTION DEFINITIONS
@@ -150,6 +153,7 @@ void attach_uart(void * mmio_base, int irqno) {
 #else
     condition_init(&uart->rxbnotempty, "uart.rxnotempty");
     condition_init(&uart->txbnotfull, "uart.txnotfull");
+    rwlock_init(&uart->txlock, "uart.txlock");
 #endif
 
     // Initialize hardware device
@@ -176,8 +180,9 @@ int uart_open(struct io ** ioptr, void * aux) {
     
     // Reset receive and transmit buffers
     
-    rbuf_init(&uart->rxbuf);
-    rbuf_init(&uart->txbuf);
+    rbuf_reset(&uart->rxbuf);
+    rbuf_reset(&uart->txbuf);
+    uart->rxoe = 0;
 
     // Read RBR to flush any stale data in hardware buffer
 
@@ -186,8 +191,6 @@ int uart_open(struct io ** ioptr, void * aux) {
 #ifdef STUDENT
     // YOUR CODE HERE
 #else
-    // Enable interrupts when data ready (DR) status asserted
-
     uart->regs->ier = IER_DRIE;
     enable_intr_source(uart->irqno, UART_INTR_PRIO, uart_isr, uart);
 #endif
@@ -201,6 +204,7 @@ void uart_reclaim(struct io * io) {
         (void*)io - offsetof(struct uart_device, io);
 
     trace("%s()", __func__);
+
 #ifdef STUDENT
     // YOUR CODE HERE
 #else
@@ -213,20 +217,28 @@ void uart_reclaim(struct io * io) {
 }
 
 long uart_read(struct io * io, void * buf, long bufsz) {
-#ifdef STUDENT
-    // YOUR CODE HERE
-#else
     struct uart_device * const uart =
         (void*)io - offsetof(struct uart_device, io);
+#ifdef STUDENT
+
+    // YOUR CODE HERE
+
+    return -ENOTSUP; // remove after implementing this function
+#else
     long n = 0; // number of bytes copied from ring buffer
     int pie;
 
     trace("%s(%ld)", __func__, bufsz);
     
+    assert (buf != NULL);
+
+    // If we missed any data, return -EIO (I/O error) for all reads
+
+    if (uart->rxoe != 0)
+        return -EIO;
+
     if (bufsz == 0)
         return 0;
-
-    assert (buf != NULL);
 
     // Sleep until receive buffer is not empty, then copy as much data as we can
     // from ring buffer into /buf/. We can return without filling the buffer.
@@ -252,11 +264,14 @@ long uart_read(struct io * io, void * buf, long bufsz) {
 }
 
 long uart_write(struct io * io, const void * buf, long buflen) {
-#ifdef STUDENT
-    // YOUR CODE HERE
-#else
     struct uart_device * const uart =
         (void*)io - offsetof(struct uart_device, io);
+#ifdef STUDENT
+
+    // YOUR CODE HERE
+
+    return -ENOTSUP; // remove after implementing this function
+#else
     long n = 0; // number of bytes written so far
     int pie;
    
@@ -266,6 +281,10 @@ long uart_write(struct io * io, const void * buf, long buflen) {
         return 0;
 
     assert (buf != NULL);
+
+    // Acquire lock to write to ensure that writes are not interleaved.
+
+    rwlock_acquire(&uart->txlock, /* exclusive */ 1);
 
     // Sleep until transmit ring buffer is not full, then copy characters from
     // _buf_ to ring buffer. Unlike the read case, we write all characters
@@ -285,8 +304,28 @@ long uart_write(struct io * io, const void * buf, long buflen) {
         uart->regs->ier |= IER_THREIE;
     }
 
+    rwlock_release(&uart->txlock);
+
     return n;
 #endif
+}
+
+int uart_ioctl(struct io * io, int op, void * arg) {
+    struct uart_device * const uart =
+        (void*)io - offsetof(struct uart_device, io);
+    int pie;
+    
+    switch (op) {
+    case IOC_RESET:
+        pie = disable_interrupts();
+        rbuf_reset(&uart->rxbuf);
+        rbuf_reset(&uart->txbuf);
+        uart->rxoe = 0;
+        restore_interrupts(pie);
+        return 0;
+    default:
+        return -ENOTSUP;
+    }
 }
 
 void uart_isr(int srcno, void * aux) {
@@ -297,7 +336,7 @@ void uart_isr(int srcno, void * aux) {
     const uint_fast8_t line_status = uart->regs->lsr;
 
     if (line_status & LSR_OE)
-        uart->rxovrcnt += 1;
+        uart->rxoe = 1;
     
     if (line_status & LSR_DR) {
         if (!rbuf_full(&uart->rxbuf)) {
@@ -317,7 +356,7 @@ void uart_isr(int srcno, void * aux) {
 #endif
 }
 
-void rbuf_init(struct ringbuf * rbuf) {
+void rbuf_reset(struct ringbuf * rbuf) {
     rbuf->hpos = 0;
     rbuf->tpos = 0;
 }

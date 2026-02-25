@@ -78,7 +78,7 @@ extern int register_device (
     void * ofaux
 );
 
-// Registers a device in the device manager.
+// Registers a device with the device manager.
 //
 // The registry name is computed as follows:
 // - If /instno/ >= 0: the final device name is "<name><instno>".
@@ -129,5 +129,12 @@ extern int mount_devfs(const char * mpname);
 // - on failure, mount_ngfs() returns a negative error code.
 
 #endif
+extern int device_exists(const char * name);
+
+// TODO
+
+extern int device_ioaddref_openfn(struct io ** ioptr, void * aux);
+
+// TODO
 
 #endif
