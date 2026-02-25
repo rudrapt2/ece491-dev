@@ -66,13 +66,10 @@ void rbuf_putc(struct rbuf * rb, char c) {
         rb->buf[rb->wpos++ & rb->mask] = c;
 }
 
-unsigned int rbuf_getb (
-    struct rbuf * rb, void * buf, unsigned int bufsz)
-{
+unsigned int rbuf_getb(struct rbuf * rb, void * buf, unsigned int bufsz) {
     unsigned int const ridx = rb->rpos & rb->mask;
     unsigned int const cap = rb->mask + 1;
     unsigned int len, m;
-    void * p;
 
     len = MIN(rb->wpos - rb->rpos, bufsz);
 
@@ -94,7 +91,25 @@ unsigned int rbuf_getb (
 unsigned int rbuf_putb (
     struct rbuf * rb, const void * buf, unsigned int buflen)
 {
-    // ...
+    unsigned int const widx = rb->wpos & rb->mask;
+    unsigned int const cap = rb->mask + 1;
+    unsigned int len, m;
+
+    len = MIN(cap - (rb->wpos - rb->rpos), buflen);
+
+    if (len == 0)
+        return 0;
+    
+    m = cap - widx;
+
+    if (m < len) {
+        memcpy(rb->buf + widx, buf, m);
+        memcpy(rb->buf, buf+m, m-len);
+    } else
+        memcpy(rb->buf + widx, buf, len);
+    
+    rb->wpos += len;
+    return len;
 }
 
 const void * rbuf_rptr(struct rbuf * rb, unsigned int * lenptr) {
