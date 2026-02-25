@@ -110,6 +110,7 @@ extern void iodropref(struct io * io);
 
 extern long ioread(struct io * io, void * buf, long bufsz);
 extern long iofill(struct io * io, void * buf, long len);
+extern int iogetc(struct io * io);
 
 // Reads from an I/O object into a buffer.
 //
@@ -121,6 +122,8 @@ extern long iofill(struct io * io, void * buf, long len);
 
 
 extern long iowrite(struct io * io, const void * buf, long len);
+extern int ioputc(struct io * io, char c);
+
 
 // Writes from a buffer to an I/O object.
 //

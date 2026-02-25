@@ -15,32 +15,31 @@
 
 // Control bytes
 
-#define CTLSYNC     0x00 // sync sequence byte
-#define CTLSYNCREQ  0x40 // synchronization request
-#define CTLSKIP1    0x80 // skip next byte
-#define CTLFLOW     0xC0 // flow control, next byte is XON mask
+#define CTLCH0 0xC0 // Select channel 0
+#define CTLCH1 0xC1 // Select channel 1
+#define CTLCH2 0xC2 // Select channel 2
+#define CTLCH3 0xC3 // Select channel 3
+#define CTLCC  0xCC // reserved
+#define CTLCD  0xCD // reserved
+#define CTLESC 0xCE // Escape
+#define CTLSYN 0xCF // Sync request
 
-#define SYNCLEN       63 // minimum sync sequence length
-#define SYNCRETRY   4096 // how many received bytes w/o sync to wait
+#define ISCTL(c) (((c) & 0xfc) == 0xc0 || ((c) & 0xfc) == 0xcc)
+#define ISCTLCH(c) (((c) & 0xfc) == 0xc0)
 
 struct iomux4_chan {
     struct io io;
     struct rbuf rxbuf;
-};
-
-enum iomux4_state {
-    IOM4_UNSYNC = 0,
-    IOM4_SYNC = 1,
-    IOM4_ERR = -1
+    unsigned long dropcnt;
 };
 
 struct iomux4 {
     const char * cdevname;
-    struct io * cio;
-    signed char state;
-    unsigned char txstop;
-    char rxbusy, txbusy;
-    int err; // negative or 1=EOF
+    struct io * cdevio;
+    signed char rxchno;
+    char txbusy;
+    char rxeof;
+    int err;
     struct condition rxup;
     struct condition txup;
     struct iomux4_chan ch[4];
@@ -56,6 +55,7 @@ static void iomux4_recv_frame(struct iomux4 * mux);
 static void iomux4_recv_bytes(struct iomux4 * mux);
 
 static void iomux4_send_syncseq(struct iomux4 * mux, int ctlbyte);
+static void iomux4_set_error(struct iomux4 * mux, int err);
 
 // Send a synchronization sequence followed by a control byte. To send a
 // synchronization sequence only, set /ctlbyte/ to CTLSYNC. To send a
@@ -75,34 +75,34 @@ static long iomux4_chan_write (
 static int iomux4_chan_ioctl (
     struct iomux4 * mux, int op, void * arg, int chno);
 
-static int iomux4_chan_reclaim(struct iomux4 * mux, int chno);
+static void iomux4_chan_reclaim(struct iomux4 * mux, int chno);
 
-// IOINTF FUNCTION DECLARATIONS
+// DEVICE AND IOINTF FUNCTION DECLARATIONS
 //
 
 static int iomux4_ch0_open(struct io ** ioptr, struct iomux4 * mux);
 static long iomux4_ch0_read(struct io * io, void * buf, long bufsz);
 static long iomux4_ch0_write(struct io * io, const void * buf, long buflen);
 static int iomux4_ch0_ioctl(struct io * io, int op, void * arg);
-static int iomux4_ch0_reclaim(struct io * io);
+static void iomux4_ch0_reclaim(struct io * io);
 
 static int iomux4_ch1_open(struct io ** ioptr, struct iomux4 * mux);
 static long iomux4_ch1_read(struct io * io, void * buf, long bufsz);
 static long iomux4_ch1_write(struct io * io, const void * buf, long buflen);
 static int iomux4_ch1_ioctl(struct io * io, int op, void * arg);
-static int iomux4_ch1_reclaim(struct io * io);
+static void iomux4_ch1_reclaim(struct io * io);
 
 static int iomux4_ch2_open(struct io ** ioptr, struct iomux4 * mux);
 static long iomux4_ch2_read(struct io * io, void * buf, long bufsz);
 static long iomux4_ch2_write(struct io * io, const void * buf, long buflen);
 static int iomux4_ch2_ioctl(struct io * io, int op, void * arg);
-static int iomux4_ch2_reclaim(struct io * io);
+static void iomux4_ch2_reclaim(struct io * io);
 
 static int iomux4_ch3_open(struct io ** ioptr, struct iomux4 * mux);
 static long iomux4_ch3_read(struct io * io, void * buf, long bufsz);
 static long iomux4_ch3_write(struct io * io, const void * buf, long buflen);
 static int iomux4_ch3_ioctl(struct io * io, int op, void * arg);
-static int iomux4_ch3_reclaim(struct io * io);
+static void iomux4_ch3_reclaim(struct io * io);
 
 
 // IOINTF STRUCTURE DEFINITIONS
@@ -157,7 +157,7 @@ int attach_iomux4(const char * cdevname) {
     void * chrxbufmem;
     char * namebuf;
     size_t namelen;
-    struct io * cio;
+    size_t nbufsz;
     struct io * chio[4];
     int result = 0;
 
@@ -166,43 +166,42 @@ int attach_iomux4(const char * cdevname) {
 
     if (device_exists(cdevname))
         return -ENOENT;
-    
-    // Allocate sapce for a temporary buffer for creating the channel device
-    // names, which have the form DEVch0 ... DEVch3, where DEV is the carrier
-    // device name.
-    //
-    // TODO We could use the space allocated for the receive buffer for the name
-    // string manipulation. We only need the name buffer in this function, and
-    // we don't need to use the receive buffer until after the device is opened.
-
-    namelen = strlen(cdevname)+2+1;
-    namebuf = kmalloc(namelen+1); // TODO temporarily use rxbufmem here?
-    snprintf(namebuf, namelen, "%sch", cdevname);
 
     mux = kcalloc(1, sizeof(struct iomux4));
 
-    // Check if the channel device names are available, so that when we cann
+    // We use the receive buffer memory as a string buffer to create channel
+    // device names, which have the form CDEVch0 ... CDEVch3, where CDEV is the
+    // carrier.
+
+    namelen = strlen(cdevname);
+    namebuf = mux->rxbufmem;
+    nbufsz = sizeof(mux->rxbufmem);
+
+    if (nbufsz < namelen+3+1) {
+        result = -ENAMETOOLONG;
+        goto fail_free_mux;
+    }
+
+    // Check if the channel device names are available, so that when we call
     // register_device() for each channel device, we know we will succeed.
     // (register_device() should only fail if the name is already taken.)
 
     for (int i = 0; i < 4; i++) {
-        namebuf[namelen] = '0' + i;
+        snprintf(namebuf, nbufsz, "%sch%d", cdevname, i);
         if (device_exists(namebuf)) {
             result = -EEXIST;
-            goto fail1;
+            goto fail_free_mux;
         }
     }
 
-    // Initialize main imoux4 structure members
+    // Initialize iomux4 structure members
     
     condition_init(&mux->rxup, "iomux4.rxup");
     condition_init(&mux->txup, "iomux4.txup");
     rbuf_init(&mux->rxbuf, mux->rxbufmem, 64);
     mux->cdevname = cdevname;
-    mux->state = IOM4_UNSYNC;
-    mux->cio = cio;
 
-    // Initialize I/O object for each channel and register the channel devices.
+    // Initialize I/O objects for each channel and register the channel devices.
     // The rest (initializing channel receive buffers) happens when a channel is
     // opened.
 
@@ -210,228 +209,159 @@ int attach_iomux4(const char * cdevname) {
         struct io * const io = &mux->ch[i].io;
         ioinit(io, iomux4_iointf+i, /* blksz */ 1, /* refcnt */ 0);
 
-        namebuf[namelen] = '0' + i;
+        snprintf(namebuf, nbufsz, "%sch%d", cdevname, i);
         result = register_device(namebuf, -1, iomux4_openfn[i], mux);
 
         if (result != 0)
             panic(__func__);
     }
 
-    goto done;
+    return 0;
 
-fail1:
+fail_free_mux:
     kfree(mux);
-done:
-    kfree(namebuf);
     return result;
-}
-
-// DEVICE AND IOINTF FUNCTION DEFINITIONS
-//
-
-int iomux4_ch0_open(struct io ** ioptr, struct iomux4 * mux) {
-    return iomux4_chan_open(ioptr, mux, 0);
-}
-
-int iomux4_ch0_reclaim(struct io * io) {
-    struct iomux4 * const mux = (void*)io - offsetof(struct iomux4, ch[0].io);
-    return iomux4_chan_reclaim(mux, 0);
-}
-
-long iomux4_ch0_read(struct io * io, void * buf, long bufsz) {
-    struct iomux4 * const mux = (void*)io - offsetof(struct iomux4, ch[0].io);
-    return iomux4_chan_read(mux, buf, bufsz, 0);
-}
-
-long iomux4_ch0_write(struct io * io, const void * buf, long buflen) {
-    struct iomux4 * const mux = (void*)io - offsetof(struct iomux4, ch[0].io);
-    return iomux4_chan_write(mux, buf, buflen, 0);
-}
-
-int iomux4_ch0_ioctl(struct io * io, int op, void * arg) {
-    struct iomux4 * const mux = (void*)io - offsetof(struct iomux4, ch[0].io);
-    return iomux4_chan_ioctl(mux, op, arg, 0);
-}
-
-int iomux4_ch1_open(struct io ** ioptr, struct iomux4 * mux) {
-    return iomux4_chan_open(ioptr, mux, 1);
-}
-
-int iomux4_ch1_reclaim(struct io * io) {
-    struct iomux4 * const mux = (void*)io - offsetof(struct iomux4, ch[1].io);
-    return iomux4_chan_reclaim(mux, 1);
-}
-
-long iomux4_ch1_read(struct io * io, void * buf, long bufsz) {
-    struct iomux4 * const mux = (void*)io - offsetof(struct iomux4, ch[1].io);
-    return iomux4_chan_read(mux, buf, bufsz, 1);
-}
-
-long iomux4_ch1_write(struct io * io, const void * buf, long buflen) {
-    struct iomux4 * const mux = (void*)io - offsetof(struct iomux4, ch[1].io);
-    return iomux4_chan_write(mux, buf, buflen, 1);
-}
-
-int iomux4_ch1_ioctl(struct io * io, int op, void * arg) {
-    struct iomux4 * const mux = (void*)io - offsetof(struct iomux4, ch[1].io);
-    return iomux4_chan_ioctl(mux, op, arg, 1);
-}
-
-int iomux4_ch2_open(struct io ** ioptr, struct iomux4 * mux) {
-    return iomux4_chan_open(ioptr, mux, 2);
-}
-
-int iomux4_ch2_reclaim(struct io * io) {
-    struct iomux4 * const mux = (void*)io - offsetof(struct iomux4, ch[2].io);
-    return iomux4_chan_reclaim(mux, 2);
-}
-
-long iomux4_ch2_read(struct io * io, void * buf, long bufsz) {
-    struct iomux4 * const mux = (void*)io - offsetof(struct iomux4, ch[2].io);
-    return iomux4_chan_read(mux, buf, bufsz, 2);
-}
-
-long iomux4_ch2_write(struct io * io, const void * buf, long buflen) {
-    struct iomux4 * const mux = (void*)io - offsetof(struct iomux4, ch[2].io);
-    return iomux4_chan_write(mux, buf, buflen, 2);
-}
-
-int iomux4_ch2_ioctl(struct io * io, int op, void * arg) {
-    struct iomux4 * const mux = (void*)io - offsetof(struct iomux4, ch[2].io);
-    return iomux4_chan_ioctl(mux, op, arg, 2);
-}
-
-int iomux4_ch3_open(struct io ** ioptr, struct iomux4 * mux) {
-    return iomux4_chan_open(ioptr, mux, 3);
-}
-
-int iomux4_ch3_reclaim(struct io * io) {
-    struct iomux4 * const mux = (void*)io - offsetof(struct iomux4, ch[3].io);
-    return iomux4_chan_reclaim(mux, 3);
-}
-
-long iomux4_ch3_read(struct io * io, void * buf, long bufsz) {
-    struct iomux4 * const mux = (void*)io - offsetof(struct iomux4, ch[3].io);
-    return iomux4_chan_read(mux, buf, bufsz, 3);
-}
-
-long iomux4_ch3_write(struct io * io, const void * buf, long buflen) {
-    struct iomux4 * const mux = (void*)io - offsetof(struct iomux4, ch[3].io);
-    return iomux4_chan_write(mux, buf, buflen, 3);
-}
-
-int iomux4_ch3_ioctl(struct io * io, int op, void * arg) {
-    struct iomux4 * const mux = (void*)io - offsetof(struct iomux4, ch[3].io);
-    return iomux4_chan_ioctl(mux, op, arg, 3);
 }
 
 // INTERNAL FUNCTION DEFINITIONS
 //
 
 int iomux4_chan_open(struct io ** ioptr, struct iomux4 * mux, int chno) {
-    void * chrxbufmem;
+    struct io * const chio = &mux->ch[chno].io;
     int result;
 
-    // Check if the carrier device is open, since we wait to open the carrier
-    // device until one of the channel devices is opened. 
+    if (iorefcnt(chio) != 0)
+        return -EBUSY;    
 
-    if (mux->cio == NULL) {
-        result = open_device(mux->cdevname, &mux->cio);
-        if (result < 0) return result;
+    // We wait to open the carrier device until one of the channels is opened. 
+
+    if (mux->cdevio == NULL) {
+        result = open_device(mux->cdevname, &mux->cdevio);
+        
+        // If open_device() fails, it could be because the device is already
+        // open, but may become available later. So an error here is not sticky
+        // (does not change state of IOM4_ERR).
+
+        if (result < 0)
+            return result;
 
         // Device block must be 1 byte
-        if (ioblksz(mux->cio) != 1)
+        if (ioblksz(mux->cdevio) != 1)
             panic(__func__);
         
         // Allocate space for each channel's receive buffers. Each channel gets
         // 1/4 of a page. Initialize receive buffers for each channel.
 
-        chrxbufmem = alloc_phys_page();
+        void * const chrxbufmem = alloc_phys_page();
         
         for (int i = 0; i < 4; i++) {
             struct ringbuf * const chrxbuf = &mux->ch[i].rxbuf;
             rbuf_init(chrxbuf, chrxbufmem + i*(PAGE_SIZE/4), PAGE_SIZE/4);
         }
 
-        mux->err = 0;
         mux->rxbusy = 0;
         mux->txbusy = 0;
-        mux->state = IOM4_UNSYNC;
-        mux->txstop = 0;
+        mux->rxeof = 0;
+        mux->err = 0;
+        mux->rxchno = -1;
     }
+    
+    rbuf_reset(&mux->ch[chno].rxbuf);
 
-    // Send sync request sequence here. Then wait on iomux4_synchronize()
+    return mux->err; // 0 if no error
 }
 
-int iomux4_chan_reclaim(struct iomux4 * mux, int chno) {
-    // ...
+void iomux4_chan_reclaim(struct iomux4 * mux, int chno __attribute__ ((unused))) {
+    // If any channels are still open, we're done. Otherwise, close the carrier device.
+
+    for (int i = 0; i < 4; i++) {
+        if (iorefcnt(&mux->ch->io) != 0)
+            return;
+    }
+
+    ioclose(mux->cdevio);
+    mux->cdevio = NULL;
+
+    free_phys_page(rbuf_bufmem(&mux->ch[0].rxbuf));
 }
 
 long iomux4_chan_read(struct iomux4 * mux, void * buf, long bufsz, int chno) {
     struct iomux4_chan * const ch = mux->ch+chno;
-    int result;
+    struct ringbuf * const rxbuf = &ch->rxbuf;
+    long wlen;
 
-    if (mux->state == IOM4_UNSYNC)
-        iomux4_synchronize(mux);
-
-    while (rbuf_empty(&ch->rxbuf) && mux->state != IOM4_ERR) {
-        if (mux->rxbusy)
-            condition_wait(&mux->rxup);
-        else
-            iomux4_recv_frame(mux);
+    if (bufsz == 0)
+        return 0;
+    
+    if (rbuf_empty(rxbuf)) {
+        while (rbuf_empty(rxbuf) && mux->err == 0 && !mux->rxeof)
+            iomux4_recv_bytes(mux);
+                
+        if (mux->err != 0)
+            return mux->err;
     }
 
-    if (mux->state == IOM4_ERR)
-        return mux->err;
-
-    return rbuf_read(&ch->rxbuf, buf, bufsz);
+    return rbuf_getb(rxbuf, buf, bufsz);
 }
 
 long iomux4_chan_write(struct iomux4 * mux, const void * buf, long buflen, int chno) {
-    char wbuf[64];
     long bufpos = 0;
     long wlen;
-    int blklen;
 
     if (buflen == 0)
         return 0;
     
-    if (mux->state == IOM4_UNSYNC)
-        iomux4_synchronize(mux);
-    
-    if (mux->state == IOM4_ERR)
+    while (mux->txbusy)
+        condition_wait(&mux->txup);
+
+    if (mux->err != 0)
         return mux->err;
 
     mux->txbusy = 1;
 
-    while (bufpos < buflen) {
-        blklen = MIN(buflen, 63);
-        wbuf[0] = (chno << 6) | blklen;
-        memcpy(wbuf+1,buf+bufpos, blklen);
+    unsigned char ctlbyte = CTLCH0 + chno;
+    wlen = iowrite(mux->cdevio, &ctlbyte, 1);
 
-        wlen = iowrite(mux->cio, wbuf, 1+blklen);
-
-        if (wlen <= 1+blklen) {
-            mux->state = IOM4_ERR;
-            mux->err = (wlen < 0) ? wlen : 0;
-            mux->txbusy = 0;
-            return mux->err;
-        }
-
-        bufpos -= blklen;
+    if (wlen != 1) {
+        if (wlen < 0)
+            iomux4_set_error(mux, wlen);
+        else
+            assert (wlen == 0);
+        goto done_return_wlen;
     }
-    
+
+    while (bufpos < buflen) {
+        const unsigned char * const cbuf = buf+bufpos;
+        long n = 0;
+
+        while (n < buflen-bufpos && !ISCTL(cbuf[n]))
+            n += 1;
+        
+        if (n > 0) {
+            wlen = iowrite(mux->cdevio, cbuf, n);
+            if (wlen != n) {
+                
+
+    if (wlen < 0)
+        iomux4_set_error(mux, wlen);
+
+done_return_wlen:
     mux->txbusy = 0;
-    return buflen;
+    return wlen;
 }
 
 int iomux4_chan_ioctl(struct iomux4 * mux, int op, void * arg, int chno) {
-    // ...
+    switch (op) {
+    case IOC_RESET:
+        rbuf_reset(&mux->ch[chno].rxbuf);
+        return 0;
+    default:
+        return -ENOTSUP;
+    }
 }
 
 void iomux4_synchronize(struct iomux4 * mux) {
     int nsync, nbytes;
-    int c, i, result;
 
     while (mux->state == IOM4_UNSYNC && mux->rxbusy)
         condition_wait(&mux->rxup);
@@ -441,34 +371,32 @@ void iomux4_synchronize(struct iomux4 * mux) {
     // Reset al internal buffers and the carrier to clear stale data.
 
     rbuf_reset(&mux->rxbuf);
-    for (i = 0; i < 4; i++)
+    for (int i = 0; i < 4; i++)
         rbuf_reset(&mux->ch[i].rxbuf);
-    ioctl(mux->cio, IOC_RESET, NULL);
+    ioctl(mux->cdevio, IOC_RESET, NULL);
 
-    for (;;) {
-        iomux4_send_syncseq(mux, CTLSYNCREQ);
+    iomux4_send_syncseq(mux, CTLSYNCREQ);
 
-        if (mux->state != IOM4_UNSYNC)
-            goto iomux4_synchronize_done;
+    if (mux->state != IOM4_UNSYNC)
+        goto iomux4_synchronize_done;
 
-        // Wait to receive SYNCLEN-byte sync sequence. If we receive SYNCRETRY
-        // bytes without seeing a sync sequence send request again.
+    // Wait to receive SYNCLEN-byte sync sequence. If we receive SYNCRETRY
+    // bytes without seeing a sync sequence send request again.
 
-        nsync = 0;
-        nbytes = 0;
+    nsync = 0;
+    nbytes = 0;
 
-        while (nbytes < SYNCRETRY) {
-            c = rbuf_getc(&mux->rxbuf);
+    while (nbytes < SYNCRETRY) {
+        int const c = rbuf_getc(&mux->rxbuf);
 
-            if (c < 0) {
-                rbuf_recv_bytes(mux);
-                if (mux->state != IOM4_UNSYNC)
-                    goto iomux4_synchronize_done;
-            } else {
-                nbytes += 1;
-                if (c == CTLSYNC && ++nsync == SYNCLEN)
-                    goto iomux4_synchronize_done;
-            }
+        if (c < 0) {
+            rbuf_recv_bytes(mux);
+            if (mux->state != IOM4_UNSYNC)
+                goto iomux4_synchronize_done;
+        } else {
+            nbytes += 1;
+            if (c == CTLSYNC && ++nsync == SYNCLEN)
+                goto iomux4_synchronize_done;
         }
     }
 
@@ -479,45 +407,36 @@ iomux4_synchronize_done:
 void iomux4_recv_frame(struct iomux4 * mux) {
     struct rbuf * const rxbuf = &mux->rxbuf;
     int chno, blklen;
-    int cc = CTLSYNC; // prev control byte
-    int c; // current control byte
+    int c;
 
-    if (mux->state == IOM4_ERR || mux->rxbusy)
+    if (mux->rxeof || mux->err != 0)
         return;
 
     mux->rxbusy = 1;
 
-    // Read control byte. Handle special control bytes (CTLSYNC, CTLSYNCREQ,
-    // CTLSKIP1, CLTFLOW) and repeat loop. Otherwise, break and parse control
-    // byte as channel and length.
+    c = rbuf_getc(rxbuf);
 
-    for (;;) {
-        c = rbuf_getc(rxbuf);
-
-        if (c < 0) {
-            iomux4_recv_bytes(mux);
-            if (mux->state == IOM4_ERR)
-                goto iomux4_recv_frame_done;
-            continue;
-        }
-
-        if (cc == CTLFLOW) {
-            iomux4_update_txena(mux, c);
-        } else if (cc == CTLSKIP1) {
-            // nothing
-        } else if (c == CTLSYNCREQ)
-            iomux4_send_syncseq(mux, CTLSYNC);
-        else if (c != CTLSYNC && c != CTLSKIP1 && c != CTLFLOW)
-            break;
-
-        cc = c;
+    while (ctlbyte < 0) {
+        iomux4_recv_bytes(mux);
+        if (mux->state == IOM4_ERR || mux->rxeof)
+            goto iomux4_recv_frame_done;
+        ctlbyte = rbuf_getc(rxbuf);
     }
 
-    chno = c >> 6;
-    blklen = c & 0x3f;
-    assert (blklen != 0);
+    chno = ctlbyte >> 6;
+    blklen = ctlbyte & 0x3f;
 
-    while (blklen != 0) {
+    if (blklen == 0) {
+        switch (ctlbyte) {
+        case CTLSYNCREQ:
+            iomux4_send_syncseq(mux, CTLSYNC);
+            if (mux->state == IOM4_ERR)
+                goto iomux4_recv_frame_done;
+            break;
+        }
+    }
+
+    do {
         struct rbuf * const chrxbuf = &mux->ch[chno].rxbuf;
 
         while (rbuf_readable(rxbuf) < blklen) {
@@ -527,7 +446,7 @@ void iomux4_recv_frame(struct iomux4 * mux) {
         }
         
         blklen -= rbuf_move(chrxbuf, rxbuf, blklen);
-    }
+    } while (blklen != 0 && !mux->rxeof);
 
 iomux4_recv_frame_done:
     mux->rxbusy = 0;
@@ -539,6 +458,8 @@ void iomux4_recv_bytes(struct iomux4 * mux) {
     unsigned int wmax;
     int readlen;
 
+    // MUST be called with rxbusy == 1 (locked)
+
     if (rbuf_full(rxbuf))
         return;
     
@@ -546,11 +467,13 @@ void iomux4_recv_bytes(struct iomux4 * mux) {
         rbuf_reset(rxbuf);
     
     wptr = rbuf_wptr(&mux->rxbuf, &wmax);
-    readlen = ioread(mux->cio, wptr, wmax);
+    readlen = ioread(mux->cdevio, wptr, wmax);
 
     if (readlen <= 0) {
-        mux->err = readlen ? readlen : 1;
-        mux->state = IOM4_ERR;
+        if (readlen < 0)
+            iomux4_set_error(mux, readlen);
+        else
+            mux->rxeof = 1;
     } else
         rbuf_produced(rxbuf, readlen);
 }
@@ -572,11 +495,10 @@ void iomux4_send_syncseq(struct iomux4 * mux, int ctlbyte) {
     seqbuf[sizeof(seqbuf)-1] = ctlbyte;
         
     while (sbpos != sizeof(seqbuf)) {
-        result = iowrite(mux->cio, seqbuf + sbpos, sizeof(seqbuf) - sbpos);
+        result = iowrite(mux->cdevio, seqbuf + sbpos, sizeof(seqbuf) - sbpos);
 
         if (result < 0) {
-            mux->err = result;
-            mux->state = IOM4_ERR;
+            iomux4_set_error(result);
             break;
         }
         
@@ -584,4 +506,131 @@ void iomux4_send_syncseq(struct iomux4 * mux, int ctlbyte) {
     }
 
     mux->txbusy = 0;
+}
+
+static void iomux4_send_chstat(struct iomux4 * mux) {
+    unsigned char minibuf[2];
+    int result;
+
+    while (mux->state != IOM4_ERR && mux->txbusy)
+        condition_wait(&mux->txup);
+    
+    if (mux->state != IOM4_UNSYNC)
+        return;
+    
+    minibuf[0] = CTLCHSTAT;
+    minibuf[1] = mux->loc_chstat;
+    result = iowrite(mux->cdevio, minibuf, sizeof(minibuf));
+
+    if (result != sizeof(minibuf))
+        iomux4_set_error(mux, (result < 0) ? result : EIO);
+    else
+        return 0;
+}
+
+static void iomux4_set_error(struct iomux4 * mux, int err) {
+    mux->err = err;
+    mux->state = IOM4_ERR;
+    condition_broadcast(&mux->csup);
+    condition_broadcast(&mux->rxup);
+    condition_broadcast(&mux->txup);
+}
+
+// DEVICE AND IOINTF FUNCTION DEFINITIONS
+//
+
+int iomux4_ch0_open(struct io ** ioptr, struct iomux4 * mux) {
+    return iomux4_chan_open(ioptr, mux, 0);
+}
+
+void iomux4_ch0_reclaim(struct io * io) {
+    struct iomux4 * const mux = (void*)io - offsetof(struct iomux4, ch[0].io);
+    iomux4_chan_reclaim(mux, 0);
+}
+
+long iomux4_ch0_read(struct io * io, void * buf, long bufsz) {
+    struct iomux4 * const mux = (void*)io - offsetof(struct iomux4, ch[0].io);
+    return iomux4_chan_read(mux, buf, bufsz, 0);
+}
+
+long iomux4_ch0_write(struct io * io, const void * buf, long buflen) {
+    struct iomux4 * const mux = (void*)io - offsetof(struct iomux4, ch[0].io);
+    return iomux4_chan_write(mux, buf, buflen, 0);
+}
+
+int iomux4_ch0_ioctl(struct io * io, int op, void * arg) {
+    struct iomux4 * const mux = (void*)io - offsetof(struct iomux4, ch[0].io);
+    return iomux4_chan_ioctl(mux, op, arg, 0);
+}
+
+int iomux4_ch1_open(struct io ** ioptr, struct iomux4 * mux) {
+    return iomux4_chan_open(ioptr, mux, 1);
+}
+
+void iomux4_ch1_reclaim(struct io * io) {
+    struct iomux4 * const mux = (void*)io - offsetof(struct iomux4, ch[1].io);
+    iomux4_chan_reclaim(mux, 1);
+}
+
+long iomux4_ch1_read(struct io * io, void * buf, long bufsz) {
+    struct iomux4 * const mux = (void*)io - offsetof(struct iomux4, ch[1].io);
+    return iomux4_chan_read(mux, buf, bufsz, 1);
+}
+
+long iomux4_ch1_write(struct io * io, const void * buf, long buflen) {
+    struct iomux4 * const mux = (void*)io - offsetof(struct iomux4, ch[1].io);
+    return iomux4_chan_write(mux, buf, buflen, 1);
+}
+
+int iomux4_ch1_ioctl(struct io * io, int op, void * arg) {
+    struct iomux4 * const mux = (void*)io - offsetof(struct iomux4, ch[1].io);
+    return iomux4_chan_ioctl(mux, op, arg, 1);
+}
+
+int iomux4_ch2_open(struct io ** ioptr, struct iomux4 * mux) {
+    return iomux4_chan_open(ioptr, mux, 2);
+}
+
+void iomux4_ch2_reclaim(struct io * io) {
+    struct iomux4 * const mux = (void*)io - offsetof(struct iomux4, ch[2].io);
+    iomux4_chan_reclaim(mux, 2);
+}
+
+long iomux4_ch2_read(struct io * io, void * buf, long bufsz) {
+    struct iomux4 * const mux = (void*)io - offsetof(struct iomux4, ch[2].io);
+    return iomux4_chan_read(mux, buf, bufsz, 2);
+}
+
+long iomux4_ch2_write(struct io * io, const void * buf, long buflen) {
+    struct iomux4 * const mux = (void*)io - offsetof(struct iomux4, ch[2].io);
+    return iomux4_chan_write(mux, buf, buflen, 2);
+}
+
+int iomux4_ch2_ioctl(struct io * io, int op, void * arg) {
+    struct iomux4 * const mux = (void*)io - offsetof(struct iomux4, ch[2].io);
+    return iomux4_chan_ioctl(mux, op, arg, 2);
+}
+
+int iomux4_ch3_open(struct io ** ioptr, struct iomux4 * mux) {
+    return iomux4_chan_open(ioptr, mux, 3);
+}
+
+void iomux4_ch3_reclaim(struct io * io) {
+    struct iomux4 * const mux = (void*)io - offsetof(struct iomux4, ch[3].io);
+    iomux4_chan_reclaim(mux, 3);
+}
+
+long iomux4_ch3_read(struct io * io, void * buf, long bufsz) {
+    struct iomux4 * const mux = (void*)io - offsetof(struct iomux4, ch[3].io);
+    return iomux4_chan_read(mux, buf, bufsz, 3);
+}
+
+long iomux4_ch3_write(struct io * io, const void * buf, long buflen) {
+    struct iomux4 * const mux = (void*)io - offsetof(struct iomux4, ch[3].io);
+    return iomux4_chan_write(mux, buf, buflen, 3);
+}
+
+int iomux4_ch3_ioctl(struct io * io, int op, void * arg) {
+    struct iomux4 * const mux = (void*)io - offsetof(struct iomux4, ch[3].io);
+    return iomux4_chan_ioctl(mux, op, arg, 3);
 }

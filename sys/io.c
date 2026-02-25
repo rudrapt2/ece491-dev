@@ -81,6 +81,14 @@ long iofill(struct io * io, void * buf, long bufsz) {
 #endif
 }
 
+int iogetc(struct io * io) {
+    long rlen;
+    unsigned char c;
+
+    rlen = ioread(io, &c, 1);
+    return (rlen != 1) ? -1 : c;
+}
+
 long iowrite(struct io * io, const void * buf, long buflen) {
     assert (io != NULL);
     assert (buf != NULL || buflen == 0);
@@ -95,6 +103,13 @@ long iowrite(struct io * io, const void * buf, long buflen) {
         return -EINVAL;
     
     return io->intf->write(io, buf, ROUND_DOWN(buflen, io->blksz));
+}
+
+int ioputc(struct io * io, char c) {
+    long wlen;
+
+    wlen = iowrite(io, &c, 1);
+    return (wlen != 1) ? -1 : (unsigned char)c;
 }
 
 long iofetch(struct io * io, unsigned long long pos, void * buf, long buflen) {

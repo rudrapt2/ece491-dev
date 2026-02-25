@@ -82,7 +82,7 @@ extern int register_device (
     void * ofaux
 );
 
-// Registers a device in the device manager.
+// Registers a device with the device manager.
 //
 // The registry name is computed as follows:
 // - If /instno/ >= 0: the final device name is "<name><instno>".
