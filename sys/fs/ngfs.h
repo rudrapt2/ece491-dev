@@ -14,14 +14,27 @@ struct io; // extern decl.
 
 extern int mount_ngfs(const char * mpname, struct io * bkgio);
 
+// Mounts an instance of the Next Generation File System. Allows the filesys 
+// functions to access the files in /bkgio/ under the name /mpname/.
+//
+// On entry mount_devfs() assumes:
+// - /mpname/ is non-NULL and points to a NUL-terminated string.
+// - /bkgio/ is non-NULL io object that is an interface for a storage device.
+// - /bkgio/ refers to a storage device that is a valid NGFS image.
+//
+// On return devmgr_init() guarantees (on success):
+// - An ngfs object is initialized and accessible via the filesys function
+//   /open_file/, /create_file/, and /delete_file/ under the name /mpname/.
+// - on failure, mount_ngfs() returns a negative error code.
+
 #define NGFS_BLKSZ                  512UL
 #define NGFS_DENSZ                  32UL
-#define NGFS_MAX_FILENAME_LEN       (NGFS_DENSZ  - sizeof(uint8_t) - 2*sizeof(uint32_t))
+#define NGFS_MAX_FILENAME_LEN       (NGFS_DENSZ - sizeof(uint8_t) - 2*sizeof(uint32_t))
 #define NGFS_FAT_ENTRIES_PER_BLOCK  (NGFS_BLKSZ / sizeof(uint32_t))
-#define NGFS_ROOT_DATA_BLOCK 0
+#define NGFS_ROOT_DATA_BLOCK        0
 
-#define NGFS_BLOCK_FREE (uint32_t)0
-#define NGFS_BLOCK_END (uint32_t)(-1)
+#define NGFS_BLOCK_FREE             (uint32_t)0
+#define NGFS_BLOCK_END              (uint32_t)(-1)
 
 /*
 Overall filesystem image layout

@@ -164,5 +164,9 @@ void console_impl_putc(char c) {
 }
 
 char console_impl_getc(void) {
-    return sbi_console_getchar();
+    long retval = -1;
+    while (retval == -1) {
+        retval = sbi_console_getchar();
+    }
+    return retval;
 }
