@@ -1,6 +1,5 @@
-/*! @file virtio.c
-    @brief MMIO-based VirtIO
-*/
+// virtio.c
+// MMIO-based VirtIO
 
 #ifdef VIRTIO_TRACE
 #define TRACE

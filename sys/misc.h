@@ -1,8 +1,6 @@
-/*! @file misc.h
-    @brief Miscellaneous functions
-    @copyright Copyright (c) 2024-2025 University of Illinois
-
-*/
+// misc.h
+// Miscellaneous functions
+// Copyright (c) 2024-2025 University of Illinois
 
 #ifndef _MISC_H_
 #define _MISC_H_
