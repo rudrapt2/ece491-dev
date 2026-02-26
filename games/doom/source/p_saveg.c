@@ -19,7 +19,7 @@
 
 #include "../usr/string.h"
 #include <stdlib.h>
-#include "../usr/uio.h"
+#include "../usr/io.h"
 #include "../usr/syscall.h"
 
 #include "dstrings.h"
@@ -156,7 +156,7 @@ static void saveg_read_pad(void)
     int i;
 
     // pos = ftell(save_stream);
-    _fcntl(save_stream_fd, FCNTL_GETPOS, &pos);
+    _ioctl(save_stream_fd, IOC_GETPOS, &pos);
 
     padding = (4 - (pos & 3)) & 3;
 
@@ -173,7 +173,7 @@ static void saveg_write_pad(void)
     int i;
 
     // pos = ftell(save_stream);
-    _fcntl(save_stream_fd, FCNTL_GETPOS, &pos);
+    _ioctl(save_stream_fd, IOC_GETPOS, &pos);
 
     padding = (4 - (pos & 3)) & 3;
 

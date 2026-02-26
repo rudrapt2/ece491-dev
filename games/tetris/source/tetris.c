@@ -95,6 +95,10 @@ static	void	setup_board(void);
 	void	onintr(int) __attribute__((__noreturn__));
 	void	usage(void) __attribute__((__noreturn__));
 
+#ifdef AEE32
+extern int current_highscore_total(void);
+#endif
+
 /*
  * Set up the initial board.  The bottom display row is completely set,
  * along with another (hidden) row underneath that.  Also, the left and
@@ -466,6 +470,34 @@ main(argc, argv)
 	savescore(level);
 
 	#ifdef AEE32
+	{
+		int total = score * level;
+		int best = current_highscore_total();
+		int chwait;
+		printf("\033[2J\033[H");
+		printf("\033[1;36m========================================\033[0m\n");
+		printf("\033[1;33m              TETRIS OVER              \033[0m\n");
+		printf("\033[1;36m========================================\033[0m\n\n");
+		printf(" Final score : %d\n", total);
+		printf(" Raw points  : %d\n", score);
+		printf(" Level       : %d\n", level);
+		printf("\nPress RETURN to view high score...\n");
+		do {
+			chwait = getchar();
+		} while (chwait != '\n' && chwait != '\r' && chwait != EOF);
+
+		printf("\033[2J\033[H");
+		printf("\033[1;36m========================================\033[0m\n");
+		printf("\033[1;33m              HIGH SCORE               \033[0m\n");
+		printf("\033[1;36m========================================\033[0m\n\n");
+		printf(" Best score  : %d\n", best);
+		if (total >= best)
+			printf("\033[1;32m New high score!\033[0m\n");
+		printf("\nPress RETURN to quit...\n");
+		do {
+			chwait = getchar();
+		} while (chwait != '\n' && chwait != '\r' && chwait != EOF);
+	}
 	exit(0);
 	#else
 	printf("\nHit RETURN to see high scores, ^C to skip.\n");

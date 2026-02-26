@@ -34,6 +34,7 @@ NUDOKU_MP3_CP2_OBJS = \
 	$(UOBJDIR)/$(MP3CP2_PREFIX)_io.o \
 	$(UOBJDIR)/$(MP3CP2_PREFIX)_heap.o \
 	$(UOBJDIR)/$(MP3CP2_PREFIX)_glue.o \
+	$(UOBJDIR)/$(MP3CP2_PREFIX)_lumonOS.o \
 	$(UOBJDIR)/$(MP3CP2_PREFIX)_start.o \
 	$(UOBJDIR)/$(MP3CP2_PREFIX)_string.o \
 	$(UOBJDIR)/$(MP3CP2_PREFIX)_syscall.o \
@@ -89,6 +90,9 @@ $(SOBJDIR)/$(MP3CP2_PREFIX)_%.o: $(SRCDIR)/%.c | $(SOBJDIR)
 	$(CC) $(CFLAGS) -DAEE32 -Dmain=nudoku_main -DVERSION='"0.1"' -o $@ -c $<
 
 $(UOBJDIR)/$(MP3CP2_PREFIX)_glue.o: glue.c | $(UOBJDIR)
+	$(CC) $(CFLAGS) -DAEE32 -o $@ -c $<
+
+$(UOBJDIR)/$(MP3CP2_PREFIX)_lumonOS.o: lumonOS.c | $(UOBJDIR)
 	$(CC) $(CFLAGS) -DAEE32 -o $@ -c $<
 
 # User mode binaries

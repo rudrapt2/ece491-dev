@@ -53,6 +53,11 @@ mp3-cp2:
 	make -C tetris tetris-mp3-cp2
 	cp tetris/bin/tetris-mp3-cp2	$(USR_GAMES_FOLDER)/tetris
 
+	make -C doom all
+	cp doom/bin/doom				$(USR_GAMES_FOLDER)/doom
+	cp doom/bin/doom1.wad			$(USR_GAMES_FOLDER)/doom1.wad
+	cp doom/bin/doomlauncher		$(USR_GAMES_FOLDER)/doomlauncher
+
 # 	make -C ../util/fs all
 	./../util/fs/mkfs_ngfs -R ../sys/fs/ngfs.raw 32M ../usr/bin/* ../usr/games/*
 

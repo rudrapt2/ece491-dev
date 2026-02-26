@@ -5,7 +5,7 @@
 #include "../usr/viohi.h"
 
 #include "../usr/string.h"
-#include "../usr/uio.h"
+#include "../usr/io.h"
 
 #define QUEUE_SIZE 16
 //temp
@@ -135,7 +135,12 @@ static const unsigned char doom_key_map[VKEY_SCALE + 1] = {
 void DG_Init(){
   gpu_fd = _open(-1, "dev/viogpu0");
 
-  int result = _fcntl(gpu_fd, FCNTL_MMAP, &DG_ScreenBuffer);
+  if (gpu_fd < 0) {
+    _print("failed to open gpu device");
+    _exit();
+  }
+  
+  int result = _ioctl(gpu_fd, IOC_MAPBUF, &DG_ScreenBuffer);
   if (result != 0) {
     _print("failed to obtain frame buffer");
     _close(gpu_fd);

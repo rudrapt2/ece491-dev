@@ -582,7 +582,11 @@ scr_update()
 					cur_so = 0;
 				}
 #endif
+#ifdef AEE32
+				moveto(RTOD(j) + 1, CTOD(i));
+#else
 				moveto(RTOD(j), CTOD(i));
+#endif
 			}
 #ifdef AEE32
 			/* skip wall columns entirely — we draw borders separately */
@@ -639,12 +643,12 @@ scr_update()
 	{
 		int lc = CTOD(1) - 1;   /* column just left of first play col */
 		int rc = CTOD(B_COLS-1); /* column just right of last play col */
-		int brow = RTOD(D_LAST - 1); /* align with visible board bottom */
+		int brow = RTOD(D_LAST - 1) + 1; /* align with lowered visible board bottom */
 		putstr("\033[90m");       /* dark grey */
 		for (j = D_FIRST; j < D_LAST; j++) {
-			moveto(RTOD(j), lc);
+			moveto(RTOD(j) + 1, lc);
 			putstr("│");
-			moveto(RTOD(j), rc);
+			moveto(RTOD(j) + 1, rc);
 			putstr("│");
 		}
 		/* bottom border */
@@ -679,7 +683,7 @@ draw_side_panel(void)
 	static int last_showpreview = -1;
 	char line[80];
 	int left = CTOD(B_COLS) + 3;
-	int row = 0;
+	int row = RTOD(D_FIRST);
 	int pcol = left + 5;  /* column for shape preview blocks */
 
 	if (left + 24 >= Cols)
