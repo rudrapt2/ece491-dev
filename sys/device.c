@@ -136,6 +136,14 @@ extern int open_device(const char * name, struct io ** ioptr) {
     return (dev != NULL) ? dev->openfn(ioptr, dev->ofaux) : -ENOENT;
 }
 
+int device_exists(const char * name) {
+    return (find_device(name) != NULL);
+}
+
+int device_ioaddref_openfn(struct io ** ioptr, void * aux) {
+    *ioptr = ioaddref(aux);
+}
+
 // INTERNAL FUNCTION DEFINITIONS
 //
 

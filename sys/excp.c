@@ -29,9 +29,7 @@ extern void handle_syscall(struct trap_frame* tfr);  // syscall.c
 // INTERNAL GLOBAL VARIABLES
 //
 
-/**
- * @brief Array of exception names indexed by their exception code
- */
+// Array of exception names indexed by their exception code
 static const char* const excp_names[] = {
     [RISCV_SCAUSE_INSTR_ADDR_MISALIGNED] = "Misaligned instruction address",
     [RISCV_SCAUSE_INSTR_ACCESS_FAULT] = "Instruction access fault",

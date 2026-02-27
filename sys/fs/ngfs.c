@@ -200,6 +200,8 @@ int mount_ngfs(const char * name, struct io * bkgio) {
     rwlock_init(&ngfs->fs_lock, "ngfs.lock");
 
     ngfs->base = ngfs_fs;
+    
+    debug("fs mounted");
 
     return mount_filesys(name, &ngfs->base);
 #endif
@@ -333,8 +335,12 @@ long ngfs_store(
     if (pos > UINT32_MAX) return -EINVAL;
 
     rwlock_acquire(&f->lock, 1);
-    if (pos + len > f->dentry.size) 
-        update_size(ngfs, &f->dentry, pos + len);
+
+    // store does not support resizing
+    if (pos + len > f->dentry.size) {
+        rwlock_release(&f->lock);
+        return -EINVAL;
+    }
     
     // since we cache the block, we need to be careful if it changes
     update_pos(ngfs, fio, pos);
@@ -429,7 +435,7 @@ int ngfs_delete(struct filesystem * fs, const char * name) {
     struct ngfs * ngfs = (void *)fs;
     struct cache * cache = ngfs->cache;
     struct ngfs_dir_entry * root_dir = &ngfs->root_dir;
-    struct ngfs_dir_entry * dentry;
+    struct ngfs_dir_entry * dentry = NULL;
 
     if (strcmp(name, root_dir->name) == 0)
         return -EACCESS;
@@ -632,7 +638,7 @@ int update_size(
 
 void update_pos(struct ngfs * ngfs, struct ngfs_io * fio, uint32_t newpos) {
     struct cache * cache = ngfs->cache;
-    if (newpos > fio->file->dentry.size) return;
+    assert(newpos <= fio->file->dentry.size);
     if (fio->write_idx != fio->file->write_idx || 
         fio->blockno > newpos / NGFS_BLKSZ)
     {
@@ -788,7 +794,7 @@ int iterate_dentry(
     int dirty) 
 {
     if (*idx >= ngfs->root_dir.size / DENTRYSZ) {
-        cache_release(ngfs->cache, *dentry, dirty);
+        if (*dentry != NULL) cache_release(ngfs->cache, *dentry, dirty);
         cache_flush(ngfs->cache); // CACHE_ISSUE
         return 0;
     }

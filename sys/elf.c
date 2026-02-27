@@ -59,9 +59,8 @@ enum elf_et {
     ET_CORE
 };
 
-/*! @struct elf64_ehdr
-    @brief ELF header struct
-*/
+// The /elf64_ehdr/ structure.
+// ELF header struct
 struct elf64_ehdr {
     unsigned char e_ident[16];
     uint16_t e_type;
@@ -80,9 +79,8 @@ struct elf64_ehdr {
 };
 
 
-/*! @enum elf_pt
-    @brief Program header p_type values
-*/
+// The /elf_pt/ enumeration.
+// Program header p_type values
 enum elf_pt {
 	PT_NULL = 0, 
 	PT_LOAD,
@@ -100,9 +98,8 @@ enum elf_pt {
 #define PF_W 0x2
 #define PF_R 0x4
 
-/*! @struct elf64_phdr
-    @brief Program header struct
-*/
+// The /elf64_phdr/ structure.
+// Program header struct
 struct elf64_phdr {
     uint32_t p_type;
     uint32_t p_flags;

@@ -84,7 +84,8 @@ void timer_init(unsigned int freq) {
     assert (freq > 0);
     timer_frequency = freq;
 
-    bolt_period = freq / BOLT_FREQ;
+    bolt_period = (BOLT_FREQ != 0) ? 
+        freq / BOLT_FREQ : UINT_MAX;
     timer_initialized = 1;
     sbi_set_timer(0); // interrupt immediately
     enable_timer_interrupts();
