@@ -263,7 +263,8 @@ int elf_load(struct io * io, void (**eptr)(void)) {
             entry_ok = 1;
         }
 
-#ifndef MP3CP1 // vmem checks
+#ifndef MP3CP1 
+        // vmem checks
         if (phdr.p_vaddr < UMEM_START_VMA || UMEM_END_VMA <= phdr.p_vaddr) {
             debug("p_vaddr out of range");
             return -EBADFMT;
