@@ -37,25 +37,25 @@
 
 struct plic_regs {
 	union {
-		uint32_t priority[PLIC_SRC_CNT]; /**< Interrupt Priorities registers */
+		uint32_t priority[PLIC_SRC_CNT]; // Interrupt Priorities registers
 		char _reserved_priority[0x1000];
 	};
 
 	union {
-		uint32_t pending[PLIC_SRC_CNT/32]; /**< Interrupt Pending Bits registers */
+		uint32_t pending[PLIC_SRC_CNT/32]; // Interrupt Pending Bits registers
 		char _reserved_pending[0x1000];
 	};
 
 	union {
-		uint32_t enable[PLIC_CTX_CNT][32]; /**< Interrupt Enables registers */
+		uint32_t enable[PLIC_CTX_CNT][32]; // Interrupt Enables registers
 		char _reserved_enable[0x200000-0x2000];
 	};
 
 	struct {
 		union {
 			struct {
-				uint32_t threshold;	/**< Priority Thresholds registers */
-				uint32_t claim;	/**< Interrupt Claim/Completion registers */
+				uint32_t threshold;	// Priority Thresholds registers
+				uint32_t claim;	// Interrupt Claim/Completion registers
 			};
 			
 			char _reserved_ctxctl[0x1000];

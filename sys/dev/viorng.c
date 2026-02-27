@@ -1,8 +1,6 @@
-/*! @file viorng.c 
-    @brief VirtIO rng device
-    @copyright Copyright (c) 2024-2026 University of Illinois
-
-*/
+// viorng.c
+// VirtIO rng device
+// Copyright (c) 2024-2026 University of Illinois
 
 #include "virtio.h"
 #include "intr.h"
