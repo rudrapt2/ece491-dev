@@ -17,6 +17,7 @@
 #include "heap.h"
 #include "thread.h"
 #include "console.h"
+#include "memory.h"
 #include "device.h"
 #include "misc.h"
 #include "ioimpl.h"
@@ -40,7 +41,7 @@
 
 struct loop_device {
     struct io io;
-    struct condition rbup; // ring buffer updated
+    struct condition rbupd; // ring buffer updated
     struct rwlock txlock; // transmit exclusive access
     struct rbuf rbuf;
 };
@@ -60,7 +61,7 @@ static int loop_ioctl(struct io * io, int op, void * arg);
 //
 
 static const struct iointf loop_intf = {
-    .implname = "loop",
+    .implname = LOOP_DEVNAME,
     .read = &loop_read,
     .write = &loop_write,
     .reclaim = &loop_reclaim,
@@ -72,37 +73,35 @@ static const struct iointf loop_intf = {
 // 
 
 void attach_loop(void) {
-    static unsigned short instcnt = 0; // device instance counter
-    struct loop_device * loop;
-
-    loop = kcalloc(1, sizeof(*loop));
-    condition_init(&loop->rbup, "loop.rbup");
-    rwlock_init(&loop->txlock, "loop.txlock");
-
-    register_device(LOOP_DEVNAME, instcnt++, &loop_open, loop);
-    ioinit(&loop->io, &loop_intf, 1, 0);
+    register_device(LOOP_DEVNAME, -1, &loop_open, NULL);
 }
 
 int loop_open(struct io ** ioptr, void * aux) {
-    struct loop_device * const loop = aux;
+    struct loop_device * loop;
 
     trace("%s()", __func__);
 
-    if (iorefcnt(&loop->io) != 0)
-        return -EBUSY;
-    
-    rbuf_reset(&loop->rbuf);
+    loop = kcalloc(1, sizeof(*loop));
 
-    *ioptr = ioaddref(&loop->io);
+    condition_init(&loop->rbupd, "loop.rbup");
+    rwlock_init(&loop->txlock, "loop.txlock");
+    rbuf_init(&loop->rbuf, alloc_phys_page(), PAGE_SIZE);
+    *ioptr = ioinit(&loop->io, &loop_intf, 1, 1);
     return 0;
 }
 
-void loop_reclaim(struct io * io __attribute__ ((unused))) {
+void loop_reclaim(struct io * io) {
+    struct loop_device * const loop = (struct loop_device*)io;
+    
     trace("%s()", __func__);
+
+    free_phys_page(rbuf_bufmem(&loop->rbuf));
+    kfree(loop);
 }
 
 long loop_read(struct io * io, void * buf, long bufsz) {
     struct loop_device * const loop = (struct loop_device*)io;
+    long n;
 
     trace("%s(%ld)", __func__, bufsz);
 
@@ -113,9 +112,11 @@ long loop_read(struct io * io, void * buf, long bufsz) {
         return 0;
 
     while (rbuf_empty(&loop->rbuf))
-        condition_wait(&loop->rbup);
+        condition_wait(&loop->rbupd);
     
-    return rbuf_getb(&loop->rbuf, buf, bufsz);
+    n = rbuf_getb(&loop->rbuf, buf, bufsz);
+    condition_broadcast(&loop->rbupd);
+    return n;
 }
 
 long loop_write(struct io * io, const void * buf, long buflen) {
@@ -134,9 +135,11 @@ long loop_write(struct io * io, const void * buf, long buflen) {
 
     do {
         while (rbuf_full(&loop->rbuf))
-            condition_wait(&loop->rbup);
+            condition_wait(&loop->rbupd);
         
+        debug("Calling rbuf_putb(buf+%ld,%ld-%ld)", n, buflen, n);
         n += rbuf_putb(&loop->rbuf, buf+n, buflen-n);
+        condition_broadcast(&loop->rbupd);
     } while (n < buflen);
 
     rwlock_release(&loop->txlock);

@@ -70,7 +70,7 @@ void board_init(unsigned int hartid, void * dtb) {
     #endif
 }
 
-void attach_devices(void) {
+void attach_board_devices(void) {
     int i;
 
     attach_rtc((void*)RTC_MMIO_BASE);

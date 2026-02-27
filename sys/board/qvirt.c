@@ -88,14 +88,14 @@ void board_init(unsigned int hartid, void * dtb) {
     plic_init((void*)PLIC_MMIO_BASE);
     timer_init(TIMER_FREQ);
 
-    #if !(defined(MP2) || defined(MP3CP1))
+#if !(defined(MP2) || defined(MP3CP1))
     memory_init(&qvirt_matlas);
-    #else
+#else
     heap_init(_kimg_end, RAM_END - (void*)_kimg_end);
-    #endif
+#endif
 }
 
-void attach_devices(void) {
+void attach_board_devices(void) {
     int i;
 
     attach_rtc((void*)RTC_MMIO_BASE);

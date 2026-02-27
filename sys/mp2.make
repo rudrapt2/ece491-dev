@@ -26,7 +26,6 @@ OBJS = \
 	games/trek-mp2.o \
 	string.o \
 	plic.o \
-	string.o \
 	error.o \
 	thrasm.o \
 	trap.o \

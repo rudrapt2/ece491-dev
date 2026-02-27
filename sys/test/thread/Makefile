@@ -55,6 +55,7 @@ ASFLAGS = -march=rv64imazicsr
 LDFLAGS = -melf64lriscv -T ../../board/qvirt.ld
 
 QEMUOPTS = -global virtio-mmio.force-legacy=false
+QEMUOPTS += -bios ../../bios/osbi181q.bin
 QEMUOPTS += -machine virt -nographic
 
 QEMUOPTS += -serial mon:stdio

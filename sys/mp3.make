@@ -27,20 +27,17 @@ OBJS = \
 	iomux.o \
 	string.o \
 	plic.o \
-	string.o \
 	error.o \
 	thread.o \
 	thrasm.o \
 	trap.o \
 	io.o \
 	filesys.o \
-	trap.o \
 	excp.o \
 	intr.o \
 	heap.o \
 	misc.o \
 	rbuf.o \
-	device.o \
 	elf.o \
 	cache.o \
 	timer.o \

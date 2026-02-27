@@ -68,7 +68,7 @@ enum elf_pt {
 };
 
 extern void board_init(unsigned int hartid, void * dtb); // from board/xxx.c
-extern void attach_devices(void); // from board/xxx.c
+extern void attach_board_devices(void); // from board/xxx.c
 
 extern char _kimg_blob_start[], _kimg_blob_end[];
 unsigned long long rand_state;
@@ -349,7 +349,7 @@ void main(unsigned int hartid, void * dtb) {
     procmgr_init();
     fsmgr_init();
 
-    attach_devices();
+    attach_board_devices();
     enable_interrupts();
 
     mount_devfs("dev");

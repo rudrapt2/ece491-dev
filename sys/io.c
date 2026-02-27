@@ -103,6 +103,8 @@ int iogetc(struct io * io) {
 
 long iowrite(struct io * io, const void * buf, long buflen) {
     assert (io != NULL);
+    assert (io->intf != NULL);
+    assert (io->refcnt != 0);
     assert (buf != NULL || buflen == 0);
 
     if (io->intf->write == NULL)
@@ -126,6 +128,7 @@ int ioputc(struct io * io, char c) {
 
 long iofetch(struct io * io, unsigned long long pos, void * buf, long buflen) {
     assert (io != NULL);
+    assert (io->intf != NULL);
     assert (io->refcnt != 0);
     assert (buf != NULL || buflen == 0);
 
@@ -146,6 +149,7 @@ long iofetch(struct io * io, unsigned long long pos, void * buf, long buflen) {
 
 long iostore(struct io * io, unsigned long long pos, const void * buf, long buflen) {
     assert (io != NULL);
+    assert (io->intf != NULL);
     assert (io->refcnt != 0);
     assert (buf != NULL || buflen == 0);
 
@@ -179,7 +183,9 @@ int ioctl(struct io * io, int op, void * arg) {
 
 int ioctl_u(struct io * io, int op, uintptr_t u_arg) {
     assert (io != NULL);
+    assert (io->intf != NULL);
     assert (io->refcnt != 0);    
+    
     if (io->intf->ioctl_u != NULL)
         return io->intf->ioctl_u(io, op, u_arg);
     else
