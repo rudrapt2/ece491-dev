@@ -15,7 +15,6 @@
 #include "ngfs.h"
 
 #include "../cache.h"
-#include "../console.h"
 #include "../device.h"
 #include "../error.h"
 #include "../filesys.h"
@@ -39,7 +38,6 @@
 #define CACHE_CLEAN 0
 #define CACHE_DIRTY 1
 
-// TODO: add locks
 struct ngfs_file {
     struct ngfs_dir_entry dentry;
     struct ngfs * fs;
@@ -107,7 +105,6 @@ static void * get_cache_from_block(struct cache * cache, uint32_t block);
 static uint32_t blockno_to_block(struct cache * cache, struct ngfs_dir_entry * file, unsigned int blockno);
 static inline long update_root_dir(struct ngfs * ngfs);
 static int iterate_dentry(struct ngfs * ngfs, uint32_t * idx, uint32_t * block, struct ngfs_dir_entry ** dentry, int dirty);
-static int free_associated_cache_block(struct cache * cache, struct ngfs_dir_entry * entry, int dirty);
 static int update_size(struct ngfs * ngfs, struct ngfs_dir_entry * dentry, uint32_t end);
 static void update_pos(struct ngfs * ngfs, struct ngfs_io * fio, uint32_t newpos);
 static void clear_block(struct cache * cache, uint32_t block, uint32_t offset, uint32_t len);
@@ -133,8 +130,7 @@ static const struct iointf ngfs_file_intf = {
     .write = &seekio_write,
     .fetch = &ngfs_fetch,
     .store = &ngfs_store,
-    .ioctl = &ngfs_ioctl,
-    .ioctl_u = (int(*)(struct io*, int, uintptr_t))&ngfs_ioctl
+    .ioctl = &ngfs_ioctl
 };
 
 static const struct iointf ngfs_listing_io_intf = {
@@ -148,6 +144,7 @@ static const struct iointf ngfs_listing_io_intf = {
 int mount_ngfs(const char * name, struct io * bkgio) {
 #ifdef STUDENT
     // YOUR CODE HERE
+    return 0;
 #else 
     int result;
     struct ngfs * ngfs;
@@ -478,7 +475,7 @@ int ngfs_delete(struct filesystem * fs, const char * name) {
     {
         if (strcmp(name, dentry->name) == 0) {
             memcpy(dentry, &last_dentry, DENTRYSZ);
-            free_associated_cache_block(cache, dentry, CACHE_DIRTY);
+            cache_release(cache, dentry, CACHE_DIRTY);
             break;
         }
     }
@@ -705,7 +702,7 @@ uint32_t get_free_data_block(struct ngfs * fs) {
                 // this line is needed bc it breaks otherwise
                 // i think this means theres a race condition
                 // in the cache? not sure though
-                cache_flush(fs->cache);
+                cache_flush(fs->cache); // CACHE_ISSUE
 
                 free_block = fat_block * NGFS_FAT_ENTRIES_PER_BLOCK + idx;
                 return (free_block < fs->size / NGFS_BLKSZ - fs->num_fat_blocks) ?
@@ -728,7 +725,7 @@ void set_next_data_block(struct cache * cache, uint32_t block, uint32_t next) {
         &next, sizeof(next));
     // this line is needed as well
     // i think this is also related to the cache race cond
-    cache_flush(cache);
+    cache_flush(cache); // CACHE_ISSUE
 }
 
 uint32_t get_next_data_block(struct cache * cache, uint32_t block) {
@@ -791,7 +788,8 @@ int iterate_dentry(
     int dirty) 
 {
     if (*idx >= ngfs->root_dir.size / DENTRYSZ) {
-        free_associated_cache_block(ngfs->cache, *dentry, dirty);
+        cache_release(ngfs->cache, *dentry, dirty);
+        cache_flush(ngfs->cache); // CACHE_ISSUE
         return 0;
     }
 
@@ -801,7 +799,8 @@ int iterate_dentry(
     }
     
     if (*idx % DENTRIES_PER_BLOCK == 0) {
-        free_associated_cache_block(ngfs->cache, *dentry, dirty);
+        cache_release(ngfs->cache, *dentry, dirty);
+        cache_flush(ngfs->cache); // CACHE_ISSUE
         *block = get_next_data_block(ngfs->cache, *block);
         *dentry = get_cache_from_block(ngfs->cache, IDX_TO_ABS(*block));
     }
@@ -809,18 +808,6 @@ int iterate_dentry(
 
     (*idx)++;
     return 1;
-}
-
-int free_associated_cache_block(
-    struct cache * cache, 
-    struct ngfs_dir_entry * entry, 
-    int dirty) 
-{
-    if (entry == NULL) return -1;
-    cache_release(cache, 
-        (void *)ROUND_DOWN((uintptr_t)entry, NGFS_BLKSZ), dirty);
-    if (dirty) cache_flush(cache);
-    return 0;
 }
 
 void clear_block(struct cache * cache, uint32_t block, uint32_t offset, uint32_t len) {

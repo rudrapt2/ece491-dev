@@ -36,7 +36,7 @@
 
 typedef unsigned long mtag_t;
 
-// EXPORTED STRUCTS
+//EXPORTED STRUCT DEFINITIONS
 //
 
 struct mregion {
@@ -60,7 +60,7 @@ extern char memory_initialized;
  * the heap memory manager, and adds remaining memory to the free chunk list
  * @return None
  */
-extern void memory_init(struct matlas* mappings);
+extern void memory_init(const struct matlas* mappings);
 
 /**
  * @brief Gets the active memory space

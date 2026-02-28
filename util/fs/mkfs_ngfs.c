@@ -166,6 +166,23 @@ static void wdata_to_file(FILE* fp, struct ngfs_dir_entry* dir_entry, const uint
     }
 }
 
+// less generic writer that reads from a binary and copies it into the file
+// runs O(N) vs rather than O(N^2)
+static void copy_file(FILE* fp, struct ngfs_dir_entry * dentry, FILE * binary_fp) {
+    uint8_t buffer[NGFS_BLKSZ];
+    uint32_t block = dentry->start_block;
+    uint32_t n = fread(buffer, 1, NGFS_BLKSZ, binary_fp);
+
+    for (; n > 0; n = fread(buffer, 1, NGFS_BLKSZ, binary_fp)) {
+        block = (block == NGFS_BLOCK_END) ? 
+            set_start_block(fp, dentry) : append_to_block(fp, block);
+
+        fseek(fp, (num_fat_blocks + block) * NGFS_BLKSZ, SEEK_SET);
+        fwrite(buffer, 1, n, fp);
+        dentry->size += n;
+    }
+}
+
 int write_dentry(FILE* fp, struct ngfs_dir_entry* dentry) {
     wdata_to_file(fp, &root_dir, (const uint8_t*)dentry, sizeof(struct ngfs_dir_entry));
     fflush(fp);
@@ -211,18 +228,7 @@ void load_binary(FILE* fp, const char* binary_path) {
     memset(dentry.name, 0, NGFS_MAX_FILENAME_LEN);
     strncpy(dentry.name, get_filename(binary_path), NGFS_MAX_FILENAME_LEN);
 
-    // Stream the binary in NGFS_BLKSZ increments to avoid full-file buffering
-    uint8_t buffer[NGFS_BLKSZ];
-    uint32_t total_written = 0;
-    while (total_written < file_size) {
-        size_t n = fread(buffer, 1, NGFS_BLKSZ, binary_fp);
-        if (n > 0) {
-            wdata_to_file(fp, &dentry, buffer, (uint32_t)n);
-            total_written += (uint32_t)n;
-        } else {
-            break;
-        }
-    }
+    copy_file(fp, &dentry, binary_fp);
 
     write_dentry(fp, &dentry);
 

@@ -221,7 +221,7 @@ struct viogpu_device {
 
 
 static int  viogpu_open(struct io ** ioptr, void * aux);
-static int viogpu_ioctl(struct io * io, int op, void * arg);
+static int viogpu_ioctl_u(struct io * io, int op, uintptr_t arg);
 static long viogpu_write(struct io * io, const void * buf, long len);
 static void viogpu_reclaim(struct io * io);
 static void viogpu_isr(int irqno, void * aux);
@@ -242,8 +242,7 @@ void viogpu_attach(volatile struct virtio_mmio_regs *regs, int irqno) {
     static const struct iointf viogpu_intf = {
         .implname = "viogpu",
         .reclaim = &viogpu_reclaim,
-        .ioctl = &viogpu_ioctl,
-        .ioctl_u = (int(*)(struct io*, int, uintptr_t))&viogpu_ioctl,
+        .ioctl_u = &viogpu_ioctl_u,
         .write = &viogpu_write,
     };
 
@@ -330,15 +329,16 @@ static void viogpu_reclaim(struct io * io) {
     viogpu->fbuf_vma = 0;
 }
 
-static int viogpu_ioctl(struct io * io, int op, void *arg) {
+static int viogpu_ioctl_u(struct io * io, int op, uintptr_t arg_uma) {
     if (!io) return -EINVAL;
     struct viogpu_device * const viogpu =
         (void*)io - offsetof(struct viogpu_device, base);
 
+    int result = validate_vptr(
+        (void *)arg_uma, sizeof(unsigned long long), PTE_R | PTE_W | PTE_U);
     switch (op) {
     case IOC_MAPBUF:
-        if (!arg) return -EINVAL;
-        *(void **)arg = (void*)viogpu->fbuf_vma;
+        *(void **)arg_uma = (void*)viogpu->fbuf_vma;
         return 0;
 
     default:

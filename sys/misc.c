@@ -19,15 +19,15 @@
 
 void panic_actual(const char* filename, int lineno, const char* msg) {
     if (msg != NULL && *msg != '\0')
-        kprintf("PANIC at %s:%d: %s\n", filename, lineno, msg);
+        kprintf("<%s:%d> PANIC at %s:%d: %s\n", running_thread_name(), running_thread(), filename, lineno, msg);
     else
-        kprintf("PANIC at %s:%d", filename, lineno);
+        kprintf("<%s:%d> PANIC at %s:%d", running_thread_name(), running_thread(), filename, lineno);
 
     halt();
 }
 
 void assert_failed(const char* filename, int lineno, const char* stmt) {
-    kprintf("ASSERT FAILED at %s:%d in thread <%s %d> (%s)\n", 
+    kprintf("ASSERT FAILED at %s:%d in thread <%s:%d> (%s)\n", 
         filename, lineno, running_thread_name(), running_thread(), stmt);
     halt();
 }
@@ -39,7 +39,7 @@ void debug_actual(const char* filename, int lineno, const char* fmt, ...) {
     va_start(ap, fmt);
     pie = disable_interrupts();
 
-    kprintf("<%s %d> DEBUG at %s:%d: ", running_thread_name(), running_thread(), filename, lineno);
+    kprintf("<%s:%d> DEBUG at %s:%d: ", running_thread_name(), running_thread(), filename, lineno);
     kvprintf(fmt, ap);
     kprintf("\n");
 
@@ -54,7 +54,7 @@ void trace_actual(const char* filename, int lineno, const char* fmt, ...) {
     va_start(ap, fmt);
     pie = disable_interrupts();
 
-    kprintf("<%s %d> TRACE at %s:%d: ", running_thread_name(), running_thread(), filename, lineno);
+    kprintf("<%s:%d> TRACE at %s:%d: ", running_thread_name(), running_thread(), filename, lineno);
     kvprintf(fmt, ap);
     kprintf("\n");
 

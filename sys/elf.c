@@ -121,6 +121,7 @@ struct elf64_phdr {
 int elf_load(struct io * io, void (**eptr)(void)) {
 #ifdef STUDENT
     // YOUR CODE HERE
+    return 0;
 #else
     static const uint32_t MAGIC_LSB = 0x464c457f;
     struct elf64_ehdr ehdr;

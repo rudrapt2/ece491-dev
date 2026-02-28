@@ -2,7 +2,6 @@
 # 
 
 PREFIX=riscv64-unknown-elf-
-QEMU=qemu-system-riscv64
 
 CC=$(PREFIX)gcc
 AS=$(PREFIX)as
@@ -16,10 +15,12 @@ KERNDIR=kernel
 USRDIR=usr
 
 KOBJDIR=$(KERNDIR)/build
-UOBJDIR=$(USRDIR)
+UOBJDIR=$(USRDIR)/build
 
 MP0_PREFIX=mp0
 MP2_PREFIX=mp2
+MP3CP1_PREFIX=mp3_cp1
+MP3CP2_PREFIX=mp3_cp2
 
 TREK_OBJS_MP0 = \
 	$(KOBJDIR)/$(MP0_PREFIX)_trek.o \
@@ -30,28 +31,27 @@ TREK_OBJS_MP2 = \
 	$(KOBJDIR)/$(MP2_PREFIX)_glue.o \
 
 TREK_MP3_CP1_OBJS = \
-	$(UOBJDIR)/$(MP3CP1_PREFIX)io.o \
-	$(UOBJDIR)/$(MP3CP1_PREFIX)trek.o \
-	$(UOBJDIR)/$(MP3CP1_PREFIX)glue.o \
-	$(KOBJDIR)/$(MP3CP1_PREFIX)string.o \
+	$(UOBJDIR)/$(MP3CP1_PREFIX)_io.o \
+	$(UOBJDIR)/$(MP3CP1_PREFIX)_trek.o \
+	$(UOBJDIR)/$(MP3CP1_PREFIX)_glue.o \
+	$(KOBJDIR)/$(MP3CP1_PREFIX)_string.o \
 
 TREK_MP3_CP2_OBJS = \
-	$(UOBJDIR)/$(MP3CP2_PREFIX)io.o \
-	$(UOBJDIR)/$(MP3CP2_PREFIX)trek.o \
-	$(UOBJDIR)/$(MP3CP2_PREFIX)glue.o \
-	$(UOBJDIR)/$(MP3CP2_PREFIX)heap.o \
-	$(UOBJDIR)/$(MP3CP2_PREFIX)start.o \
-	$(UOBJDIR)/$(MP3CP2_PREFIX)string.o \
-	$(UOBJDIR)/$(MP3CP2_PREFIX)syscall.o \
+	$(UOBJDIR)/$(MP3CP2_PREFIX)_io.o \
+	$(UOBJDIR)/$(MP3CP2_PREFIX)_trek.o \
+	$(UOBJDIR)/$(MP3CP2_PREFIX)_glue.o \
+	$(UOBJDIR)/$(MP3CP2_PREFIX)_heap.o \
+	$(UOBJDIR)/$(MP3CP2_PREFIX)_start.o \
+	$(UOBJDIR)/$(MP3CP2_PREFIX)_string.o \
+	$(UOBJDIR)/$(MP3CP2_PREFIX)_syscall.o \
 
-CFLAGS = -Wall -Werror=implicit-function-declaration
-CFLAGS += -fno-omit-frame-pointer -ggdb -gdwarf-2
-CFLAGS += -mcmodel=medany -fno-pie -no-pie -march=rv64imazicsr -mabi=lp64
-CFLAGS += -fno-common -nostdlib -mno-relax -ffreestanding 
-CFLAGS += -fno-asynchronous-unwind-tables -mno-riscv-attribute
+CFLAGS = -Wall -fno-omit-frame-pointer -ggdb -gdwarf-2
+CFLAGS += -mcmodel=medany -fno-pie -no-pie -march=rv64g -mabi=lp64d
+CFLAGS += -ffreestanding -fno-common -nostdlib -mno-relax
+CFLAGS += -fno-asynchronous-unwind-tables
 CFLAGS += -I.
 
-ASFLAGS += -march=rv64imazicsr -mabi=lp64
+ASFLAGS += -march=rv64g -mabi=lp64d
 
 #################################################
 
@@ -60,7 +60,7 @@ all: trek-mp2
 clean:
 	rm -rf *.o *.elf *.asm
 	rm -rf $(KOBJDIR)
-	rm -rf $(UOBJDIR)/*.o
+	rm -rf $(UOBJDIR)
 	rm -rf $(BINDIR)
 
 $(KOBJDIR):
@@ -108,59 +108,57 @@ $(KOBJDIR)/$(MP2_PREFIX)_glue.o: glue.c | $(KOBJDIR)
 ## CP1
 
 trek-mp3-cp1: $(UOBJDIR)/trek_mp3_cp1.elf | $(BINDIR)
-	mv $(UOBJDIR)/trek_mp3_cp1.elf $(BINDIR)/trek
+	mv $(UOBJDIR)/trek_mp3_cp1.elf $(BINDIR)/trek-mp3-cp1
 
 # Main binaries
 $(UOBJDIR)/trek_mp3_cp1.elf: $(TREK_MP3_CP1_OBJS)
 	$(LD) -T $(USRDIR)/no_umode.ld -o $@ $^
 
 # Trek + glue binaries
-$(UOBJDIR)/$(MP3CP1_PREFIX)trek.o: trek.c | $(UOBJDIR)
+$(UOBJDIR)/$(MP3CP1_PREFIX)_trek.o: trek.c | $(UOBJDIR)
 	$(CC) $(CFLAGS) -DAEE31 -o $@ -c $<
 
-$(UOBJDIR)/$(MP3CP1_PREFIX)glue.o: glue.c | $(UOBJDIR)
+$(UOBJDIR)/$(MP3CP1_PREFIX)_glue.o: glue.c | $(UOBJDIR)
 	$(CC) $(CFLAGS) -DAEE31 -o $@ -c $<
 
 # User mode binaries
-$(UOBJDIR)/$(MP3CP1_PREFIX)%.o: $(USRDIR)/%.c | $(UOBJDIR)
+$(UOBJDIR)/$(MP3CP1_PREFIX)_%.o: $(USRDIR)/%.c | $(UOBJDIR)
 	$(CC) $(CFLAGS) -DAEE31 -o $@ -c $<
 
-$(KOBJDIR)/$(MP3CP1_PREFIX)%.o: $(KERNDIR)/%.c | $(KOBJDIR)
+$(KOBJDIR)/$(MP3CP1_PREFIX)_%.o: $(KERNDIR)/%.c | $(KOBJDIR)
 	$(CC) $(CFLAGS) -DAEE31 -o $@ -c $<
 	
-$(UOBJDIR)/$(MP3CP1_PREFIX)%.s: $(USRDIR)/%.S | $(UOBJDIR)
+$(UOBJDIR)/$(MP3CP1_PREFIX)_%.s: $(USRDIR)/%.S | $(UOBJDIR)
 	$(CPP) $(CPPFLAGS) -o $@ -c $<
 
-$(UOBJDIR)/$(MP3CP1_PREFIX)%.o: $(USRDIR)/%.s | $(UOBJDIR)
+$(UOBJDIR)/$(MP3CP1_PREFIX)_%.o: $(USRDIR)/%.s | $(UOBJDIR)
 	$(AS) $(ASFLAGS) -o $@ -c $<
 
 #################################################
 ## CP2 + CP3
 
 trek-mp3-cp2: $(UOBJDIR)/trek_mp3_cp2.elf | $(BINDIR)
-	mv $(UOBJDIR)/trek_mp3_cp2.elf $(BINDIR)/trek
+	mv $(UOBJDIR)/trek_mp3_cp2.elf $(BINDIR)/trek-mp3-cp2
 
 # Main binaries
 $(UOBJDIR)/trek_mp3_cp2.elf: $(TREK_MP3_CP2_OBJS)
 	$(LD) -T $(USRDIR)/umode.ld -o $@ $^
 
 # Trek + glue binaries
-$(UOBJDIR)/$(MP3CP2_PREFIX)trek.o: trek.c | $(UOBJDIR)
+$(UOBJDIR)/$(MP3CP2_PREFIX)_trek.o: trek.c | $(UOBJDIR)
 	$(CC) $(CFLAGS) -DAEE32 -o $@ -c $<
 
-$(UOBJDIR)/$(MP3CP2_PREFIX)glue.o: glue.c | $(UOBJDIR)
+$(UOBJDIR)/$(MP3CP2_PREFIX)_glue.o: glue.c | $(UOBJDIR)
 	$(CC) $(CFLAGS) -DAEE32 -o $@ -c $<
 
 # User mode binaries
-$(UOBJDIR)/$(MP3CP2_PREFIX)%.o: $(USRDIR)/%.c | $(UOBJDIR)
+$(UOBJDIR)/$(MP3CP2_PREFIX)_%.o: $(USRDIR)/%.c | $(UOBJDIR)
 	$(CC) $(CFLAGS) -DAEE32 -o $@ -c $<
 
-$(UOBJDIR)/$(MP3CP2_PREFIX)%.s: $(USRDIR)/%.S | $(UOBJDIR)
-	$(CPP) $(CPPFLAGS) -o $@ -c $<
+$(UOBJDIR)/$(MP3CP2_PREFIX)_%.o: $(USRDIR)/%.S | $(UOBJDIR)
+	$(CC) $(CFLAGS) -DAEE32 -c $< -o $@
 
-$(UOBJDIR)/$(MP3CP2_PREFIX)%.o: $(USRDIR)/%.s | $(UOBJDIR)
+$(UOBJDIR)/$(MP3CP2_PREFIX)_%.o: $(USRDIR)/%.s | $(UOBJDIR)
 	$(AS) $(ASFLAGS) -o $@ -c $<
 
 #################################################
-
-

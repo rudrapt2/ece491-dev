@@ -64,7 +64,7 @@ static char rcsid[] = "$NetBSD: main.c,v 1.3 1995/04/22 10:27:41 cgd Exp $";
 
 // #define GOD_MODE
 
-#include "rogue.h"
+#include "source/rogue.h"
 
 extern short party_room;
 int exited = 0;

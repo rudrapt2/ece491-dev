@@ -15,31 +15,31 @@ USER_OBJS = \
 	usr/heap.o \
 	usr/start.o \
 	usr/string.o \
-	usr/syscall.o \
+	usr/syscall.o
 
-ROGUE_OBJS = \
-	hit.o \
-	use.o \
-	zap.o \
-	save.o \
-	init.o \
+ROGUE_OBJS = $(USER_OBJS) \
 	main.o \
-	move.o \
-	pack.o \
-	play.o \
-	ring.o \
-	room.o \
-	trap.o \
-	level.o \
-	score.o \
-	throw.o \
-	curses.o \
-	object.o \
-	random.o \
-	message.o \
-	monster.o \
-	spec_hit.o \
-	inventory.o \
+	source/hit.o \
+	source/use.o \
+	source/zap.o \
+	source/save.o \
+	source/init.o \
+	source/move.o \
+	source/pack.o \
+	source/play.o \
+	source/ring.o \
+	source/room.o \
+	source/trap.o \
+	source/level.o \
+	source/score.o \
+	source/throw.o \
+	source/curses.o \
+	source/object.o \
+	source/random.o \
+	source/message.o \
+	source/monster.o \
+	source/spec_hit.o \
+	source/inventory.o \
 
 CFLAGS = -Wall -fno-omit-frame-pointer -Oz -s -ggdb -gdwarf-2
 CFLAGS += -fno-pie -no-pie -march=rv64imazicsr -mabi=lp64
@@ -72,11 +72,11 @@ egg.o:
 	$(OPT) -load-pass-plugin=./libStringObfuscation.so -passes="string-obfuscation" -S egg_one.ll -o egg_obf.ll
 	$(CLANG) $(LLVM_CFLAGS) -c egg_obf.ll -o egg.o
 
-rogue.elf: $(ULIB_OBJS) $(ROGUE_OBJS) glue.o \
-	$(LD) -T user.ld -o $@ $^
+rogue.elf: $(ULIB_OBJS) $(ROGUE_OBJS) glue.o 
+	$(LD) -T usr/umode.ld -o $@ $^
 
 rogue-ec.elf: $(ULIB_OBJS) $(ROGUE_OBJS) egg.o # egg is where get_password is stored
-	$(LD) -T user.ld -o $@ $^
+	$(LD) -T usr/umode.ld -o $@ $^
 
 clean:
-	rm -rf *.o *.elf
+	rm -rf *.o *.elf usr/*.o rogue/*.o

@@ -145,8 +145,7 @@ static const struct iointf vioblk_intf = {
     .store = &vioblk_store,
     .read = &seekio_read,
     .write = &seekio_write,
-    .ioctl = &vioblk_ioctl,
-    .ioctl_u = (int(*)(struct io*, int, uintptr_t))&vioblk_ioctl
+    .ioctl = &vioblk_ioctl
 };
 
 // EXPORTED FUNCTION DEFINITIONS

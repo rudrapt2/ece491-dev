@@ -104,6 +104,7 @@ void rule30_start(struct uio *uio) {
 #endif
 
 #if defined(AEE32)
+#include "usr/syscall.h"
 
 extern void putc(char c);
 
@@ -112,13 +113,12 @@ void draw(const char * line) {
     for (;;) {
         char c = *p++;
         putc(c);
-        if (c == '\n') break;
+        if (c == '\r' || c == '\n') break;
     }
 }
 
 void wait(void) {
-    volatile unsigned long i;
-    for (i = 0; i < 100000; i++) { }
+    _usleep(100000);
 }
 
 void main(void) {
