@@ -256,6 +256,9 @@ void memory_init(struct matlas * mappings) {
         main_pt1_0x80000[VPN1((uintptr_t)pp)] = leaf_pte(pp, PTE_R | PTE_W | PTE_G);
     }
 
+    //Map DTB as read only
+    main_pt1_0x80000[VPN1((uintptr_t)pp)] = leaf_pte(pp, PTE_R | PTE_G);
+
     // Enable paging; this part always makes me nervous.
 
     main_mtag = ptab_to_mtag(main_pt2, 0);
