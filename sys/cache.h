@@ -16,6 +16,11 @@ struct cache; // opaque decl.
 // The cache module stores fixed-size blocks from a backing `struct io *` and
 // serves repeated block accesses from memory when possible.
 //
+// Some implementations may support shared (nonexclusive) fetches of a cached
+// block by multiple readers. This is optional. A cache implementation that
+// does not support nonexclusive fetches may reject them by returning
+// [-ENOTSUP] from cache_fetch().
+//
 //
 // REQUIRED BEHAVIOR FOR THIS ASSIGNMENT
 //
@@ -82,13 +87,16 @@ extern unsigned int cache_blksz(const struct cache * ca);
 // - /ca/ is a valid `struct cache *`.
 //
 
-extern int cache_fetch(struct cache * ca, unsigned long long pos, void ** pptr);
+extern int cache_fetch(
+    struct cache * ca, unsigned long long pos, int exclusive, void ** pptr);
 
 // Fetches the cache block at backing-device byte offset /pos/.
 //
 // On entry cache_fetch() assumes:
 // - /ca/ is a valid `struct cache *`.
 // - /pos/ is aligned to cache_blksz(/ca/).
+// - /exclusive/ is nonzero for an exclusive fetch and zero for a nonexclusive
+//   fetch.
 // - /pptr/ is a non-NULL pointer.
 //
 // On successful return cache_fetch() guarantees:
@@ -96,12 +104,14 @@ extern int cache_fetch(struct cache * ca, unsigned long long pos, void ** pptr);
 // - /pptr/ points to the cached in-memory block for /pos/.
 // - The returned block remains in the cache and in-use until the matching
 //   cache_release() call for that pointer.
+// - If /exclusive/ is nonzero, no other thread is permitted to hold the same
+//   block nonexclusively or exclusively at the same time.
+// - If /exclusive/ is zero and the implementation supports nonexclusive
+//   fetches, other threads may also hold the same block nonexclusively.
 //
 // On error cache_fetch() returns a negative error code.
-//
-// Derived requirement:
-// - For every successful cache_fetch(), callers must eventually call
-//   cache_release() exactly once with the returned pointer.
+// - Implementations that do not support nonexclusive fetches may return
+//   [-ENOTSUP] when /exclusive/ is zero.
 //
 // * This function may block.
 // * This function may switch to another thread context.
@@ -112,8 +122,8 @@ extern void cache_release(struct cache * ca, void * ptr, int dirty);
 // Releases a block previously returned by cache_fetch().
 //
 // The /ptr/ argument must be a pointer previously returned through /pptr/ by a
-// successful cache_fetch(/ca/, ..., /pptr/) call whose block has not yet been
-// released.
+// successful cache_fetch(/ca/, ..., ..., /pptr/) call whose block has not yet
+// been released.
 //
 // If /dirty/ is nonzero, this call marks the block modified; the cache must
 // eventually write the block back to the backing device before the block is

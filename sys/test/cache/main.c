@@ -28,13 +28,13 @@ struct cache * init_cache() {
 void test_cache(struct cache * cache) {
     char * data;
     for (int i = 0; i < 4096; i++) {
-        cache_fetch(cache, 4096, (void**)&data);
+        cache_fetch(cache, 4096, 1, (void**)&data);
         data[i] = (char)i;
         cache_release(cache, data, 1);
 
         yield_running_thread();
 
-        cache_fetch(cache, 4096, (void**)&data);
+        cache_fetch(cache, 4096, 1, (void**)&data);
         for (int j=0; j<=i; j++)
             assert(data[j] == (char)j);
         cache_release(cache, data, 0);

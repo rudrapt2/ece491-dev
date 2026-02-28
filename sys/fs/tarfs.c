@@ -332,7 +332,7 @@ long tarfs_fileio_fetch (
         blkno = (fio->file->blkno * TAR_BLKSZ + pos) / TAR_BLKSZ;
         off = pos % TAR_BLKSZ;   // offset from where we want data
 
-        result = cache_fetch(cache, blkno * TAR_BLKSZ, &blk);
+        result = cache_fetch(cache, blkno * TAR_BLKSZ, 1, &blk);
         
         if (result < 0)
             return result;
@@ -386,7 +386,7 @@ long tarfs_fileio_store (
         blkno = (fio->file->blkno * TAR_BLKSZ + pos) / TAR_BLKSZ;
         off = pos % TAR_BLKSZ;   // offset from where we want data
 
-        result = cache_fetch(cache, blkno * TAR_BLKSZ, &blk);
+        result = cache_fetch(cache, blkno * TAR_BLKSZ, 1, &blk);
 
         if (result < 0)
             return result;

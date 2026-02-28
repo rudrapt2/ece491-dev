@@ -778,7 +778,7 @@ long arbitrary_read(unsigned long pos, void* buf, long bufsz) {
         const uint64_t block_offset = pos % KTFS_BLKSZ;
         void* block_data = NULL;
         
-        if (cache_fetch(ktfs_block_cache, block_index * KTFS_BLKSZ, &block_data) != 0) {
+        if (cache_fetch(ktfs_block_cache, block_index * KTFS_BLKSZ, 1, &block_data) != 0) {
             return -1;
         }
 
@@ -819,7 +819,7 @@ long arbitrary_write(unsigned long pos, void* buf, long len) {
         const uint64_t block_offset = pos % KTFS_BLKSZ;
         void* block_data = NULL;
         
-        if (cache_fetch(ktfs_block_cache, block_index * KTFS_BLKSZ, &block_data) != 0) {
+        if (cache_fetch(ktfs_block_cache, block_index * KTFS_BLKSZ, 1, &block_data) != 0) {
             return -1;
         }
 

@@ -182,7 +182,9 @@ struct cache * create_cache(struct io * bkgio, unsigned long cache_blksz) {
 #endif
 }
 
-int cache_fetch(struct cache * cache, unsigned long long pos, void ** pptr) {
+int cache_fetch(
+    struct cache * cache, unsigned long long pos, int exclusive, void ** pptr)
+{
 #ifdef STUDENT
     // YOUR CODE HERE
     return 0;
@@ -192,6 +194,9 @@ int cache_fetch(struct cache * cache, unsigned long long pos, void ** pptr) {
     int i; // block index
 
     trace("%s(0x%llx)", __func__, pos);
+
+    if (!exclusive)
+        return -ENOTSUP;
 
     if (pos % cache->blksz != 0)
         return -EINVAL;
