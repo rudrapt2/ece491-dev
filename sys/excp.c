@@ -61,17 +61,6 @@ void handle_smode_exception(unsigned int cause, struct trap_frame* tfr) {
         switch (cause) {
             case RISCV_SCAUSE_LOAD_PAGE_FAULT:
             case RISCV_SCAUSE_STORE_PAGE_FAULT:
-#ifndef MP2
-#ifndef MP3CP1
-		if(csrr_stval() >= UMEM_START_VMA && csrr_stval() <= UMEM_END_VMA){
-                	int handled = handle_umode_page_fault(tfr, csrr_stval());
-                	if(handled)return;
-			process_exit(); //If there's a page fault in user space that we can't recover
-					//from, this had to have come from a system call so we can
-					//safely exit the process.
-		}
-#endif
-#endif
             case RISCV_SCAUSE_INSTR_PAGE_FAULT:
             case RISCV_SCAUSE_LOAD_ADDR_MISALIGNED:
             case RISCV_SCAUSE_STORE_ADDR_MISALIGNED:

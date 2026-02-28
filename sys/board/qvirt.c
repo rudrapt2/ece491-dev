@@ -80,24 +80,20 @@ static struct mregion qvirt_resv[] = {
 static const struct matlas qvirt_matlas = {
     .ram = qvirt_ram,
     .mmio = qvirt_mmio,
-    .resv = qvirt_resv
+    .resv = qvirt_resv,
+
+    .ram_size = 1,
+    .mmio_size = 1,
+    .resv_size = 3
 };
 
 void board_init(unsigned int hartid, void * dtb) {    
     console_init();
     plic_init((void*)PLIC_MMIO_BASE);
     timer_init(TIMER_FREQ);
-
-<<<<<<< HEAD
-    #ifndef MP2
-    memory_init(&qvirt_matlas);
-    #endif
-    #ifdef MP2
-=======
     #if !(defined(MP2) || defined(MP3CP1))
     memory_init(&qvirt_matlas);
     #else
->>>>>>> main
     heap_init(_kimg_end, RAM_END - (void*)_kimg_end);
     #endif
 }

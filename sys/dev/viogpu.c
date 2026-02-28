@@ -334,7 +334,7 @@ static int viogpu_ioctl_u(struct io * io, int op, uintptr_t arg_uma) {
     struct viogpu_device * const viogpu =
         (void*)io - offsetof(struct viogpu_device, base);
 
-    int result = validate_vptr(
+    int result = enforce_vptr(
         (void *)arg_uma, sizeof(unsigned long long), PTE_R | PTE_W | PTE_U);
     switch (op) {
     case IOC_MAPBUF:
