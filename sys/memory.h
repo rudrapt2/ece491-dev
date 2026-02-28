@@ -48,6 +48,10 @@ struct matlas {
     struct mregion * ram;
     struct mregion * mmio;
     struct mregion * resv;
+
+    uint64_t ram_size;
+    uint64_t mmio_size;
+    uint64_t resv_size;
 };
 
 // EXPORTED FUNCTION DECLARATIONS
@@ -60,7 +64,7 @@ extern char memory_initialized;
  * the heap memory manager, and adds remaining memory to the free chunk list
  * @return None
  */
-extern void memory_init(const struct matlas* mappings);
+extern void memory_init(struct matlas* mappings);
 
 /**
  * @brief Gets the active memory space
@@ -153,7 +157,7 @@ extern void unmap_and_free_range(void* vp, size_t size);
  * @param rwxu_flags Flags to check pages in range for
  * @return 0 on success; error on malformed pointer, unmapped page, or mismatching flags
  */
-extern int validate_vptr(const void* vp, size_t len, int rwxu_flags);
+extern int enforce_vptr(const void* vp, size_t len, int rwxu_flags);
 
 /**
  * @brief Checks that pointer is wellformed and the given string is valid. Since the length

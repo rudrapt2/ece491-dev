@@ -8,7 +8,7 @@
 
 #include "console.h" // console_init();
 #include "heap.h" // heap_init()
-#include "memory.h"
+#include "memory.h" // memory_init()
 
 // Run-time QEMU configuration
 //
@@ -80,14 +80,17 @@ static struct mregion qvirt_resv[] = {
 static const struct matlas qvirt_matlas = {
     .ram = qvirt_ram,
     .mmio = qvirt_mmio,
-    .resv = qvirt_resv
+    .resv = qvirt_resv,
+
+    .ram_size = 1,
+    .mmio_size = 1,
+    .resv_size = 3
 };
 
 void board_init(unsigned int hartid, void * dtb) {    
     console_init();
     plic_init((void*)PLIC_MMIO_BASE);
     timer_init(TIMER_FREQ);
-
 #if !(defined(MP2) || defined(MP3CP1))
     memory_init(&qvirt_matlas);
 #else

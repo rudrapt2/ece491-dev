@@ -284,6 +284,7 @@ void s_mode_faulter(char* ptr, int* fail, int* total){
 	kprintf("Test 12: S-Mode Faulter\n");
 	(*total)++;
 	for(int i = 0; i < PAGE_SIZE; i++){
+		enforce_vptr(ptr + i, 1, PTE_R | PTE_W | PTE_U);
 		ptr[i] = 0x67;
 	}
 	for(int i = 0; i < PAGE_SIZE; i++){
@@ -303,38 +304,39 @@ void test_validation(int* fail, int* total){
 	kprintf("TEST 13: Validation Test\n");
 	(*total)++;
 	//Wellformed
-	if(validate_vptr((void*)0xc0000000, PAGE_SIZE * 2, PTE_R | PTE_W) != 0){bad = 1;kprintf("GOOD pointer rejected.\n");}
-	if(validate_vptr((void*)0x8200000c0001000, 1, PTE_R | PTE_W) >= 0){
+	if(enforce_vptr((void*)0xc0000000, PAGE_SIZE * 2, PTE_R | PTE_W) != 0){bad = 1;kprintf("GOOD pointer rejected.\n");}
+	if(enforce_vptr((void*)0x8200000c0001000, 1, PTE_R | PTE_W) >= 0){
 		bad = 1;
-		kprintf("%p = %d\n", 0x8200000c0001000, validate_vptr((void*)0x8200000c0001000, 1, PTE_R | PTE_W));
+		kprintf("%p = %d\n", 0x8200000c0001000, enforce_vptr((void*)0x8200000c0001000, 1, PTE_R | PTE_W));
 	}
 	//X not allowed
-	if(validate_vptr((void*)0xc0001000, 1, PTE_R | PTE_W | PTE_X) >= 0){
+	if(enforce_vptr((void*)0xc0001000, 1, PTE_R | PTE_W | PTE_X) >= 0){
 		bad = 1;
-		kprintf("%p = %d\n", 0xc0001000, validate_vptr((void*)0xc0001000, 1, PTE_R | PTE_W | PTE_X));
+		kprintf("%p = %d\n", 0xc0001000, enforce_vptr((void*)0xc0001000, 1, PTE_R | PTE_W | PTE_X));
 	}
 	//Size too large
-	if(validate_vptr((void*)0xc0001004, ~((size_t)0), PTE_R | PTE_W) >= 0){
+	if(enforce_vptr((void*)0xc0001004, ~((size_t)0), PTE_R | PTE_W) >= 0){
 		bad = 1;
-		kprintf("%p = %d\n", 0x8200000c0001000, validate_vptr((void*)0xc0001004, ~((size_t)0), PTE_R | PTE_W));
+		kprintf("%p = %d\n", 0x8200000c0001000, enforce_vptr((void*)0xc0001004, ~((size_t)0), PTE_R | PTE_W));
 	}
 	/* What should the behavior be here?
 	//Overrun into unmapped page
-	if(validate_vptr((void*)0xc0001000, PAGE_SIZE * 3000, PTE_R | PTE_W) != -ENOENT){
+	if(enforce_vptr((void*)0xc0001000, PAGE_SIZE * 3000, PTE_R | PTE_W) != -ENOENT){
 		bad = 1;
-		kprintf("%p = %d\n", 0xc0001000, (validate_vptr((void*)0xc0001000, PAGE_SIZE * 3000, PTE_R | PTE_W)));
+		kprintf("%p = %d\n", 0xc0001000, (enforce_vptr((void*)0xc0001000, PAGE_SIZE * 3000, PTE_R | PTE_W)));
 	}
 	//Unmapped page overrun into mapped region
-	if(validate_vptr((void*)0xc0000000, PAGE_SIZE * 3000, PTE_R | PTE_W) != -ENOENT){
+	if(enforce_vptr((void*)0xc0000000, PAGE_SIZE * 3000, PTE_R | PTE_W) != -ENOENT){
 		bad = 1;
-		kprintf("%p = %d\n", 0xc0000000, (validate_vptr((void*)0xc0000000, PAGE_SIZE * 3000, PTE_R | PTE_W)));
+		kprintf("%p = %d\n", 0xc0000000, (enforce_vptr((void*)0xc0000000, PAGE_SIZE * 3000, PTE_R | PTE_W)));
 	}
-	if(validate_vptr((void*)0xc0000000, PAGE_SIZE * 2, PTE_R | PTE_X) != -EACCESS){
+	if(enforce_vptr((void*)0xc0000000, PAGE_SIZE * 2, PTE_R | PTE_X) != -EACCESS){
 		bad = 1;
-		kprintf("%p x2 = %d\n", 0xc0000000, (validate_vptr((void*)0xc0000000, PAGE_SIZE * 2, PTE_R | PTE_X)));
+		kprintf("%p x2 = %d\n", 0xc0000000, (enforce_vptr((void*)0xc0000000, PAGE_SIZE * 2, PTE_R | PTE_X)));
 	}
 	*/
 	char* vstr = (void*)0xc0001000;
+	enforce_vptr(vstr, 2*4096+1, PTE_R | PTE_W);
 	memset(vstr, 1, 2*4096); //Relies on s mode faulter
 	vstr[4096*2] = 0;
 	if(validate_vstr(vstr, PTE_R | PTE_U) < 0){
@@ -342,6 +344,7 @@ void test_validation(int* fail, int* total){
 		kprintf("FAIL: Valid VSTR failed.\n");
 	}
 	vstr = (void*)((uintptr_t)0xc0001000 + 2*4096);
+	enforce_vptr(vstr, 2*4096, PTE_R | PTE_W);
 	memset(vstr, 1, 4096*2);
 	if(validate_vstr(vstr, PTE_R | PTE_U) >= 0){
 		bad = 1;
@@ -385,9 +388,11 @@ mtag_t test_clone(int* fail, int* total){
 		bad=1;
 		kprintf("FAIL: Non-Global page not Copied\n");
 	}
+	enforce_vptr((void*)0xc0001000, 1, PTE_R | PTE_W | PTE_U);
 	*(char*)0xc0001000 = 0x42; // This should not be visible
 	*(char*)0xc0000000 = 0x42; // This should be visible
 	switch_mspace(old);
+	enforce_vptr((void*)0xc0001000, 1, PTE_R | PTE_W | PTE_U);
 	if(*(char*)0xc0001000 == 0x42){
 		bad = 1;
 		kprintf("FAIL: Non-Global page visible from first memory space\n");
@@ -443,6 +448,7 @@ void complete_memtest(uintptr_t end, int* fail, int* total){
 		int pages = 0;
 		int leak_check = free_phys_page_count();
 		for(; (free_phys_page_count() >= 3) & (end <= UMEM_END_VMA-PAGE_SIZE); pages++){
+			enforce_vptr((void*)end, PAGE_SIZE, PTE_R | PTE_W); //hack to map the page
 			memset((void*)(end), (pages & 0xFF), PAGE_SIZE);
 			end+=PAGE_SIZE;
 		}
