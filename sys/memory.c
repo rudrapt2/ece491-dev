@@ -110,6 +110,7 @@ struct pte {
 // INTERNAL FUNCTION DECLARATIONS
 //
 
+#ifndef STUDENT
 static void ptab_reset(struct pte * ptab);
 
 static struct pte * ptab_clone (struct pte * ptab);
@@ -128,6 +129,7 @@ static void * ptab_remove(struct pte * ptab, unsigned long vpn);
 static void ptab_adjust(struct pte * ptab, unsigned long vpn, int rwxug_flags);
 
 struct pte * ptab_fetch(struct pte * ptab, unsigned long vpn);
+#endif
 
 static inline mtag_t active_space_mtag(void);
 static inline mtag_t ptab_to_mtag(struct pte * root, unsigned int asid);
@@ -288,9 +290,14 @@ void memory_init(struct matlas * mappings) {
     debug("Heap allocator: [%p,%p): %zu KB free",
             heap_start, heap_end, (heap_end - heap_start) / 1024);
 
+    #ifdef STUDENT
+    //FIXME Initialize the free chunk list
+
+    #else
     free_chunk_list = heap_end; // heap_end is page aligned
     free_chunk_list->pagecnt = (RAM_END - MEGA_SIZE - heap_end) / PAGE_SIZE;
     free_chunk_list->next = NULL;
+    #endif
 
     debug("Page allocator: [%p,%p): %u pages free",
             heap_end, RAM_END, free_chunk_list->pagecnt);
@@ -586,21 +593,36 @@ mtag_t switch_mspace(mtag_t mtag) {
 }
 
 mtag_t clone_active_mspace(void) {
+    #ifdef STUDENT
+    //FIXME Your code here
+
+    #else
     return ptab_to_mtag(ptab_clone(active_space_ptab()), 0);
+    #endif
 }
 
 void reset_active_mspace(void) {
+    #ifdef STUDENT
+    //FIXME Your code here
+
+    #else
     ptab_reset(active_space_ptab());
     sfence_vma();
+    #endif
 }
 
 mtag_t discard_active_mspace(void) {
+    #ifdef STUDENT
+    //FIXME Your code here
+
+    #else
     struct pte * ptab;
 
     ptab = active_space_ptab();
     switch_mspace(main_mtag);
     ptab_discard(ptab);
     return main_mtag;
+    #endif
 }
 
 // The map_page() function maps a single page into the active address space at
@@ -610,17 +632,24 @@ mtag_t discard_active_mspace(void) {
 // map_range() can be implemented by calling map_page() for each page in the
 // range. The current implementation does the latter.
 
-// We currently map 4K pages only. At some point it may be disirable to support
+// We currently map 4K pages only. At some point it may be desirable to support
 // mapping megapages and gigapages.
 
 void * map_page(uintptr_t vma, void * pp, int rwxug_flags) {
-    // assert (vma % PAGE_SIZE == 0);
+    #ifdef STUDENT
+    //FIXME Your code here
 
+    #else
     ptab_insert(active_space_ptab(), VPN(vma), pp, rwxug_flags);
     return (void *)vma;
+    #endif
 }
 
 void * map_range(uintptr_t vma, size_t size, void * pp, int rwxug_flags) {
+    #ifdef STUDENT
+    //FIXME Your code here
+
+    #else
     uintptr_t const vma_start = vma;
 
     assert (vma % PAGE_SIZE == 0);
@@ -634,9 +663,14 @@ void * map_range(uintptr_t vma, size_t size, void * pp, int rwxug_flags) {
     }
 
     return (void *)vma_start;
+    #endif
 }
 
 void * alloc_and_map_range(uintptr_t vma, size_t size, int rwxug_flags) {
+    #ifdef STUDENT
+    //FIXME Your code here
+
+    #else
     struct pte * ptab;
     unsigned long vpn;
 
@@ -648,9 +682,14 @@ void * alloc_and_map_range(uintptr_t vma, size_t size, int rwxug_flags) {
         ptab_insert(ptab, vpn, alloc_phys_page(), rwxug_flags);
 
     return (void *)vma;
+    #endif
 }
 
 void set_range_flags(const void * vp, size_t size, int rwxug_flags) {
+    #ifdef STUDENT
+    //FIXME Your code here
+
+    #else
     uintptr_t const vma = (uintptr_t)vp;
     struct pte * root;
     unsigned long vpn;
@@ -661,9 +700,14 @@ void set_range_flags(const void * vp, size_t size, int rwxug_flags) {
 
     for (vpn = VPN(vma); vpn < VPN(vma+size); vpn++)
         ptab_adjust(root, vpn, rwxug_flags);
+    #endif
 }
 
 void unmap_and_free_range(void * vp, size_t size) {
+    #ifdef STUDENT
+    //FIXME Your code here
+
+    #else
     uintptr_t const vma = (uintptr_t)vp;
     struct pte * ptab;
     unsigned long vpn;
@@ -677,9 +721,14 @@ void unmap_and_free_range(void * vp, size_t size) {
         pp = ptab_remove(ptab, vpn);
         free_phys_page(pp); // ok if null
     }
+    #endif
 }
 
 int enforce_vptr(const void * vp, size_t len, int rwxu_flags) {
+    #ifdef STUDENT
+    //FIXME Your code here
+
+    #else
     uintptr_t const vma = (uintptr_t)vp;
     struct pte * ptab;
     unsigned long vpn;
@@ -715,9 +764,14 @@ int enforce_vptr(const void * vp, size_t len, int rwxu_flags) {
             return -EACCESS;
     }
     return 0;
+    #endif
 }
 
 int validate_vstr(const char * vs, int rug_flags) {
+    #ifdef STUDENT
+    //FIXME Your code here
+
+    #else
     struct pte * ptab;
     unsigned long vpn;
     struct pte * pte;
@@ -743,17 +797,32 @@ int validate_vstr(const char * vs, int rug_flags) {
             vs += 1;
         }
     }
+    #endif
 }
 
 void * alloc_phys_page(void) {
+    #ifdef STUDENT
+    //FIXME Your code here
+
+    #else
     return alloc_phys_pages(1);
+    #endif
 }
 
 void free_phys_page(void * pp) {
+    #ifdef STUDENT
+    //FIXME Your code here
+
+    #else
     free_phys_pages(pp, 1);
+    #endif
 }
 
 void * alloc_phys_pages(unsigned int cnt) {
+    #ifdef STUDENT
+    //FIXME Your code here
+
+    #else
     struct page_chunk * best = NULL;
     struct page_chunk * * chunkptr;
     struct page_chunk * chunk;
@@ -789,9 +858,14 @@ void * alloc_phys_pages(unsigned int cnt) {
 
     best->pagecnt -= cnt;
     return (void *)best + best->pagecnt * PAGE_SIZE;
+    #endif
 }
 
 void free_phys_pages(void * pp, unsigned int cnt) {
+    #ifdef STUDENT
+    //FIXME Your code here
+
+    #else
     struct page_chunk * const chunk = pp;
 
     if (pp == NULL)
@@ -803,9 +877,14 @@ void free_phys_pages(void * pp, unsigned int cnt) {
     chunk->next = free_chunk_list;
     chunk->pagecnt = cnt;
     free_chunk_list = chunk;
+    #endif
 }
 
 unsigned long free_phys_page_count(void) {
+    #ifdef STUDENT
+    //FIXME Your code here
+
+    #else
     const struct page_chunk * chunk;
     unsigned long cnt = 0;
 
@@ -813,6 +892,7 @@ unsigned long free_phys_page_count(void) {
         cnt += chunk->pagecnt;
 
     return cnt;
+    #endif
 }
 
 //This function isn't required and can be removed. We can rename to
@@ -824,6 +904,10 @@ int handle_smode_page_fault(struct trap_frame * tfr, uintptr_t vma) {
 }
 
 int handle_umode_page_fault(struct trap_frame * tfr, uintptr_t vma) {
+    #ifdef STUDENT
+    //FIXME Your code here
+
+    #else
     struct pte * pte;
     void * pp;
 
@@ -843,11 +927,13 @@ int handle_umode_page_fault(struct trap_frame * tfr, uintptr_t vma) {
     }
 
     return 0; // not handled
+    #endif
 }
 
 // INTERNAL FUNCTION DEFINITIONS
 //
 
+#ifndef STUDENT
 int _ptab_reset(unsigned int lvl, struct pte * pt, int keep_global) {
     int empty = 1; // subtable contains a mapping
     unsigned int i;
@@ -1017,6 +1103,7 @@ struct pte * _ptab_fetch(int lvl, struct pte * pt, unsigned long vpn) {
 struct pte * ptab_fetch(struct pte * ptab, unsigned long vpn) {
     return _ptab_fetch(2, ptab, vpn);
 }
+#endif
 
 mtag_t active_space_mtag(void) {
     return csrr_satp();
