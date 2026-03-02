@@ -736,7 +736,7 @@ void rwlock_acquire(struct rwlock * rwlk, int exclusive) {
             rwlk->owner = TP;
         }
     } else {
-        while (rwlk->owner != NULL)
+        while (rwlk->owner != NULL && rwlk->owner != TP)
             condition_wait(&rwlk->released);
     }
 
