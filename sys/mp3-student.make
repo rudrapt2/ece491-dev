@@ -1,4 +1,4 @@
-# mp2.make - MP2 makefile
+# mp3.make - MP3 makefile
 # 
 
 PREFIX=riscv64-unknown-elf-
@@ -11,32 +11,39 @@ OBJCOPY=$(PREFIX)objcopy
 OBJDUMP=$(PREFIX)objdump
 UNIFDEF=unifdef
 
+CP1=0
+
 OBJS = \
-	start.o \
-	sbi.o \
-	misc.o \
-	console.o \
 	board/qvirt.o \
-	dev/uart.o \
 	dev/rtc.o \
+	dev/uart.o \
 	dev/vioblk.o \
-	dev/virtio.o \
 	dev/viorng.o \
-	games/rule30-mp2.o \
-	games/trek-mp2.o \
-	string.o \
-	plic.o \
+	dev/virtio.o \
+	fs/ngfs.o \
+	cache.o \
+	console.o \
+	device.o \
+	elf.o \
 	error.o \
+	excp.o \
+	filesys.o \
+	heap.o \
+	intr.o \
+	io.o \
+	main.o \
+	memory.o \
+	misc.o \
+	plic.o \
+	process.o \
+	sbi.o \
+	start.o \
+	string.o \
+	syscall.o \
 	thrasm.o \
-	trap.o \
-	mp2-main.o \
-	mp2-thread.o \
-	mp2-timer.o \
-	mp2-device.o \
-	mp2-intr.o \
-	mp2-excp.o \
-	mp2-heap.o \
-	mp2-io.o 
+	thread.o \
+	timer.o \
+	trap.o
 
 CFLAGS = -Wall -Werror=implicit-function-declaration -Wno-unused-function
 CFLAGS += -fno-omit-frame-pointer -ggdb3 -gdwarf-2
@@ -46,12 +53,30 @@ CFLAGS += -fno-asynchronous-unwind-tables -mno-riscv-attribute
 CFLAGS += -I.
 
 # CFLAGS += -DDEBUG -DTRACE # Everything!
-# CFLAGS += -DHEAP_DEBUG -DHEAP_TRACE
-# CFLAGS += -DMAIN_DEBUG -DMAIN_TRACE
-# CFLAGS += -DTHREAD_DEBUG -DTHREAD_TRACE
-# CFLAGS += -DTIMER_DEBUG -DTIMER_TRACE
 
-ASFLAGS = -march=rv64imazicsr -defsym MP2=1
+# CFLAGS += -DMEMORY_DEBUG -DMEMORY_TRACE
+# CFLAGS += -DHEAP_DEBUG -DHEAP_TRACE
+
+# CFLAGS += -DTHREAD_DEBUG -DTHREAD_TRACE
+# CFLAGS += -DLOCK_DEBUG -DLOCK_TRACE
+# CFLAGS += -DPROCESS_DEBUG -DPROCESS_TRACE
+# CFLAGS += -DSYSCALL_DEBUG -DSYSCALL_TRACE
+# CFLAGS += -DELF_DEBUG -DELF_TRACE
+
+# CFLAGS += -DIO_DEBUG -DIO_TRACE
+# CFLAGS += -DVIRTIO_DEBUG -DVIRTIO_TRACE
+# CFLAGS += -DTIMER_DEBUG -DTIMER_TRACE
+# CFLAGS += -DVIOGPU_DEBUG -DVIOGPU_TRACE
+# CFLAGS += -DVIOBLK_DEBUG -DVIOBLK_TRACE
+
+# CFLAGS += -DCACHE_DEBUG -DCACHE_TRACE
+# CFLAGS += -DKTFS_DEBUG -DKTFS_TRACE
+# CFLAGS += -DNGFS_DEBUG -DNGFS_TRACE
+
+# CFLAGS += -DMAIN_DEBUG -DMAIN_TRACE
+
+
+ASFLAGS = -march=rv64imazicsr
 
 LDFLAGS = -melf64lriscv -T board/qvirt.ld
 
@@ -59,19 +84,24 @@ QEMUOPTS = -global virtio-mmio.force-legacy=false
 QEMUOPTS += -machine virt -nographic
 QEMUOPTS += -object rng-random,filename=/dev/urandom,id=rng0
 QEMUOPTS += -device virtio-rng-device,rng=rng0
-QEMUOPTS += -drive file=ngfs.raw,id=blk0,if=none,format=raw,readonly=false
-QEMUOPTS += -device virtio-blk-device,drive=blk0
 QEMUOPTS += -bios bios/osbi181q.bin
 QEMUOPTS += -serial mon:stdio
 QEMUOPTS += -serial pty
 QEMUOPTS += -serial pty
+QEMUOPTS += -device virtio-blk-device,drive=blk0
+QEMUOPTS += -drive file=fs/ngfs.raw,id=blk0,if=none,format=raw,readonly=false
+
+ifeq ($(CP1), 1)
+	CFLAGS += -DMP3CP1
+	ASFLAGS += -defsym MP3CP1=1
+endif
 
 all: kernel.elf
 
 clean:
 	rm -rf board/*.o dev/*.o fs/*.o *.o *.elf
 
-kernel.elf: $(OBJS)
+kernel.elf: $(OBJS) blob.o
 	$(LD) $(LDFLAGS) -o $@ $^
 
 run: kernel.elf
@@ -80,8 +110,13 @@ run: kernel.elf
 debug: kernel.elf
 	$(QEMU) $(QEMUOPTS) -m 16M -kernel $< -S -s
 
-mp2-%.o: %.c
-	$(CC) -c -o $@ $(CFLAGS) -DMP2 $<
+BLOB_OBJCOPY_FLAGS = \
+	--add-section .data.blob=blob.raw \
+	--set-section-flags .data.blob=alloc,contents,load,data
+
+blob.o:
+	echo .end | $(AS) $(ASFLAGS) -o blob.o
+	[ ! -f blob.raw ] || $(OBJCOPY) $(BLOB_OBJCOPY_FLAGS) $@
 
 %.o: %.c
 	$(CC) -c -o $@ $(CFLAGS) $<

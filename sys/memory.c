@@ -35,9 +35,6 @@
 // INTERNAL CONSTANT DEFINITIONS
 //
 
-#define MEGA_SIZE ((1UL << 9) * PAGE_SIZE)  // megapage size
-#define GIGA_SIZE ((1UL << 9) * MEGA_SIZE)  // gigapage size
-
 #define PTE_ORDER 3
 #define PTE_CNT (1U << (PAGE_ORDER - PTE_ORDER))
 

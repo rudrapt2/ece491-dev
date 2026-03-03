@@ -20,7 +20,6 @@
 
 #ifndef MP2
 #include "fs/ngfs.h"
-#include "fs/tarfs.h"
 #include "filesys.h"
 #include "process.h"
 #endif
@@ -34,10 +33,8 @@
 #endif
 
 #define CMNTNAME "c" // ngfs
-#define DMNTNAME "d" // tarfs
 #define DEVMNTNAME "dev"
-#define CDEVNAME "vioblk1"
-#define DDEVNAME "vioblk0"
+#define CDEVNAME "vioblk0"
 
 #ifndef NUART // number of UARTs
 #define NUART 3
@@ -75,7 +72,6 @@ void main(unsigned int hartid, void * dtb) {
 #ifndef MP2
     mount_devfs(DEVMNTNAME);
     mount_drive(CMNTNAME, CDEVNAME, mount_ngfs);
-    mount_drive(DMNTNAME, DDEVNAME, mount_tarfs);
     exec_init();
     flush_all_filesys();
 #else
@@ -120,7 +116,7 @@ void exec_init() {
         halt();
     }
 
-#ifdef MP3CP1
+#ifdef STUDENT
 #if 0
     char * argv[] = { NULL };
     // Make descriptor 0 be a null io object, which the shell will need
@@ -132,31 +128,12 @@ void exec_init() {
     void (*entry)(void);
     int tid;
     struct io * uartio;
-    // struct io * randio;
-    // struct io * rtcio;
-    // struct io * fileio;
 
     result = open_device(CONSOLEDEV, &uartio);
     if (result != 0) {
         kprintf(CONSOLEDEV ": %s; terminating\n", error_name(result));
         halt();
     }
-
-    // result = open_device("viorng0", &randio);
-    // if (result != 0) {
-    //     kprintf("viorng0: %s; using default seed\n", error_name(result));
-    //     randio = NULL;
-    // }
-    // result = open_device("rtc", &rtcio);
-    // if (result != 0) {
-    //     kprintf("rtc: %s; time-based seed will be unavailable\n", error_name(result));
-    //     rtcio = NULL;
-    // }
-    // result = open_file(CMNTNAME, "dtextc.dat", &fileio);
-    // if (result != 0) {
-    //     kprintf("dtextc.dat: %s; file operations will fail\n", error_name(result));
-    //     fileio = NULL;
-    // }
 
     // load the executable into memory
     result = elf_load(initexe, &entry);
@@ -177,12 +154,42 @@ void exec_init() {
     join_thread(tid);
 #endif
 #else
+#ifdef MP3CP1
+    void (*entry)(void);
+    int tid;
+    struct io * uartio;
+
+    result = open_device(CONSOLEDEV, &uartio);
+    if (result != 0) {
+        kprintf(CONSOLEDEV ": %s; terminating\n", error_name(result));
+        halt();
+    }
+
+    // load the executable into memory
+    result = elf_load(initexe, &entry);
+
+    if (result != 0) {
+        kprintf(INITEXE ": %s; terminating\n", error_name(result));
+        halt();
+    }
+
+    // launch the executable
+    tid = spawn_thread(INITEXE, entry, uartio);
+
+    if (tid < 0) {
+        kprintf("spawn thread: %s; terminating\n", error_name(result));
+        halt();
+    }
+
+    join_thread(tid);
+#else
     char * argv[] = { NULL };
     // Make descriptor 0 be a null io object, which the shell will need
 
     current_process()->iotab[0] = create_nullio();
 
     process_exec(initexe, 0, argv);
+#endif
 #endif
 }
 #endif

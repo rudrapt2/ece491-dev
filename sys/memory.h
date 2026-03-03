@@ -17,6 +17,8 @@
 
 #define PAGE_ORDER 12
 #define PAGE_SIZE (1UL << PAGE_ORDER)
+#define MEGA_SIZE ((1UL << 9) * PAGE_SIZE)  // megapage size
+#define GIGA_SIZE ((1UL << 9) * MEGA_SIZE)  // gigapage size
 
 // Flags for alloc_and_map_range() and set_range_flags()
 

@@ -114,7 +114,7 @@ QEMUOPTS += -device virtio-blk-device,drive=blk1
 QEMUOPTS += -drive file=fs/tarfs.tar,id=blk1,if=none,format=raw,readonly=false
 
 VIDEO_QEMUOPTS = $(QEMUOPTS)
-VIDEO_QEMUOPTS += -device virtio-gpu-device -display cocoa
+VIDEO_QEMUOPTS += -device virtio-gpu-device -display gtk
 VIDEO_QEMUOPTS += -device virtio-keyboard-device -device virtio-tablet-device
 
 ifeq ($(CP1), 1)
@@ -131,10 +131,10 @@ kernel.elf: $(OBJS) blob.o
 	$(LD) $(LDFLAGS) -o $@ $^
 
 run: kernel.elf
-	$(QEMU) $(QEMUOPTS) -m 8M -kernel $<
+	$(QEMU) $(QEMUOPTS) -m 16M -kernel $<
 
 debug: kernel.elf
-	$(QEMU) $(QEMUOPTS) -m 8M -kernel $< -S -s
+	$(QEMU) $(QEMUOPTS) -m 16M -kernel $< -S -s
 
 # NOTE: need to link against viogpu and viohi drivers; this won't work as it currently is
 run-video: kernel.elf
