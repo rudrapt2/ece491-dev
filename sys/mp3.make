@@ -41,13 +41,28 @@ OBJS = \
 	elf.o \
 	cache.o \
 	timer.o \
+	string.o \
+	string.o \
+	thread.o \
+	thrasm.o \
 	device.o \
 	sbi.o \
 	fs/ngfs.o \
 	fs/tarfs.o \
 	memory.o \
+	console.o \
+	dev/rtc.o \
+	filesys.o \
+	fs/ngfs.o \
 	process.o \
-	syscall.o 
+	syscall.o \
+	dev/uart.o \
+	dev/viohi.o \
+    dev/virtio.o \
+	dev/viorng.o \
+	dev/vioblk.o \
+    dev/viogpu.o \
+	board/qvirt.o \
 
 VIDEO_OBJS = \
 	$(OBJS) \
@@ -103,7 +118,8 @@ QEMUOPTS += -device virtio-blk-device,drive=blk1
 QEMUOPTS += -drive file=fs/tarfs.tar,id=blk1,if=none,format=raw,readonly=false
 
 VIDEO_QEMUOPTS = $(QEMUOPTS)
-VIDEO_QEMUOPTS += -device virtio-gpu-device -display gtk
+VIDEO_QEMUOPTS += -device virtio-gpu-device 
+VIDEO_QEMUOPTS += -display gtk #-display cocoa
 VIDEO_QEMUOPTS += -device virtio-keyboard-device -device virtio-tablet-device
 
 ifeq ($(CP1), 1)
@@ -130,7 +146,7 @@ video-kernel.elf: $(VIDEO_OBJS) blob.o
 	$(LD) $(LDFLAGS) -o $@ $^
 
 run-video: video-kernel.elf
-	$(QEMU) $(VIDEO_QEMUOPTS) -m 16M -kernel $< | tee qemu.log
+	$(QEMU) $(VIDEO_QEMUOPTS) -m 16M -kernel $<
 
 debug-video: video-kernel.elf
 	$(QEMU) $(VIDEO_QEMUOPTS) -m 16M -kernel $< -S -s

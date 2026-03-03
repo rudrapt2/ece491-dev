@@ -27,10 +27,10 @@
 
 #ifndef MP2
 #ifndef MP3CP1
-#define INITEXE "shell"
+    #define INITEXE "shell"
 #else
-#define INITEXE "trek-mp3-cp1"
-#define CONSOLEDEV "uart1"
+    #define INITEXE "trek-mp3-cp1"
+    #define CONSOLEDEV "uart1"
 #endif
 
 #define CMNTNAME "c" // ngfs
@@ -77,6 +77,7 @@ void main(unsigned int hartid, void * dtb) {
     mount_drive(CMNTNAME, CDEVNAME, mount_ngfs);
     mount_drive(DMNTNAME, DDEVNAME, mount_tarfs);
     exec_init();
+    flush_all_filesys();
 #else
     run_games();
 #endif
@@ -131,12 +132,31 @@ void exec_init() {
     void (*entry)(void);
     int tid;
     struct io * uartio;
-    result = open_device(CONSOLEDEV, &uartio);
+    // struct io * randio;
+    // struct io * rtcio;
+    // struct io * fileio;
 
+    result = open_device(CONSOLEDEV, &uartio);
     if (result != 0) {
         kprintf(CONSOLEDEV ": %s; terminating\n", error_name(result));
         halt();
     }
+
+    // result = open_device("viorng0", &randio);
+    // if (result != 0) {
+    //     kprintf("viorng0: %s; using default seed\n", error_name(result));
+    //     randio = NULL;
+    // }
+    // result = open_device("rtc", &rtcio);
+    // if (result != 0) {
+    //     kprintf("rtc: %s; time-based seed will be unavailable\n", error_name(result));
+    //     rtcio = NULL;
+    // }
+    // result = open_file(CMNTNAME, "dtextc.dat", &fileio);
+    // if (result != 0) {
+    //     kprintf("dtextc.dat: %s; file operations will fail\n", error_name(result));
+    //     fileio = NULL;
+    // }
 
     // load the executable into memory
     result = elf_load(initexe, &entry);

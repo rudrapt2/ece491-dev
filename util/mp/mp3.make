@@ -5,7 +5,7 @@
 # =========================
 
 SRC_DIR     := /home/rudrapt2/sp26_ece391/glycine-max
-TARGET_DIR  := /home/rudrapt2/sp26_ece391/mp3-sp26/gold/cp1
+TARGET_DIR  := /home/rudrapt2/sp26_ece391/mp3-sp26/release
 
 # List of files to copy.
 # Format: "source:destination" OR "path" (if source and dest are same)
@@ -70,7 +70,22 @@ FILES_FOR_COPYING   := \
     sys/trap.s \
     \
     usr/games/trek-mp3-cp1 \
-    usr/progs/hello.c \
+    usr/games/trek-mp3-cp2_3 \
+    usr/games/zork-mp3-cp2_3 \
+    usr/games/rogue-mp3-cp2_3 \
+    usr/games/nudoku-mp3-cp2_3 \
+    usr/games/tetris-mp3-cp3 \
+    usr/progs/cat.c \
+    usr/progs/date.c \
+    usr/progs/echo.c \
+    usr/progs/hello-cp1.c \
+    usr/progs/hello-cp2_3.c \
+    usr/progs/ls.c \
+    usr/progs/rm.c \
+    usr/progs/shell.c \
+    usr/progs/touch.c \
+    usr/progs/wc.c \
+    usr/progs/xargs.c \
     usr/error.c \
     usr/error.h \
     usr/heap.c \

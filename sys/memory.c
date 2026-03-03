@@ -290,14 +290,14 @@ void memory_init(struct matlas * mappings) {
     debug("Heap allocator: [%p,%p): %zu KB free",
             heap_start, heap_end, (heap_end - heap_start) / 1024);
 
-    #ifdef STUDENT
-    //FIXME Initialize the free chunk list
-
-    #else
+#ifdef STUDENT
+    // YOUR CODE HERE
+    // Initialize free chunk list
+#else
     free_chunk_list = heap_end; // heap_end is page aligned
     free_chunk_list->pagecnt = (RAM_END - MEGA_SIZE - heap_end) / PAGE_SIZE;
     free_chunk_list->next = NULL;
-    #endif
+#endif
 
     debug("Page allocator: [%p,%p): %u pages free",
             heap_end, RAM_END, free_chunk_list->pagecnt);
@@ -581,48 +581,60 @@ static void sort(uintptr_t arr, uintptr_t elem_sz, uint32_t n_elem, int(*cmp)(vo
 }
 #endif
 
-mtag_t active_mspace(void) { return active_space_mtag(); }
+mtag_t active_mspace(void) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return 0;
+#else
+    return active_space_mtag();
+#endif
+}
 
 mtag_t switch_mspace(mtag_t mtag) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return 0;
+#else
     mtag_t prev_mtag;
 
     prev_mtag = csrrw_satp(mtag);
     sfence_vma();
 
     return prev_mtag;
+#endif
 }
 
 mtag_t clone_active_mspace(void) {
-    #ifdef STUDENT
-    //FIXME Your code here
-
-    #else
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return 0;
+#else
     return ptab_to_mtag(ptab_clone(active_space_ptab()), 0);
-    #endif
+#endif
 }
 
 void reset_active_mspace(void) {
-    #ifdef STUDENT
-    //FIXME Your code here
-
-    #else
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return;
+#else
     ptab_reset(active_space_ptab());
     sfence_vma();
-    #endif
+#endif
 }
 
 mtag_t discard_active_mspace(void) {
-    #ifdef STUDENT
+#ifdef STUDENT
     //FIXME Your code here
-
-    #else
+    return 0;
+#else
     struct pte * ptab;
 
     ptab = active_space_ptab();
     switch_mspace(main_mtag);
     ptab_discard(ptab);
     return main_mtag;
-    #endif
+#endif
 }
 
 // The map_page() function maps a single page into the active address space at
@@ -636,20 +648,20 @@ mtag_t discard_active_mspace(void) {
 // mapping megapages and gigapages.
 
 void * map_page(uintptr_t vma, void * pp, int rwxug_flags) {
-    #ifdef STUDENT
-    //FIXME Your code here
-
-    #else
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return NULL;
+#else
     ptab_insert(active_space_ptab(), VPN(vma), pp, rwxug_flags);
     return (void *)vma;
-    #endif
+#endif
 }
 
 void * map_range(uintptr_t vma, size_t size, void * pp, int rwxug_flags) {
-    #ifdef STUDENT
-    //FIXME Your code here
-
-    #else
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return NULL;
+#else
     uintptr_t const vma_start = vma;
 
     assert (vma % PAGE_SIZE == 0);
@@ -663,14 +675,14 @@ void * map_range(uintptr_t vma, size_t size, void * pp, int rwxug_flags) {
     }
 
     return (void *)vma_start;
-    #endif
+#endif
 }
 
 void * alloc_and_map_range(uintptr_t vma, size_t size, int rwxug_flags) {
-    #ifdef STUDENT
-    //FIXME Your code here
-
-    #else
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return NULL;
+#else
     struct pte * ptab;
     unsigned long vpn;
 
@@ -682,14 +694,14 @@ void * alloc_and_map_range(uintptr_t vma, size_t size, int rwxug_flags) {
         ptab_insert(ptab, vpn, alloc_phys_page(), rwxug_flags);
 
     return (void *)vma;
-    #endif
+#endif
 }
 
 void set_range_flags(const void * vp, size_t size, int rwxug_flags) {
-    #ifdef STUDENT
-    //FIXME Your code here
-
-    #else
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return;
+#else
     uintptr_t const vma = (uintptr_t)vp;
     struct pte * root;
     unsigned long vpn;
@@ -700,14 +712,14 @@ void set_range_flags(const void * vp, size_t size, int rwxug_flags) {
 
     for (vpn = VPN(vma); vpn < VPN(vma+size); vpn++)
         ptab_adjust(root, vpn, rwxug_flags);
-    #endif
+#endif
 }
 
 void unmap_and_free_range(void * vp, size_t size) {
-    #ifdef STUDENT
-    //FIXME Your code here
-
-    #else
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return;
+#else
     uintptr_t const vma = (uintptr_t)vp;
     struct pte * ptab;
     unsigned long vpn;
@@ -721,34 +733,34 @@ void unmap_and_free_range(void * vp, size_t size) {
         pp = ptab_remove(ptab, vpn);
         free_phys_page(pp); // ok if null
     }
-    #endif
+#endif
 }
 
-int enforce_vptr(const void * vp, size_t len, int rwxu_flags) {
-    #ifdef STUDENT
-    //FIXME Your code here
-
-    #else
+int enforce_vptr(const void * vp, size_t size, int rwxug_flags) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return 0;
+#else
     uintptr_t const vma = (uintptr_t)vp;
     struct pte * ptab;
     unsigned long vpn;
     struct pte * pte;
     void * pp;
 
-    if (len == 0)
+    if (size == 0)
         return 0;
 
     // Check if pointer is well-formed and region does not wrap around zero
 
-    if (vp == NULL || !wellformed(vma) || vma + len < vma || vma < UMEM_START_VMA || vma + len > UMEM_END_VMA)
+    if (vp == NULL || !wellformed(vma) || vma + size < vma || vma < UMEM_START_VMA || vma + size > UMEM_END_VMA)
         return -EINVAL;
 
     ptab = active_space_ptab();
 
-    for (vpn = VPN(vma); vpn <= VPN(vma+len-1); vpn++) {
+    for (vpn = VPN(vma); vpn <= VPN(vma+size-1); vpn++) {
         pte = ptab_fetch(ptab, vpn);
 
-        if ((pte == NULL || !PTE_VALID((*pte))) && !(rwxu_flags & PTE_X)) { //If the page is invalid and we don't care about execute
+        if ((pte == NULL || !PTE_VALID((*pte))) && !(rwxug_flags & PTE_X)) { //If the page is invalid and we don't care about execute
 
             if (free_phys_page_count() < 3)
                 return 0;
@@ -760,18 +772,18 @@ int enforce_vptr(const void * vp, size_t len, int rwxu_flags) {
             pte = ptab_fetch(ptab, vpn);
         }
     
-        if ((pte->flags & rwxu_flags) != rwxu_flags)
+        if ((pte->flags & rwxug_flags) != rwxug_flags)
             return -EACCESS;
     }
     return 0;
-    #endif
+#endif
 }
 
-int validate_vstr(const char * vs, int rug_flags) {
-    #ifdef STUDENT
-    //FIXME Your code here
-
-    #else
+int validate_vstr(const char * vs, int rwxug_flags) {
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return 0;
+#else
     struct pte * ptab;
     unsigned long vpn;
     struct pte * pte;
@@ -788,7 +800,7 @@ int validate_vstr(const char * vs, int rug_flags) {
         pte = ptab_fetch(ptab, vpn);
         if (pte == NULL || !PTE_VALID(*pte))
             return -EACCESS;
-        if ((pte->flags & rug_flags) != rug_flags)
+        if ((pte->flags & rwxug_flags) != rwxug_flags)
             return -EACCESS;
 
         while (VPN((uintptr_t)vs) == vpn) {
@@ -797,32 +809,32 @@ int validate_vstr(const char * vs, int rug_flags) {
             vs += 1;
         }
     }
-    #endif
+#endif
 }
 
 void * alloc_phys_page(void) {
-    #ifdef STUDENT
-    //FIXME Your code here
-
-    #else
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return 0;
+#else
     return alloc_phys_pages(1);
-    #endif
+#endif
 }
 
 void free_phys_page(void * pp) {
-    #ifdef STUDENT
-    //FIXME Your code here
-
-    #else
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return;
+#else
     free_phys_pages(pp, 1);
-    #endif
+#endif
 }
 
 void * alloc_phys_pages(unsigned int cnt) {
-    #ifdef STUDENT
-    //FIXME Your code here
-
-    #else
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return NULL;
+#else
     struct page_chunk * best = NULL;
     struct page_chunk * * chunkptr;
     struct page_chunk * chunk;
@@ -858,14 +870,14 @@ void * alloc_phys_pages(unsigned int cnt) {
 
     best->pagecnt -= cnt;
     return (void *)best + best->pagecnt * PAGE_SIZE;
-    #endif
+#endif
 }
 
 void free_phys_pages(void * pp, unsigned int cnt) {
-    #ifdef STUDENT
-    //FIXME Your code here
-
-    #else
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return;
+#else
     struct page_chunk * const chunk = pp;
 
     if (pp == NULL)
@@ -877,14 +889,14 @@ void free_phys_pages(void * pp, unsigned int cnt) {
     chunk->next = free_chunk_list;
     chunk->pagecnt = cnt;
     free_chunk_list = chunk;
-    #endif
+#endif
 }
 
 unsigned long free_phys_page_count(void) {
-    #ifdef STUDENT
-    //FIXME Your code here
-
-    #else
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return 0;
+#else
     const struct page_chunk * chunk;
     unsigned long cnt = 0;
 
@@ -892,22 +904,14 @@ unsigned long free_phys_page_count(void) {
         cnt += chunk->pagecnt;
 
     return cnt;
-    #endif
-}
-
-//This function isn't required and can be removed. We can rename to
-//handle_page_fault in general maybe since we only want to handle
-//page faults in user range either way.
-int handle_smode_page_fault(struct trap_frame * tfr, uintptr_t vma) {
-    // ...
-    return 0;
+#endif
 }
 
 int handle_umode_page_fault(struct trap_frame * tfr, uintptr_t vma) {
-    #ifdef STUDENT
-    //FIXME Your code here
-
-    #else
+#ifdef STUDENT
+    // YOUR CODE HERE
+    return 0;
+#else
     struct pte * pte;
     void * pp;
 
@@ -927,7 +931,7 @@ int handle_umode_page_fault(struct trap_frame * tfr, uintptr_t vma) {
     }
 
     return 0; // not handled
-    #endif
+#endif
 }
 
 // INTERNAL FUNCTION DEFINITIONS

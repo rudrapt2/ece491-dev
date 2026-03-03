@@ -1,3 +1,7 @@
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
+
 #include "../syscall.h"
 #include "../shell.h"
 #include "../error.h"
@@ -47,3 +51,5 @@ void main(int argc, char** argv)
         _close(fd);
     }
 }
+
+#endif
