@@ -28,10 +28,8 @@
 #define RISCV_SCAUSE_LOAD_PAGE_FAULT        13
 #define RISCV_SCAUSE_STORE_PAGE_FAULT       15
 
-/**
- * @brief This function retrieves scause
- * @return scause CSR value
- */
+// This function retrieves scause
+// Returns scause CSR value
 static inline long csrr_scause(void) {
     long val;
     asm("csrr %0, scause" : "=r"(val));
@@ -39,10 +37,8 @@ static inline long csrr_scause(void) {
 }
 
 // stval
-/**
- * @brief This function retrieves stval
- * @return stval CSR value
- */
+// This function retrieves stval
+// Returns stval CSR value
 static inline unsigned long csrr_stval(void) {
     unsigned long val;
     asm("csrr %0, stval" : "=r"(val));
@@ -50,19 +46,15 @@ static inline unsigned long csrr_stval(void) {
 }
 
 // sepc
-/**
- * @brief This function writes into stval
- * @param val new sepc value
- * @return None
- */
+// This function writes into stval
+// The /val/ argument specifies new sepc value
+// Returns None
 static inline void csrw_sepc(const void* val) {
     asm("csrw sepc, %0" ::"r"(val));
 }
 
-/**
- * @brief This function retrieves sepc
- * @return sepc CSR value
- */
+// This function retrieves sepc
+// Returns sepc CSR value
 static inline const void* csrr_sepc(void) {
     const void* val;
     asm("csrr %0, sepc" : "=r"(val));
@@ -126,33 +118,27 @@ static inline void csrc_sie(unsigned long mask) {
 #define RV32_SIP_STIP (1 << 5)
 #define RV32_SIP_SEIP (1 << 9)
 
-/**
- * @brief This function overwrite sip with given mask
- * @param mask bit mask
- * @return None
- */
+// This function overwrite sip with given mask
+// The /mask/ argument specifies bit mask
+// Returns None
 static inline void csrw_sip(unsigned long mask) {
     // This function may cause an an interrupt trap immediately upon execution,
     // so we need to ensure there is a compiler memory barrier.
     asm("csrw sip, %0" ::"r"(mask));
 }
 
-/**
- * @brief This function sets bits in sip provided by mask
- * @param mask bit mask
- * @return None
- */
+// This function sets bits in sip provided by mask
+// The /mask/ argument specifies bit mask
+// Returns None
 static inline void csrs_sip(unsigned long mask) {
     // This function may cause an an interrupt trap immediately upon execution,
     // so we need to ensure there is a compiler memory barrier.
     asm("csrrs zero, sip, %0" ::"r"(mask) : "memory");
 }
 
-/**
- * @brief This function clears bits in sip provided by mask
- * @param mask bit mask
- * @return None
- */
+// This function clears bits in sip provided by mask
+// The /mask/ argument specifies bit mask
+// Returns None
 static inline void csrc_sip(unsigned long mask) {
     asm("csrrc zero, sip, %0" ::"r"(mask));
 }
@@ -164,10 +150,8 @@ static inline void csrc_sip(unsigned long mask) {
 #define RISCV_SSTATUS_SPP (1UL << 8)
 #define RISCV_SSTATUS_SUM (1UL << 18)
 
-/**
- * @brief This function retrieves sstatus
- * @return sstatus CSR value
- */
+// This function retrieves sstatus
+// Returns sstatus CSR value
 static inline unsigned long csrr_sstatus(void) {
     unsigned long val;
 
@@ -175,11 +159,9 @@ static inline unsigned long csrr_sstatus(void) {
     return val;
 }
 
-/**
- * @brief This function sets bits in sstatus provided by mask
- * @param mask bit mask
- * @return None
- */
+// This function sets bits in sstatus provided by mask
+// The /mask/ argument specifies bit mask
+// Returns None
 static inline void csrs_sstatus(unsigned long mask) {
     // This function may cause an an interrupt trap immediately upon execution,
     // so we need to ensure there is a compiler memory barrier.
@@ -235,10 +217,8 @@ static inline void sfence_vma(void) {
     asm inline("sfence.vma" ::: "memory");
 }
 
-/**
- * @brief This function gets the value in the mtime register
- * @return value in the mtime register
- */
+// This function gets the value in the mtime register
+// Returns value in the mtime register
 static inline unsigned long long rdtime(void) {
 #if __riscv_xlen == 64
     unsigned long long time;

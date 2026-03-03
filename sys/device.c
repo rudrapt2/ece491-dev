@@ -4,6 +4,14 @@
 // SPDX-License-identifier: NCSA
 //
 
+#ifdef DEVICE_TRACE
+#define TRACE
+#endif
+
+#ifdef DEVICE_DEBUG
+#define DEBUG
+#endif
+
 #include "device.h"
 
 #include <limits.h>  // INT_MAX
@@ -102,7 +110,7 @@ int register_device (
     namelen = strlen(name);
 
     if (999 < instno || 255 < namelen)
-        return -EINVAL;
+        return -ENAMETOOLONG;
 
     dev = kmalloc(sizeof(*dev) + namelen+3+1);
     memset(dev, 0, sizeof(*dev));
@@ -134,6 +142,15 @@ extern int open_device(const char * name, struct io ** ioptr) {
     dev = find_device(name);
 
     return (dev != NULL) ? dev->openfn(ioptr, dev->ofaux) : -ENOENT;
+}
+
+int device_exists(const char * name) {
+    return (find_device(name) != NULL);
+}
+
+int device_ioaddref_openfn(struct io ** ioptr, void * aux) {
+    *ioptr = ioaddref(aux);
+    return 0;
 }
 
 // INTERNAL FUNCTION DEFINITIONS
@@ -190,5 +207,6 @@ struct device_record * find_device(const char * name) {
             return dev;
     }
 
+    debug("Device %s not found", name);
     return NULL;
 }

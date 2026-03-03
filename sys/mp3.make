@@ -14,19 +14,31 @@ UNIFDEF=unifdef
 CP1=0
 
 OBJS = \
-	io.o \
-	elf.o \
-	sbi.o \
+	start.o \
 	main.o \
+	board/qvirt.o \
+	console.o \
+	dev/uart.o \
+	dev/rtc.o \
+	dev/virtio.o \
+	dev/viorng.o \
+	dev/vioblk.o \
+	dev/loop.o \
+	iomux.o \
+	string.o \
 	plic.o \
+	error.o \
+	thread.o \
+	thrasm.o \
 	trap.o \
-	trap.o \
+	io.o \
+	filesys.o \
 	excp.o \
 	intr.o \
 	heap.o \
 	misc.o \
-	start.o \
-	error.o \
+	rbuf.o \
+	elf.o \
 	cache.o \
 	timer.o \
 	string.o \
@@ -35,6 +47,9 @@ OBJS = \
 	thrasm.o \
 	device.o \
 	device.o \
+	sbi.o \
+	fs/ngfs.o \
+	fs/tarfs.o \
 	memory.o \
 	console.o \
 	dev/rtc.o \
@@ -95,6 +110,8 @@ QEMUOPTS += -serial pty
 QEMUOPTS += -serial pty
 QEMUOPTS += -device virtio-blk-device,drive=blk0
 QEMUOPTS += -drive file=fs/ngfs.raw,id=blk0,if=none,format=raw,readonly=false
+QEMUOPTS += -device virtio-blk-device,drive=blk1
+QEMUOPTS += -drive file=fs/tarfs.tar,id=blk1,if=none,format=raw,readonly=false
 
 VIDEO_QEMUOPTS = $(QEMUOPTS)
 VIDEO_QEMUOPTS += -device virtio-gpu-device -display cocoa
@@ -102,7 +119,7 @@ VIDEO_QEMUOPTS += -device virtio-keyboard-device -device virtio-tablet-device
 
 ifeq ($(CP1), 1)
 	CFLAGS += -DMP3CP1
-    ASFLAGS += -defsym MP3CP1=1
+	ASFLAGS += -defsym MP3CP1=1
 endif
 
 all: kernel.elf

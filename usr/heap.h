@@ -1,6 +1,6 @@
 /*! @file heap.h
     @brief User heap memory allocator
-    @copyright Copyright (c) 2024-2025 University of Illinois
+    @copyright Copyright (c) 2024-2026 University of Illinois
     @license SPDX-License-identifier: NCSA
 */
 

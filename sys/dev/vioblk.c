@@ -80,9 +80,7 @@ struct vioblk_request_header {
 #define VIRTIO_BLK_S_IOERR      1
 #define VIRTIO_BLK_S_UNSUPP     2
 
-/**
- * @brief VirtIO Block Device with virtqueues and condition variables
- */ 
+// VirtIO Block Device with virtqueues and condition variables 
 
 struct vioblk_device {
 #ifdef STUDENT
