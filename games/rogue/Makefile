@@ -1,82 +1,171 @@
-# Based on xv6-riscv Makefile; see LICENSE.
+# Makefile
+# 
 
-TOOLPREFIX=riscv64-unknown-elf-
+PREFIX=riscv64-unknown-elf-
 QEMU=qemu-system-riscv64
 
-CLANG=/usr/lib/llvm-19/bin/clang-19
-OPT=/usr/lib/llvm-19/bin/opt
-CC=$(TOOLPREFIX)gcc
-AS=$(TOOLPREFIX)as
-LD=$(TOOLPREFIX)ld
-OBJCOPY=$(TOOLPREFIX)objcopy
-OBJDUMP=$(TOOLPREFIX)objdump
+CC=$(PREFIX)gcc
+AS=$(PREFIX)as
+LD=$(PREFIX)ld
+OBJCOPY=$(PREFIX)objcopy
+OBJDUMP=$(PREFIX)objdump
 
-USER_OBJS = \
-	usr/heap.o \
-	usr/start.o \
-	usr/string.o \
-	usr/syscall.o
+BINDIR=bin
+KERNDIR=kernel
+USRDIR=usr
+SRCDIR=source
 
-ROGUE_OBJS = $(USER_OBJS) \
-	main.o \
-	source/hit.o \
-	source/use.o \
-	source/zap.o \
-	source/save.o \
-	source/init.o \
-	source/move.o \
-	source/pack.o \
-	source/play.o \
-	source/ring.o \
-	source/room.o \
-	source/trap.o \
-	source/level.o \
-	source/score.o \
-	source/throw.o \
-	source/curses.o \
-	source/object.o \
-	source/random.o \
-	source/message.o \
-	source/monster.o \
-	source/spec_hit.o \
-	source/inventory.o \
+KOBJDIR=$(KERNDIR)/build
+UOBJDIR=$(USRDIR)/build
+SOBJDIR=$(SRCDIR)/build
+
+MP0_PREFIX=mp0
+MP2_PREFIX=mp2
+MP3CP1_PREFIX=mp3_cp1
+MP3CP2_PREFIX=mp3_cp2
+
+ROGUE_OBJS = \
+	hit.o \
+	use.o \
+	zap.o \
+	save.o \
+	init.o \
+	move.o \
+	pack.o \
+	play.o \
+	ring.o \
+	room.o \
+	trap.o \
+	level.o \
+	score.o \
+	throw.o \
+	curses.o \
+	object.o \
+	random.o \
+	message.o \
+	monster.o \
+	spec_hit.o \
+	inventory.o \
+
+ROGUE_MP3_CP1_OBJS = \
+	$(addprefix $(SOBJDIR)/$(MP3CP1_PREFIX)_, $(ROGUE_OBJS)) \
+	$(UOBJDIR)/$(MP3CP1_PREFIX)_io.o \
+	$(UOBJDIR)/$(MP3CP1_PREFIX)_main.o \
+	$(UOBJDIR)/$(MP3CP1_PREFIX)_glue.o \
+	$(KOBJDIR)/$(MP3CP1_PREFIX)_string.o \
+	$(KOBJDIR)/$(MP3CP1_PREFIX)_setjmp.o \
+
+ROGUE_MP3_CP2_OBJS = \
+	$(addprefix $(SOBJDIR)/$(MP3CP2_PREFIX)_, $(ROGUE_OBJS)) \
+	$(UOBJDIR)/$(MP3CP2_PREFIX)_io.o \
+	$(UOBJDIR)/$(MP3CP2_PREFIX)_heap.o \
+	$(UOBJDIR)/$(MP3CP2_PREFIX)_main.o \
+	$(UOBJDIR)/$(MP3CP2_PREFIX)_glue.o \
+	$(UOBJDIR)/$(MP3CP2_PREFIX)_start.o \
+	$(UOBJDIR)/$(MP3CP2_PREFIX)_string.o \
+	$(UOBJDIR)/$(MP3CP2_PREFIX)_syscall.o \
 
 CFLAGS = -Wall -fno-omit-frame-pointer -Oz -s -ggdb -gdwarf-2
-CFLAGS += -fno-pie -no-pie -march=rv64imazicsr -mabi=lp64
-CFLAGS += -Wno-return-mismatch
+CFLAGS += -fno-pie -no-pie -march=rv64g -mabi=lp64d
+CFLAGS += -Wno-return-mismatch -Wno-int-conversion
 CFLAGS += -ffreestanding -fno-common -nostdlib -mno-relax
-CFLAGS += -fno-asynchronous-unwind-tables
-CFLAGS += -I. # -DDEBUG -DTRACE
-CFLAGS += $(EXTRA_CFLAGS)
-
-LLVM_CFLAGS = $(CFLAGS)
-LLVM_CFLAGS += -target riscv64
-
-CFLAGS += -mcmodel=medany # LLVM doesn't like this flag
-# Special flags for rogue
-
 CFLAGS += -Wno-implicit-int -Wno-implicit-function-declaration
 CFLAGS += -Wno-unused-variable -Wno-return-type
-CFLAGS += -DCURSES
+CFLAGS += -fno-asynchronous-unwind-tables
+CFLAGS += -mcmodel=medany
+CFLAGS += -I. # -DDEBUG -DTRACE
+CFLAGS += -DCURSES 
+CFLAGS += $(EXTRA_CFLAGS)
 
-# for syscall.S
-CPPFLAGS = -march=rv64imazicsr -mabi=lp64
+ASFLAGS += -march=rv64g -mabi=lp64d
 
-ASFLAGS = -march=rv64imazicsr
+#################################################
 
-all: rogue.elf
-
-egg.o:
-	$(CLANG) $(LLVM_CFLAGS) -emit-llvm -c egg.c -o egg_int.bc
-	$(OPT) -load-pass-plugin=./libStringConvert.so -passes="string-convert" -S egg_int.bc -o egg_one.ll
-	$(OPT) -load-pass-plugin=./libStringObfuscation.so -passes="string-obfuscation" -S egg_one.ll -o egg_obf.ll
-	$(CLANG) $(LLVM_CFLAGS) -c egg_obf.ll -o egg.o
-
-rogue.elf: $(ULIB_OBJS) $(ROGUE_OBJS) glue.o 
-	$(LD) -T usr/umode.ld -o $@ $^
-
-rogue-ec.elf: $(ULIB_OBJS) $(ROGUE_OBJS) egg.o # egg is where get_password is stored
-	$(LD) -T usr/umode.ld -o $@ $^
+all: rogue-mp3-cp2
 
 clean:
-	rm -rf *.o *.elf usr/*.o rogue/*.o
+	rm -rf *.o *.elf *.asm
+	rm -rf $(KOBJDIR)
+	rm -rf $(UOBJDIR)
+	rm -rf $(SOBJDIR)
+	rm -rf $(BINDIR)
+
+$(KOBJDIR):
+	mkdir -p $(KOBJDIR)
+
+$(UOBJDIR):
+	mkdir -p $(UOBJDIR)
+
+$(SOBJDIR):
+	mkdir -p $(SOBJDIR)
+
+$(BINDIR):
+	mkdir -p $(BINDIR)
+
+#################################################
+## CP1
+
+rogue-mp3-cp1: $(UOBJDIR)/rogue_mp3_cp1.elf | $(BINDIR)
+	mv $(UOBJDIR)/rogue_mp3_cp1.elf $(BINDIR)/rogue-mp3-cp1
+
+# Main binaries
+$(UOBJDIR)/rogue_mp3_cp1.elf: $(ROGUE_MP3_CP1_OBJS)
+	$(LD) -T $(USRDIR)/no_umode.ld -o $@ $^
+
+# Rogue + glue binaries
+$(UOBJDIR)/$(MP3CP1_PREFIX)_main.o: main.c | $(UOBJDIR)
+	$(CC) $(CFLAGS) -DAEE31 -o $@ -c $<
+
+$(UOBJDIR)/$(MP3CP1_PREFIX)_glue.o: glue.c | $(UOBJDIR)
+	$(CC) $(CFLAGS) -DAEE31 -o $@ -c $<
+
+$(SOBJDIR)/$(MP3CP1_PREFIX)_%.o: $(SRCDIR)/%.c | $(SOBJDIR)
+	$(CC) $(CFLAGS) -DAEE31 -o $@ -c $<
+
+# User mode binaries
+$(UOBJDIR)/$(MP3CP1_PREFIX)_%.o: $(USRDIR)/%.c | $(UOBJDIR)
+	$(CC) $(CFLAGS) -DAEE31 -o $@ -c $<
+
+$(KOBJDIR)/$(MP3CP1_PREFIX)_%.o: $(KERNDIR)/%.c | $(KOBJDIR)
+	$(CC) $(CFLAGS) -DAEE31 -o $@ -c $<
+
+$(KOBJDIR)/$(MP3CP1_PREFIX)_%.o: $(KERNDIR)/%.s | $(KOBJDIR)
+	$(AS) $(ASFLAGS) -o $@ $<
+	
+$(UOBJDIR)/$(MP3CP1_PREFIX)_%.s: $(USRDIR)/%.S | $(UOBJDIR)
+	$(CPP) $(CPPFLAGS) -o $@ -c $<
+
+$(UOBJDIR)/$(MP3CP1_PREFIX)_%.o: $(USRDIR)/%.s | $(UOBJDIR)
+	$(AS) $(ASFLAGS) -o $@ -c $<
+
+#################################################
+## CP2 + CP3
+
+rogue-mp3-cp2: $(UOBJDIR)/rogue_mp3_cp2.elf | $(BINDIR)
+	mv $(UOBJDIR)/rogue_mp3_cp2.elf $(BINDIR)/rogue-mp3-cp2
+
+# Main binary
+$(UOBJDIR)/rogue_mp3_cp2.elf: $(ROGUE_MP3_CP2_OBJS)
+	$(LD) -T $(USRDIR)/umode.ld -o $@ $^
+
+# Rogue + glue binaries
+$(UOBJDIR)/$(MP3CP2_PREFIX)_main.o: main.c | $(UOBJDIR)
+	$(CC) $(CFLAGS) -DAEE32 -o $@ -c $<
+
+$(UOBJDIR)/$(MP3CP2_PREFIX)_glue.o: glue.c | $(UOBJDIR)
+	$(CC) $(CFLAGS) -DAEE32 -o $@ -c $<
+
+$(SOBJDIR)/$(MP3CP2_PREFIX)_%.o: $(SRCDIR)/%.c | $(SOBJDIR)
+	$(CC) $(CFLAGS) -DAEE32 -o $@ -c $<
+	
+# User mode binaries
+$(UOBJDIR)/$(MP3CP2_PREFIX)_%.o: $(USRDIR)/%.c | $(UOBJDIR)
+	$(CC) $(CFLAGS) -DAEE32 -o $@ -c $<
+
+$(UOBJDIR)/$(MP3CP2_PREFIX)_%.o: $(USRDIR)/%.S | $(UOBJDIR)
+	$(CC) $(CFLAGS) -DAEE32 -c $< -o $@
+
+$(UOBJDIR)/$(MP3CP2_PREFIX)_%.o: $(USRDIR)/%.s | $(UOBJDIR)
+	$(AS) $(ASFLAGS) -o $@ -c $<
+
+#################################################

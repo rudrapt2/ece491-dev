@@ -19,7 +19,7 @@
 
 #include <stdlib.h>
 #include <math.h>
-#include "../usr/uio.h"
+#include "../usr/io.h"
 #include "../usr/syscall.h"
 #include "../usr/string.h"
 
@@ -1653,7 +1653,7 @@ void G_DoSaveGame (void)
     // except if the vanilla_savegame_limit setting is turned off.
 
     unsigned long long pos;
-    _fcntl(save_stream_fd, FCNTL_GETPOS, &pos);
+    _ioctl(save_stream_fd, IOC_GETPOS, &pos);
 
     if (vanilla_savegame_limit && pos > SAVEGAMESIZE)
     {

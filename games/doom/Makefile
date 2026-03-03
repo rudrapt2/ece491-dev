@@ -10,7 +10,7 @@ OBJCOPY=$(TOOLPREFIX)objcopy
 OBJDUMP=$(TOOLPREFIX)objdump
 
 ULIB_OBJS = \
-	uio.o \
+	io.o \
 	heap.o \
 	string.o \
 	syscall.o \

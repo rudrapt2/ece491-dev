@@ -15,7 +15,7 @@ OBJCOPY=$(TOOLPREFIX)objcopy
 OBJDUMP=$(TOOLPREFIX)objdump
 
 ULIB_OBJS = \
-	../usr/build/uio.o \
+	../usr/build/io.o \
 	../usr/build/heap.o \
 	../usr/build/start.o \
 	../usr/build/string.o \

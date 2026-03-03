@@ -12,7 +12,6 @@ util/fs/unmkfs_ngfs
 .clang-format
 .clangd
 *.log
-usr/bin
 
 */.gdbhist
 */.gdb_history
@@ -29,7 +28,12 @@ usr/bin
 */.clang-format
 */.clangd
 */*.log
-*/usr/bin
+
+usr/bin
+usr/games
+
+games/**/bin
+games/**/build
 
 !sys/games
 !sys/games/*.o

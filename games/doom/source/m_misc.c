@@ -18,7 +18,7 @@
 //
 
 #include "../usr/syscall.h"
-#include "../usr/uio.h"
+#include "../usr/io.h"
 
 #include "doomtype.h"
 
@@ -76,7 +76,7 @@ long M_FileLength(int fd)
     // go back to the old location
     // fseek(fd, savedpos, SEEK_SET);
 
-    _fcntl(fd, FCNTL_GETEND, &length);
+    _ioctl(fd, IOC_GETPOS, &length);
 
     return (long)length;
 }
