@@ -20,7 +20,7 @@
 #ifndef __DOOMDEF__
 #define __DOOMDEF__
 
-#include "../usr/string.h"
+
 #include <string.h>
 
 #include "doomtype.h"

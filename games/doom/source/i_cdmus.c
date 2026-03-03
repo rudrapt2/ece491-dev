@@ -16,7 +16,7 @@
 // SDL implementation of the Hexen CD interface.
 //
 
-#include "../usr/string.h"
+
 
 #ifdef ORIGCODE
 #include "SDL2/SDL.h"
@@ -99,7 +99,7 @@ void I_CDMusPrintStartup(void)
 
     if (startup_error != NULL)
     {
-        dprintf(2, "I_CDMusInit: %s\n", startup_error);
+        fprintf(stderr, "I_CDMusInit: %s\n", startup_error);
     }
 #endif
 }

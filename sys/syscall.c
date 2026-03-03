@@ -512,7 +512,7 @@ int syspipe(int * wfdptr, int * rfdptr) {
     int wfd, rfd;
     int result;
 
-    trace("%s(wfd=%d,rfd=%d)", __func__, wfd, rfd);
+    trace("%s(wfd=%d,rfd=%d)", __func__, *wfdptr, *rfdptr);
 
     // Ensure memory region is user-writable
 

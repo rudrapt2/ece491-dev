@@ -17,10 +17,10 @@
 //
 
 
-#include "../usr/string.h"
+
 #include <stdlib.h>
 #include <string.h>
-// #include <ctype.h>
+
 
 #include "config.h"
 #include "doomtype.h"
@@ -113,7 +113,7 @@ static void I_Allegro_PlaySong(void *handle, boolean looping)
 
 	retval = play_midi(current_track_music, looping);
 	if (retval < 0) {
-		dprintf(2, "Error playing midi: %d \"%s\"\n", retval, allegro_error);
+		fprintf(stderr, "Error playing midi: %d \"%s\"\n", retval, allegro_error);
 	}
 }
 
@@ -239,7 +239,7 @@ static void *I_Allegro_RegisterSong(void *data, int len)
 	if (music == NULL)
 	{
 		// Failed to load
-		dprintf(2, "Error loading midi: %s\n", allegro_error);
+		fprintf(stderr, "Error loading midi: %s\n", allegro_error);
 	}
 
 	// Remove the temporary MIDI file;

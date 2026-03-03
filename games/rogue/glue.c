@@ -2,8 +2,9 @@
 // 
 
 #include "glue.h"
+#include "usr/string.h"
+#include "usr/syscall.h"
 #include <stdarg.h>
-#include <stddef.h>
 #include <limits.h>
 
 const char * const termcap = ""

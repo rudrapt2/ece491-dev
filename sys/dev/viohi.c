@@ -207,7 +207,7 @@ long viohi_read(struct io * io, void * buf, long bufsz) {
     int pie;
     int k;
 
-    trace("%s(buf=%p, bufsz=%ld)", __func__, buf, buflen);
+    trace("%s(buf=%p, bufsz=%ld)", __func__, buf, bufsz);
 
     if (bufsz == 0)
         return 0;

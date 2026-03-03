@@ -336,6 +336,9 @@ static int viogpu_ioctl_u(struct io * io, int op, uintptr_t arg_uma) {
 
     int result = enforce_vptr(
         (void *)arg_uma, sizeof(unsigned long long), PTE_R | PTE_W | PTE_U);
+
+    if (result < 0) return result;
+    
     switch (op) {
     case IOC_MAPBUF:
         *(void **)arg_uma = (void*)viogpu->fbuf_vma;

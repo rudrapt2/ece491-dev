@@ -217,14 +217,14 @@ void process_exit(void) {
         shutdown();
     }
 
-    discard_active_mspace();
-
     iodropref(self->exeio);
     
     for (i = 0; i < PROCESS_IOMAX; i++) {
         if (self->iotab[i] != NULL)
             iodropref(self->iotab[i]);
     }
+    
+    discard_active_mspace();
     
     // Detach process from running thread and free the process structure.
 

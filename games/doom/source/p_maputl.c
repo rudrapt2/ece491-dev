@@ -22,6 +22,7 @@
 
 
 
+#include <stdlib.h>
 
 
 #include "m_bbox.h"
@@ -34,9 +35,6 @@
 // State.
 #include "r_state.h"
 
-static int abs(int x) {
-    return x < 0 ? -x : x;
-}
 //
 // P_AproxDistance
 // Gives an estimation of distance (not exact)

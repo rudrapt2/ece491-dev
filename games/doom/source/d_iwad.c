@@ -16,9 +16,10 @@
 //     to the IWAD type.
 //
 
-#include "../usr/string.h"
+
 #include <stdlib.h>
-// #include <ctype.h>
+
+#include <string.h>
 
 #include "config.h"
 #include "deh_str.h"
@@ -59,6 +60,15 @@ static const iwad_t iwads[] =
 static boolean iwad_dirs_built = false;
 static char *iwad_dirs[MAX_IWAD_DIRS];
 static int num_iwad_dirs = 0;
+
+static void AddIWADDir(char *dir)
+{
+    if (num_iwad_dirs < MAX_IWAD_DIRS)
+    {
+        iwad_dirs[num_iwad_dirs] = dir;
+        ++num_iwad_dirs;
+    }
+}
 
 // This is Windows-specific code that automatically finds the location
 // of installed IWAD files.  The registry is inspected to find special
@@ -395,10 +405,29 @@ static boolean DirIsFile(char *path, char *filename)
 // file, returning the full path to the IWAD if found, or NULL
 // if not found.
 
-static char *CheckDirectoryHasIWAD(char *iwadname)
+static char *CheckDirectoryHasIWAD(char *dir, char *iwadname)
 {
     char *filename; 
-    filename = strdup(iwadname);
+
+    // As a special case, the "directory" may refer directly to an
+    // IWAD file if the path comes from DOOMWADDIR or DOOMWADPATH.
+
+    if (DirIsFile(dir, iwadname) && M_FileExists(dir))
+    {
+        return strdup(dir);
+    }
+
+    // Construct the full path to the IWAD if it is located in
+    // this directory, and check if it exists.
+
+    if (!strcmp(dir, "."))
+    {
+        filename = strdup(iwadname);
+    }
+    else
+    {
+        filename = M_StringJoin(dir, DIR_SEPARATOR_S, iwadname, NULL);
+    }
 
     printf("Trying IWAD file:%s\n", filename);
 
@@ -415,7 +444,7 @@ static char *CheckDirectoryHasIWAD(char *iwadname)
 // Search a directory to try to find an IWAD
 // Returns the location of the IWAD if found, otherwise NULL.
 
-static char *SearchDirectoryForIWAD(int mask, GameMission_t *mission)
+static char *SearchDirectoryForIWAD(char *dir, int mask, GameMission_t *mission)
 {
     char *filename;
     size_t i;
@@ -427,7 +456,7 @@ static char *SearchDirectoryForIWAD(int mask, GameMission_t *mission)
             continue;
         }
 
-        filename = CheckDirectoryHasIWAD(iwads[i].name);
+        filename = CheckDirectoryHasIWAD(dir, DEH_String(iwads[i].name));
 
         if (filename != NULL)
         {
@@ -447,7 +476,15 @@ static GameMission_t IdentifyIWADByName(char *name, int mask)
 {
     size_t i;
     GameMission_t mission;
- 
+    char *p;
+
+    p = strrchr(name, DIR_SEPARATOR);
+
+    if (p != NULL)
+    {
+        name = p + 1;
+    }
+
     mission = none;
 
     for (i=0; i<arrlen(iwads); ++i)
@@ -471,6 +508,119 @@ static GameMission_t IdentifyIWADByName(char *name, int mask)
     return mission;
 }
 
+#if ORIGCODE
+//
+// Add directories from the list in the DOOMWADPATH environment variable.
+//
+
+static void AddDoomWadPath(void)
+{
+    char *doomwadpath;
+    char *p;
+
+    // Check the DOOMWADPATH environment variable.
+
+    doomwadpath = getenv("DOOMWADPATH");
+
+    if (doomwadpath == NULL)
+    {
+        return;
+    }
+
+    doomwadpath = strdup(doomwadpath);
+
+    // Add the initial directory
+
+    AddIWADDir(doomwadpath);
+
+    // Split into individual dirs within the list.
+
+    p = doomwadpath;
+
+    for (;;)
+    {
+        p = strchr(p, PATH_SEPARATOR);
+
+        if (p != NULL)
+        {
+            // Break at the separator and store the right hand side
+            // as another iwad dir
+  
+            *p = '\0';
+            p += 1;
+
+            AddIWADDir(p);
+        }
+        else
+        {
+            break;
+        }
+    }
+}
+
+#endif
+
+//
+// Build a list of IWAD files
+//
+
+static void BuildIWADDirList(void)
+{
+#if ORIGCODE
+    char *doomwaddir;
+
+    if (iwad_dirs_built)
+    {
+        return;
+    }
+
+    // Look in the current directory.  Doom always does this.
+
+    AddIWADDir(".");
+
+    // Add DOOMWADDIR if it is in the environment
+
+    doomwaddir = getenv("DOOMWADDIR");
+
+    if (doomwaddir != NULL)
+    {
+        AddIWADDir(doomwaddir);
+    }        
+
+    // Add dirs from DOOMWADPATH
+
+    AddDoomWadPath();
+
+#ifdef _WIN32
+
+    // Search the registry and find where IWADs have been installed.
+
+    CheckUninstallStrings();
+    CheckCollectorsEdition();
+    CheckSteamEdition();
+    CheckDOSDefaults();
+
+    // Check for GUS patches installed with the BFG edition!
+
+    CheckSteamGUSPatches();
+
+#else
+
+    // Standard places where IWAD files are installed under Unix.
+
+    AddIWADDir("/usr/share/games/doom");
+    AddIWADDir("/usr/local/share/games/doom");
+
+#endif
+#else
+    AddIWADDir (FILES_DIR);
+
+    // Don't run this function again.
+
+    iwad_dirs_built = true;
+#endif
+}
+
 //
 // Searches WAD search paths for an WAD with a specific filename.
 // 
@@ -485,6 +635,33 @@ char *D_FindWADByName(char *name)
     if (M_FileExists(name))
     {
         return name;
+    }
+
+    BuildIWADDirList();
+
+    // Search through all IWAD paths for a file with the given name.
+
+    for (i=0; i<num_iwad_dirs; ++i)
+    {
+        // As a special case, if this is in DOOMWADDIR or DOOMWADPATH,
+        // the "directory" may actually refer directly to an IWAD
+        // file.
+
+        if (DirIsFile(iwad_dirs[i], name) && M_FileExists(iwad_dirs[i]))
+        {
+            return strdup(iwad_dirs[i]);
+        }
+
+        // Construct a string for the full path
+
+        path = M_StringJoin(iwad_dirs[i], DIR_SEPARATOR_S, name, NULL);
+
+        if (M_FileExists(path))
+        {
+            return path;
+        }
+
+        free(path);
     }
 
     // File not found
@@ -559,7 +736,15 @@ char *D_FindIWAD(int mask, GameMission_t *mission)
         // Search through the list and look for an IWAD
 
         printf("-iwad not specified, trying a few iwad names\n");
-        result = SearchDirectoryForIWAD(mask, mission);
+
+        result = NULL;
+
+        BuildIWADDirList();
+    
+        for (i=0; result == NULL && i<num_iwad_dirs; ++i)
+        {
+            result = SearchDirectoryForIWAD(iwad_dirs[i], mask, mission);
+        }
     }
 
     return result;

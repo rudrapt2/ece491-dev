@@ -16,7 +16,7 @@
 //
 
 
-// #include <ctype.h>
+
 
 #include "doomdef.h"
 #include "doomkeys.h"
@@ -294,7 +294,7 @@ void HU_Init(void)
     j = HU_FONTSTART;
     for (i=0;i<HU_FONTSIZE;i++)
     {
-	DEH_snprintf(buffer, 9, "STCFN%03d", j++);
+	DEH_snprintf(buffer, 9, "STCFN%.3d", j++);
 	hu_font[i] = (patch_t *) W_CacheLumpName(buffer, PU_STATIC);
     }
 
@@ -592,7 +592,7 @@ boolean HU_Responder(event_t *ev)
 	    c = ev->data1 - '0';
 	    if (c > 9)
 		return false;
-	    // dprintf(2, "got here\n");
+	    // fprintf(stderr, "got here\n");
 	    macromessage = chat_macros[c];
 	    
 	    // kill last message with a '\n'

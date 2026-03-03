@@ -26,6 +26,19 @@ mp3-cp2:
 	cp zork/dtextc.dat $(USR_GAMES_FOLDER)/dtextc.dat
 	cp zork/zork-mp3cp2.elf $(USR_GAMES_FOLDER)/zork
 
+	make -C rogue
+	mv rogue/rogue.elf $(USR_GAMES_FOLDER)/rogue
+
+mp3-cp3: mp3-cp2
+	make -C flying-toasters/toasters_gold
+	mv flying-toasters/toasters_gold/toasters $(USR_GAMES_FOLDER)/toasters
+
+	make -C snake
+	cp snake/bin/snake $(USR_GAMES_FOLDER)/snake
+
+	make -C doom
+	mv doom/bin/* $(USR_GAMES_FOLDER)/
+
 clean:
 	rm -rf $(KERN_GAMES_FOLDER)
 	rm -rf $(USR_GAMES_FOLDER)

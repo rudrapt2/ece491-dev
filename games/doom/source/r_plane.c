@@ -19,8 +19,8 @@
 //
 
 
-#include "../usr/string.h"
 
+#include <stdlib.h>
 
 #include "i_system.h"
 #include "z_zone.h"
@@ -33,9 +33,6 @@
 #include "r_sky.h"
 
 
-static int abs(int x) {
-    return x < 0 ? -x : x;
-}
 
 planefunction_t		floorfunc;
 planefunction_t		ceilingfunc;
@@ -130,7 +127,7 @@ R_MapPlane
      || x2 >= viewwidth
      || y > viewheight)
     {
-	I_Error ("R_MapPlane: %d, %d at %d",x1,x2,y);
+	I_Error ("R_MapPlane: %i, %i at %i",x1,x2,y);
     }
 #endif
 
@@ -371,15 +368,15 @@ void R_DrawPlanes (void)
 				
 #ifdef RANGECHECK
     if (ds_p - drawsegs > MAXDRAWSEGS)
-	I_Error ("R_DrawPlanes: drawsegs overflow (%d)",
+	I_Error ("R_DrawPlanes: drawsegs overflow (%i)",
 		 ds_p - drawsegs);
     
     if (lastvisplane - visplanes > MAXVISPLANES)
-	I_Error ("R_DrawPlanes: visplane overflow (%d)",
+	I_Error ("R_DrawPlanes: visplane overflow (%i)",
 		 lastvisplane - visplanes);
     
     if (lastopening - openings > MAXOPENINGS)
-	I_Error ("R_DrawPlanes: opening overflow (%d)",
+	I_Error ("R_DrawPlanes: opening overflow (%i)",
 		 lastopening - openings);
 #endif
 

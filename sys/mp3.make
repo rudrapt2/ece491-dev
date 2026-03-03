@@ -49,6 +49,11 @@ OBJS = \
 	process.o \
 	syscall.o 
 
+VIDEO_OBJS = \
+	$(OBJS) \
+	dev/viogpu.o \
+	dev/viohi.o
+
 CFLAGS = -Wall -Werror=implicit-function-declaration -Wno-unused-function
 CFLAGS += -fno-omit-frame-pointer -ggdb3 -gdwarf-2
 CFLAGS += -mcmodel=medany -fno-pie -no-pie -march=rv64imazicsr -mabi=lp64
@@ -121,8 +126,14 @@ debug: kernel.elf
 	$(QEMU) $(QEMUOPTS) -m 8M -kernel $< -S -s
 
 # NOTE: need to link against viogpu and viohi drivers; this won't work as it currently is
-run-video: kernel.elf
-	$(QEMU) $(VIDEO_QEMUOPTS) -m 16M -kernel $<
+video-kernel.elf: $(VIDEO_OBJS) blob.o
+	$(LD) $(LDFLAGS) -o $@ $^
+
+run-video: video-kernel.elf
+	$(QEMU) $(VIDEO_QEMUOPTS) -m 16M -kernel $< | tee qemu.log
+
+debug-video: video-kernel.elf
+	$(QEMU) $(VIDEO_QEMUOPTS) -m 16M -kernel $< -S -s
 
 BLOB_OBJCOPY_FLAGS = \
 	--add-section .data.blob=blob.raw \

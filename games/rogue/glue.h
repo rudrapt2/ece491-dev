@@ -4,7 +4,7 @@
 #ifndef _GLUE_H_
 #define _GLUE_H_
 
-#include <cstddef>
+#include <stddef.h>
 #include <stdint.h>
 
 extern const char * const termcap;

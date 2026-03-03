@@ -19,11 +19,11 @@
 
 #include "config.h"
 
-#include "../usr/string.h"
+
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-// #include <ctype.h>
+
 #include <SDL.h>
 #include <SDL_mixer.h>
 
@@ -257,7 +257,7 @@ static void LockAllocatedSound(allocated_sound_t *snd)
 
     ++snd->use_count;
 
-    //printf("++ %s: Use count=%d\n", snd->sfxinfo->name, snd->use_count);
+    //printf("++ %s: Use count=%i\n", snd->sfxinfo->name, snd->use_count);
 
     // When we use a sound, re-link it into the list at the head, so
     // that the oldest sounds fall to the end of the list for freeing.
@@ -277,7 +277,7 @@ static void UnlockAllocatedSound(allocated_sound_t *snd)
 
     --snd->use_count;
 
-    //printf("-- %s: Use count=%d\n", snd->sfxinfo->name, snd->use_count);
+    //printf("-- %s: Use count=%i\n", snd->sfxinfo->name, snd->use_count);
 }
 
 // When a sound stops, check if it is still playing.  If it is not, 
@@ -436,7 +436,7 @@ static boolean ExpandSoundData_SRC(sfxinfo_t *sfxinfo,
 
     if (clipped > 0)
     {
-        dprintf(2, "Sound '%s': clipped %u samples (%0.2f %%)\n", 
+        fprintf(stderr, "Sound '%s': clipped %u samples (%0.2f %%)\n", 
                         sfxinfo->name, clipped,
                         400.0 * clipped / chunk->alen);
     }
@@ -980,13 +980,13 @@ static boolean I_SDL_InitSound(boolean _use_sfx_prefix)
 
     if (SDL_Init(SDL_INIT_AUDIO) < 0)
     {
-        dprintf(2, "Unable to set up sound.\n");
+        fprintf(stderr, "Unable to set up sound.\n");
         return false;
     }
 
     if (Mix_OpenAudio(snd_samplerate, AUDIO_S16SYS, 2, GetSliceSize()) < 0)
     {
-        dprintf(2, "Error initialising SDL_mixer: %s\n", Mix_GetError());
+        fprintf(stderr, "Error initialising SDL_mixer: %s\n", Mix_GetError());
         return false;
     }
 
@@ -999,7 +999,7 @@ static boolean I_SDL_InitSound(boolean _use_sfx_prefix)
     {
         if (SRC_ConversionMode() < 0)
         {
-            I_Error("I_SDL_InitSound: Invalid value for use_libsamplerate: %d",
+            I_Error("I_SDL_InitSound: Invalid value for use_libsamplerate: %i",
                     use_libsamplerate);
         }
 
@@ -1008,7 +1008,7 @@ static boolean I_SDL_InitSound(boolean _use_sfx_prefix)
 #else
     if (use_libsamplerate != 0)
     {
-        dprintf(2, "I_SDL_InitSound: use_libsamplerate=%d, but "
+        fprintf(stderr, "I_SDL_InitSound: use_libsamplerate=%i, but "
                         "libsamplerate support not compiled in.\n",
                         use_libsamplerate);
     }
@@ -1031,7 +1031,7 @@ static boolean I_SDL_InitSound(boolean _use_sfx_prefix)
         if (v <= SDL_VERSIONNUM(1, 2, 8))
         {
             setpanning_workaround = true;
-            dprintf(2, "\n"
+            fprintf(stderr, "\n"
               "ATTENTION: You are using an old version of SDL_mixer!\n"
               "           This version has a bug that may cause "
                           "your sound to stutter.\n"

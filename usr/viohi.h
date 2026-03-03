@@ -1,6 +1,6 @@
 // dev/viohi.h - ioctls for VirtIO human user interface input
 //
-// Copyright (c) 2025 University of Illinois
+// Copyright (c) 2025-2026 University of Illinois
 // SPDX-License-identifier: NCSA
 //
 

@@ -19,7 +19,7 @@
 //	Functions to blit a block to the screen.
 //
 
-#include "../usr/string.h"
+
 #include <string.h>
 #include <math.h>
 
@@ -162,7 +162,7 @@ void V_DrawPatch(int x, int y, patch_t *patch)
      || y < 0
      || y + SHORT(patch->height) > SCREENHEIGHT)
     {
-        I_Error("Bad V_DrawPatch x=%d y=%d patch.width=%d patch.height=%d topoffset=%d leftoffset=%d", x, y, patch->width, patch->height, patch->topoffset, patch->leftoffset);
+        I_Error("Bad V_DrawPatch x=%i y=%i patch.width=%i patch.height=%i topoffset=%i leftoffset=%i", x, y, patch->width, patch->height, patch->topoffset, patch->leftoffset);
     }
 #endif
 
@@ -865,10 +865,10 @@ void V_DrawMouseSpeedBox(int speed)
     // If the mouse is turned off or acceleration is turned off, don't
     // draw the box at all.
 
-    // if (!usemouse || fabs(mouse_acceleration - 1) < 0.01)
-    // {
-    //     return;
-    // }
+    if (!usemouse || fabs(mouse_acceleration - 1) < 0.01)
+    {
+        return;
+    }
 
     // Calculate box position
 

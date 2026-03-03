@@ -15,7 +15,7 @@
 //    Exit text-mode ENDOOM screen.
 //
 
-#include "../usr/string.h"
+
 #include <string.h>
 
 #include "config.h"

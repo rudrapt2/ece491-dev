@@ -18,7 +18,7 @@
 
 
 #include <stdlib.h>
-#include "../usr/string.h"
+
 #include <string.h>
 
 #include <stdarg.h>
@@ -26,8 +26,6 @@
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-#else
-#include <unistd.h>
 #endif
 
 #ifdef ORIGCODE
@@ -109,7 +107,7 @@ static byte *AutoAllocMemory(int *size, int default_ram, int min_ram)
 
         if (default_ram < min_ram)
         {
-            I_Error("Unable to allocate %d MiB of RAM for zone", default_ram);
+            I_Error("Unable to allocate %i MiB of RAM for zone", default_ram);
         }
 
         // Try to allocate the zone memory.
@@ -146,7 +144,7 @@ byte *I_ZoneBase (int *size)
 
     if (p > 0)
     {
-        default_ram = (int)strtoul(myargv[p+1], NULL, 10);
+        default_ram = atoi(myargv[p+1]);
         min_ram = default_ram;
     }
     else
@@ -169,7 +167,7 @@ void I_PrintBanner(char *msg)
     int spaces = 35 - (strlen(msg) / 2);
 
     for (i=0; i<spaces; ++i)
-        putc(' ');
+        putchar(' ');
 
     puts(msg);
 }
@@ -180,10 +178,10 @@ void I_PrintDivider(void)
 
     for (i=0; i<75; ++i)
     {
-        putc('=');
+        putchar('=');
     }
 
-    putc('\n');
+    putchar('\n');
 }
 
 void I_PrintStartupBanner(char *gamedescription)
@@ -271,7 +269,7 @@ void I_Quit (void)
 
 static int ZenityAvailable(void)
 {
-    return 1; //system(ZENITY_BINARY " --help >/dev/null 2>&1") == 0;
+    return system(ZENITY_BINARY " --help >/dev/null 2>&1") == 0;
 }
 
 // Escape special characters in the given string so that they can be
@@ -339,7 +337,7 @@ static int ZenityErrorBox(char *message)
     M_snprintf(errorboxpath, errorboxpath_size, "%s --error --text=%s",
                ZENITY_BINARY, escaped_message);
 
-    result = 0;//system(errorboxpath);
+    result = system(errorboxpath);
 
     free(errorboxpath);
     free(escaped_message);
@@ -365,7 +363,7 @@ void I_Error (char *error, ...)
 
     if (already_quitting)
     {
-        dprintf(2, "Warning: recursive call to I_Error detected.\n");
+        fprintf(stderr, "Warning: recursive call to I_Error detected.\n");
 #if ORIGCODE
         exit(-1);
 #endif
@@ -377,18 +375,17 @@ void I_Error (char *error, ...)
 
     // Message first.
     va_start(argptr, error);
-    //dprintf(2, "\nError: ");
-    printf(error, argptr);
-    dprintf(2, "\n\n");
+    //fprintf(stderr, "\nError: ");
+    vfprintf(stderr, error, argptr);
+    fprintf(stderr, "\n\n");
     va_end(argptr);
-    // fflush(2);
-    
+    fflush(stderr);
+
     // Write a copy of the message into buffer.
     va_start(argptr, error);
     memset(msgbuf, 0, sizeof(msgbuf));
     M_vsnprintf(msgbuf, sizeof(msgbuf), error, argptr);
     va_end(argptr);
-    dprintf(2, msgbuf);
 
     // Shutdown. Here might be other errors.
 
@@ -467,9 +464,7 @@ void I_Error (char *error, ...)
 
     exit(-1);
 #else
-    while (true)
-    {
-    }
+    exit(-1);
 #endif
 }
 

@@ -18,17 +18,20 @@
 //
 
 void panic_actual(const char* filename, int lineno, const char* msg) {
+    if (thrmgr_initialized)
+        kprintf("<%s:%d> ", running_thread_name(), running_thread());
     if (msg != NULL && *msg != '\0')
-        kprintf("<%s:%d> PANIC at %s:%d: %s\n", running_thread_name(), running_thread(), filename, lineno, msg);
+        kprintf("PANIC at %s:%d: %s\n", filename, lineno, msg);
     else
-        kprintf("<%s:%d> PANIC at %s:%d", running_thread_name(), running_thread(), filename, lineno);
+        kprintf("PANIC at %s:%d\n", filename, lineno);
 
     halt();
 }
 
 void assert_failed(const char* filename, int lineno, const char* stmt) {
-    kprintf("ASSERT FAILED at %s:%d in thread <%s:%d> (%s)\n", 
-        filename, lineno, running_thread_name(), running_thread(), stmt);
+    if (thrmgr_initialized)
+        kprintf("<%s:%d> ", running_thread_name(), running_thread());
+    kprintf("ASSERT FAILED at %s:%d (%s)\n", filename, lineno, stmt);
     halt();
 }
 
@@ -39,7 +42,9 @@ void debug_actual(const char* filename, int lineno, const char* fmt, ...) {
     va_start(ap, fmt);
     pie = disable_interrupts();
 
-    kprintf("<%s:%d> DEBUG at %s:%d: ", running_thread_name(), running_thread(), filename, lineno);
+    if (thrmgr_initialized)
+        kprintf("<%s:%d> ", running_thread_name(), running_thread());
+    kprintf("DEBUG at %s:%d: ", filename, lineno);
     kvprintf(fmt, ap);
     kprintf("\n");
 
@@ -54,7 +59,9 @@ void trace_actual(const char* filename, int lineno, const char* fmt, ...) {
     va_start(ap, fmt);
     pie = disable_interrupts();
 
-    kprintf("<%s:%d> TRACE at %s:%d: ", running_thread_name(), running_thread(), filename, lineno);
+    if (thrmgr_initialized)
+        kprintf("<%s:%d> ", running_thread_name(), running_thread());
+    kprintf("TRACE at %s:%d: ", filename, lineno);
     kvprintf(fmt, ap);
     kprintf("\n");
 

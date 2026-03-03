@@ -16,7 +16,7 @@
 //	Moving object handling. Spawn functions.
 //
 
-#include "../usr/string.h"
+
 
 #include "i_system.h"
 #include "z_zone.h"
@@ -795,7 +795,7 @@ void P_SpawnMapThing (mapthing_t* mthing)
 	    break;
 	
     if (i==NUMMOBJTYPES)
-	I_Error ("P_SpawnMapThing: Unknown type %d at (%d, %d)",
+	I_Error ("P_SpawnMapThing: Unknown type %i at (%i, %i)",
 		 mthing->type,
 		 mthing->x, mthing->y);
 		

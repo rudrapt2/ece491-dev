@@ -22,6 +22,7 @@
 
 
 
+#include <stdlib.h>
 #include <math.h>
 
 
@@ -34,9 +35,7 @@
 #include "r_local.h"
 #include "r_sky.h"
 
-static int abs(int x) {
-    return x < 0 ? -x : x;
-}
+
 
 
 
@@ -385,8 +384,8 @@ R_PointToDist
     fixed_t	dist;
     fixed_t     frac;
 	
-    dx = abs((x - viewx));
-    dy = abs((y - viewy));
+    dx = abs(x - viewx);
+    dy = abs(y - viewy);
 	
     if (dy>dx)
     {

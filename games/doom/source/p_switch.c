@@ -17,7 +17,7 @@
 //	Switches, buttons. Two-state animation. Exits.
 //
 
-#include "../usr/string.h"
+
 
 #include "i_system.h"
 #include "deh_main.h"

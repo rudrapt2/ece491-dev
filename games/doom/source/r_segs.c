@@ -21,8 +21,8 @@
 
 
 
-#include "../usr/string.h"
 
+#include <stdlib.h>
 
 #include "i_system.h"
 
@@ -32,9 +32,7 @@
 #include "r_local.h"
 #include "r_sky.h"
 
-static int abs(int x) {
-    return x < 0 ? -x : x;
-}
+
 // OPTIMIZE: closed two sided lines as single sided
 
 // True if any of the segs textures might be visible.
@@ -387,7 +385,7 @@ R_StoreWallRange
 		
 #ifdef RANGECHECK
     if (start >=viewwidth || start > stop)
-	I_Error ("Bad R_RenderWallRange: %d to %d", start , stop);
+	I_Error ("Bad R_RenderWallRange: %i to %i", start , stop);
 #endif
     
     sidedef = curline->sidedef;

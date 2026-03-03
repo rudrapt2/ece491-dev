@@ -18,9 +18,9 @@
 //
 
 
-#include "../usr/string.h"
+
 #include <stdlib.h>
-#include <errno.h>
+#include <string.h>
 
 #include "config.h"
 
@@ -1682,11 +1682,11 @@ static void SaveDefaultCollection(default_collection_t *collection)
                     }
                 }
 
-	        fprintf(f, "%d", v);
+	        fprintf(f, "%i", v);
                 break;
 
             case DEFAULT_INT:
-	        fprintf(f, "%d", * (int *) defaults[i].location);
+	        fprintf(f, "%i", * (int *) defaults[i].location);
                 break;
 
             case DEFAULT_INT_HEX:
@@ -1715,15 +1715,10 @@ static int ParseIntParameter(char *strparm)
 {
     int parm;
 
-    if (strparm[0] == '0' && strparm[1] == 'x') {
-        // sscanf(strparm+2, "%x", &parm); original
-        parm = (int)strtoul(strparm + 2, NULL, 16);
-    }
-    else {
-        // sscanf(strparm, "%d", &parm);
-        if (strparm[0] == '0') parm = (int)strtoul(strparm + 1, NULL, 8);
-        else parm = (int)strtoul(strparm + 0, NULL, 10);
-    }
+    if (strparm[0] == '0' && strparm[1] == 'x')
+        sscanf(strparm+2, "%x", &parm);
+    else
+        sscanf(strparm, "%i", &parm);
 
     return parm;
 }
@@ -1766,13 +1761,7 @@ static void SetVariable(default_t *def, char *value)
             break;
 
         case DEFAULT_FLOAT:
-            // * (float *) def->location = (float) atof(value); original
-            char * dp;
-            float i_part, d_part;
-            i_part = (float)strtoul(value, &dp, 10);
-            d_part = (float)strtoul(dp+1, NULL, 10);
-            for (int b=0; b < strlen(dp); b++) d_part /= 10.0;
-            * (float *) def->location = i_part + d_part;
+            * (float *) def->location = (float) atof(value);
             break;
     }
 }
@@ -1902,6 +1891,7 @@ void M_LoadDefaults (void)
     //
 
     i = M_CheckParmWithArgs("-config", 1);
+
     if (i)
     {
 	doom_defaults.filename = myargv[i+1];
@@ -1910,7 +1900,7 @@ void M_LoadDefaults (void)
     else
     {
         doom_defaults.filename
-            = M_StringJoin(default_main_config, NULL);
+            = M_StringJoin(configdir, default_main_config, NULL);
     }
 
     printf("saving config in %s\n", doom_defaults.filename);
@@ -1933,7 +1923,7 @@ void M_LoadDefaults (void)
     else
     {
         extra_defaults.filename
-            = M_StringJoin(default_extra_config, NULL);
+            = M_StringJoin(configdir, default_extra_config, NULL);
     }
 
     LoadDefaultCollection(&doom_defaults);
@@ -2018,6 +2008,7 @@ int M_GetIntVariable(char *name)
 const char *M_GetStrVariable(char *name)
 {
     default_t *variable;
+
     variable = GetDefaultForName(name);
 
     if (variable == NULL || !variable->bound
@@ -2049,9 +2040,89 @@ float M_GetFloatVariable(char *name)
 
 static char *GetDefaultConfigDir(void)
 {
-    char *result = (char *)malloc(2);
-    result[0] = '.';
-    result[1] = '\0';
+    // original
+    // char *result = (char *)malloc(2);
+    // result[0] = '.';
+    // result[1] = '\0';
 
-    return result;
+    return strdup("/c");
 }
+
+// 
+// SetConfigDir:
+//
+// Sets the location of the configuration directory, where configuration
+// files are stored - default.cfg, chocolate-doom.cfg, savegames, etc.
+//
+
+void M_SetConfigDir(char *dir)
+{
+    // Use the directory that was passed, or find the default.
+
+    if (dir != NULL)
+    {
+        configdir = dir;
+    }
+    else
+    {
+        configdir = GetDefaultConfigDir();
+    }
+
+    if (strcmp(configdir, "") != 0)
+    {
+        printf("Using %s for configuration and saves\n", configdir);
+    }
+
+    // Make the directory if it doesn't already exist:
+
+    M_MakeDirectory(configdir);
+}
+
+//
+// Calculate the path to the directory to use to store save games.
+// Creates the directory as necessary.
+//
+
+char *M_GetSaveGameDir(char *iwadname)
+{
+    char *savegamedir;
+#if ORIGCODE
+    char *topdir;
+#endif
+
+    // If not "doing" a configuration directory (Windows), don't "do"
+    // a savegame directory, either.
+
+    if (!strcmp(configdir, ""))
+    {
+    	savegamedir = strdup("");
+    }
+    else
+    {
+#if ORIGCODE
+        // ~/.chocolate-doom/savegames
+
+        topdir = M_StringJoin(configdir, "savegame", NULL);
+        M_MakeDirectory(topdir);
+
+        // eg. ~/.chocolate-doom/savegames/doom2.wad/
+
+        savegamedir = M_StringJoin(topdir, DIR_SEPARATOR_S, iwadname,
+                                   DIR_SEPARATOR_S, NULL);
+
+        M_MakeDirectory(savegamedir);
+
+        free(topdir);
+#else
+        savegamedir = M_StringJoin(configdir, DIR_SEPARATOR_S, ".savegame/", NULL);
+        // savegamedir = M_StringJoin(configdir, DIR_SEPARATOR_S, ".savegame/", NULL); // original
+
+        M_MakeDirectory(savegamedir);
+
+        printf ("Using %s for savegames\n", savegamedir);
+#endif
+    }
+
+    return savegamedir;
+}
+

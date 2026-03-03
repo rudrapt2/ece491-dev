@@ -16,9 +16,7 @@
 //	WAD I/O functions.
 //
 
-#include "../usr/string.h"
-#include "../usr/uio.h"
-#include "../usr/syscall.h"
+
 
 #include "m_misc.h"
 #include "w_file.h"
@@ -27,7 +25,7 @@
 typedef struct
 {
     wad_file_t wad;
-    int fd;
+    FILE *fstream;
 } stdc_wad_file_t;
 
 extern wad_file_class_t stdc_wad_file;
@@ -35,11 +33,11 @@ extern wad_file_class_t stdc_wad_file;
 static wad_file_t *W_StdC_OpenFile(char *path)
 {
     stdc_wad_file_t *result;
-    int fd;
+    FILE *fstream;
 
-    fd = fsopen(-1, path);
+    fstream = fopen(path, "rb");
 
-    if (fd < 0)
+    if (fstream == NULL)
     {
         return NULL;
     }
@@ -49,8 +47,8 @@ static wad_file_t *W_StdC_OpenFile(char *path)
     result = Z_Malloc(sizeof(stdc_wad_file_t), PU_STATIC, 0);
     result->wad.file_class = &stdc_wad_file;
     result->wad.mapped = NULL;
-    result->wad.length = M_FileLength(fd);
-    result->fd = fd;
+    result->wad.length = M_FileLength(fstream);
+    result->fstream = fstream;
 
     return &result->wad;
 }
@@ -61,7 +59,7 @@ static void W_StdC_CloseFile(wad_file_t *wad)
 
     stdc_wad = (stdc_wad_file_t *) wad;
 
-    _close(stdc_wad->fd);
+    fclose(stdc_wad->fstream);
     Z_Free(stdc_wad);
 }
 
@@ -78,16 +76,11 @@ size_t W_StdC_Read(wad_file_t *wad, unsigned int offset,
 
     // Jump to the specified position in the file.
 
-    // fseek(stdc_wad->fd, offset, SEEK_SET); (original)
-    unsigned long long off;
-    off = (unsigned long long)offset;
-    int r = _fcntl(stdc_wad->fd, FCNTL_SETPOS, &off);
-    _fcntl(stdc_wad->fd, FCNTL_GETPOS, &off);
-
+    fseek(stdc_wad->fstream, offset, SEEK_SET);
 
     // Read into the buffer.
 
-    result = _read(stdc_wad->fd, buffer, buffer_len);
+    result = fread(buffer, 1, buffer_len, stdc_wad->fstream);
 
     return result;
 }
