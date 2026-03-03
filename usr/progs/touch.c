@@ -17,7 +17,7 @@ void main (int argc, char** argv)
     }
 
     for (int i = 1; i < argc; i++) {
-        result = _create(argv[0]);
+        result = _create(argv[i]);
 
         if (result < 0) {
             printf("%s: failed to create %s (%s)\n", 
