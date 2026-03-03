@@ -23,6 +23,131 @@ const char * const termcap = ""
 ":sc=\\E7:se=\\E[m:sf=^J:so=\\E[7m:sr=\\EM:st=\\EH:ta=^I:ue=\\E[m:"
 ":up=\\E[A:us=\\E[4m";
 
+#define MICROSECONDS_PER_SECOND  1000000
+#define RAND_DEFAULT    391
+
+#ifdef AEE31
+#include "kernel/string.h"
+#include "kernel/setjmp.h"
+#include "usr/io.h"
+
+static struct io_term rogue_term;
+static struct io * rng_io = NULL;
+static jmp_buf exit_jmp;
+
+void main(struct io *termio, struct io *rand_io) {
+    extern int rogue_main(int argc, char *argv[]);
+    char *argv[] = {"rogue", NULL};
+
+    ioterm_init(&rogue_term, termio);
+    rng_io = rand_io;
+
+    if (setjmp(exit_jmp) == 0)
+        rogue_main(1, argv);
+}
+
+void exit(void) {
+    longjmp(exit_jmp, 1);
+}
+
+void printf(const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    iovprintf(&rogue_term.io, fmt, ap);
+    va_end(ap);
+}
+
+int sprintf(char *buf, const char *fmt, ...) {
+    int n;
+    va_list ap;
+    va_start(ap, fmt);
+    n = vsnprintf(buf, 256, fmt, ap); // fake buffer size
+    va_end(ap);
+    return n;
+}
+
+char *strcpy(char *dst, const char *src) {
+    return strncpy(dst, src, 256); // surely ...
+}
+
+char *strcat(char *dst, const char *src) {
+    return strncpy(dst + strlen(dst), src, 256);
+}
+
+int fopen(const char *fname) {
+    return 0; // no filesystem in CP1
+}
+
+int fclose(int fd) {
+    return 0;
+}
+
+void fputs(const char *str, int fd) {
+    iowrite(&rogue_term.io, str, strlen(str));
+}
+
+void fputc(int fd, char c) {
+    iowrite(&rogue_term.io, &c, 1);
+}
+
+int fwrite(const void *ptr, size_t size, size_t nmemb, int fd) {
+    return 0; // no filesystem in CP1
+}
+
+int fread(void *ptr, size_t size, size_t nmemb, int fd) {
+    return 0; // no filesystem in CP1
+}
+
+void sleep(unsigned int cnt) {
+    (void)cnt; // no timer in CP1
+}
+
+int putchar(int c) {
+    ioputc(&rogue_term.io, (char)c);
+    return c;
+}
+
+int getchar(void) {
+    char c;
+    ioread(&rogue_term.io, &c, 1);
+    return (int)(unsigned char)c;
+}
+
+// Bump allocator for the small termcap string copies in curses.c.
+// curses.c calls malloc() exactly once per termcap field (~10 fields, each
+// a few bytes).  A 512-byte static pool is more than sufficient.
+static char malloc_pool[512];
+static int  malloc_used = 0;
+
+void *malloc(size_t sz) {
+    // align to 8 bytes
+    sz = (sz + 7) & ~(size_t)7;
+    if (malloc_used + (int)sz > (int)sizeof(malloc_pool))
+        return (void *)0;
+    void *p = malloc_pool + malloc_used;
+    malloc_used += (int)sz;
+    return p;
+}
+
+int random_seed(void) {
+    int r;
+
+    if (rng_io != NULL) {
+        if (ioread(rng_io, &r, sizeof(int)) == sizeof(int))
+            return r;
+    }
+
+    printf("Error reading random number, defaulting to set value...\n");
+#ifndef RAND_SEED
+    return RAND_DEFAULT;
+#else
+    return RAND_SEED;
+#endif
+}
+
+#endif // AEE31
+
+#ifdef AEE32
 int sprintf(char * buf, const char * fmt, ... ) {
     int n;
     va_list ap;
@@ -40,8 +165,6 @@ extern char * strcat(char * dst, const char * src) {
     return strncpy(dst + strlen(dst), src, 256);
 }
 
-#define RAND_DEFAULT    391
-
 static int rng_fd;
 static void rand_init(void);
 
@@ -55,8 +178,6 @@ void main(int argc, char *argv[]) {
 inline void exit() {
     _exit();
 }
-
-#define MICROSECONDS_PER_SECOND  1000000
 
 int fopen(const char *fname) {
     int result;
@@ -119,3 +240,5 @@ int random_seed(void) {
 #endif
     
 }
+
+#endif // AEE32

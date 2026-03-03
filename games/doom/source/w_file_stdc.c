@@ -17,7 +17,7 @@
 //
 
 #include "../usr/string.h"
-#include "../usr/uio.h"
+#include "../usr/io.h"
 #include "../usr/syscall.h"
 
 #include "m_misc.h"
@@ -81,8 +81,8 @@ size_t W_StdC_Read(wad_file_t *wad, unsigned int offset,
     // fseek(stdc_wad->fd, offset, SEEK_SET); (original)
     unsigned long long off;
     off = (unsigned long long)offset;
-    int r = _fcntl(stdc_wad->fd, FCNTL_SETPOS, &off);
-    _fcntl(stdc_wad->fd, FCNTL_GETPOS, &off);
+    int r = _ioctl(stdc_wad->fd, IOC_SETPOS, &off);
+    _ioctl(stdc_wad->fd, IOC_GETPOS, &off);
 
 
     // Read into the buffer.

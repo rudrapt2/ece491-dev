@@ -41,13 +41,29 @@ OBJS = \
 	elf.o \
 	cache.o \
 	timer.o \
+	string.o \
+	string.o \
+	thread.o \
+	thrasm.o \
+	device.o \
 	device.o \
 	sbi.o \
 	fs/ngfs.o \
 	fs/tarfs.o \
 	memory.o \
+	console.o \
+	dev/rtc.o \
+	filesys.o \
+	fs/ngfs.o \
 	process.o \
-	syscall.o 
+	syscall.o \
+	dev/uart.o \
+	dev/viohi.o \
+    dev/virtio.o \
+	dev/viorng.o \
+	dev/vioblk.o \
+    dev/viogpu.o \
+	board/qvirt.o \
 
 CFLAGS = -Wall -Werror=implicit-function-declaration -Wno-unused-function
 CFLAGS += -fno-omit-frame-pointer -ggdb3 -gdwarf-2
@@ -58,7 +74,7 @@ CFLAGS += -I.
 
 # CFLAGS += -DDEBUG -DTRACE # Everything!
 
-# CFLAGS += -DMEMORY_DEBUG -DMEMORY_TRACE
+CFLAGS += -DMEMORY_DEBUG -DMEMORY_TRACE
 # CFLAGS += -DHEAP_DEBUG -DHEAP_TRACE
 
 # CFLAGS += -DTHREAD_DEBUG -DTHREAD_TRACE
@@ -98,7 +114,7 @@ QEMUOPTS += -device virtio-blk-device,drive=blk1
 QEMUOPTS += -drive file=fs/tarfs.tar,id=blk1,if=none,format=raw,readonly=false
 
 VIDEO_QEMUOPTS = $(QEMUOPTS)
-VIDEO_QEMUOPTS += -device virtio-gpu-device -display gtk
+VIDEO_QEMUOPTS += -device virtio-gpu-device -display cocoa
 VIDEO_QEMUOPTS += -device virtio-keyboard-device -device virtio-tablet-device
 
 ifeq ($(CP1), 1)
@@ -123,6 +139,9 @@ debug: kernel.elf
 # NOTE: need to link against viogpu and viohi drivers; this won't work as it currently is
 run-video: kernel.elf
 	$(QEMU) $(VIDEO_QEMUOPTS) -m 16M -kernel $<
+
+debug-video: kernel.elf
+	$(QEMU) $(VIDEO_QEMUOPTS) -m 16M -kernel $< -S -s
 
 BLOB_OBJCOPY_FLAGS = \
 	--add-section .data.blob=blob.raw \
