@@ -1,3 +1,7 @@
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
+
 #include "../syscall.h"
 #include "../string.h"
 #include "../shell.h"
@@ -100,3 +104,5 @@ void main (int argc, char** argv)
     printf("%s: failed to exec %s (%s)\n", 
         argv[0], argv[1], error_name(result));
 }
+
+#endif

@@ -1,3 +1,7 @@
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
+
 #include "../syscall.h"
 #include "../string.h"
 #include "../shell.h"
@@ -64,3 +68,5 @@ void main (int argc, char** argv)
         day+1, months[month], year,
         HOUR(time), MINUTE(time), SEC(time));
 }
+
+#endif

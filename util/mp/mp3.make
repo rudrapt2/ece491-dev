@@ -70,7 +70,21 @@ FILES_FOR_COPYING   := \
     sys/trap.s \
     \
     usr/games/trek-mp3-cp1 \
+    usr/games/trek-mp3-cp2_3 \
+    usr/games/zork-mp3-cp2_3 \
+    usr/games/rogue-mp3-cp2_3 \
+    usr/games/nudoku-mp3-cp2_3 \
+    usr/games/tetris-mp3-cp2_3 \
+    usr/progs/cat.c \
+    usr/progs/date.c \
+    usr/progs/echo.c \
     usr/progs/hello.c \
+    usr/progs/ls.c \
+    usr/progs/rm.c \
+    usr/progs/shell.c \
+    usr/progs/touch.c \
+    usr/progs/wc.c \
+    usr/progs/xargs.c \
     usr/error.c \
     usr/error.h \
     usr/heap.c \
