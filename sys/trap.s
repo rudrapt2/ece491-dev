@@ -98,7 +98,9 @@ _smode_trap_entry:
 
 smode_trap_entry_from_umode:
 
-.ifndef STUDENT
+.ifdef STUDENT
+        # YOUR CODE HERE
+.else
 
         # When we're in U mode, sscratch contains a pointer to a trap frame at
         # the base of the kernel stack. This pointer, now in /sp/, is our kernel

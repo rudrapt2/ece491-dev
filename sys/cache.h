@@ -152,20 +152,4 @@ extern int cache_flush(struct cache * ca);
 // * This function may switch to another thread context.
 // * This function must _not_ be called from an ISR.
 
-extern void cache_close(struct cache * ca);
-
-// Closes a cache and releases resources associated with it.
-//
-// After cache_close(/ca/) returns, /ca/ must not be used again.
-//
-// Implementations must wait on all blocks to no longer be in-use in addition
-// to flushing pending dirty blocks before releasing resources.
-//
-// Once cache_close(/ca/) has been called, no further calls to 
-// cache_fetch(/ca/, ...) can succeed.
-// 
-// * This function may block.
-// * This function may switch to another thread context.
-// * This function must _not_ be called from an ISR.
-
 #endif // _CACHE_H_

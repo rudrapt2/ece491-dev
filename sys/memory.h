@@ -64,7 +64,7 @@ extern char memory_initialized;
  * the heap memory manager, and adds remaining memory to the free chunk list
  * @return None
  */
-extern void memory_init(struct matlas* mappings);
+extern void memory_init(struct matlas * mappings);
 
 /**
  * @brief Gets the active memory space
@@ -148,26 +148,29 @@ extern void set_range_flags(const void* vp, size_t size, int rwxug_flags);
  */
 extern void unmap_and_free_range(void* vp, size_t size);
 
-/**
- * @brief Checks that pointer is wellformed and pointer + len does not wrap around zero,
- * then iterates over pages in range, confirming the pages are mapped and have AT LEAST
- * the passed flags set (it may have additional flags as well).
- * @param vp Virtual memory address to start validation
- * @param len Size (in bytes) of range
- * @param rwxu_flags Flags to check pages in range for
- * @return 0 on success; error on malformed pointer, unmapped page, or mismatching flags
- */
-extern int enforce_vptr(const void* vp, size_t len, int rwxu_flags);
+
+
+// TODO redo header comments for enforce vptr
+// /**
+//  * @brief Checks that pointer is wellformed and pointer + len does not wrap around zero,
+//  * then iterates over pages in range, confirming the pages are mapped and have AT LEAST
+//  * the passed flags set (it may have additional flags as well).
+//  * @param vp Virtual memory address to start validation
+//  * @param size Size (in bytes) of range
+//  * @param rwxug_flags Flags to check pages in range for
+//  * @return 0 on success; error on malformed pointer, unmapped page, or mismatching flags
+//  */
+extern int enforce_vptr(const void* vp, size_t size, int rwxug_flags);
 
 /**
  * @brief Checks that pointer is wellformed and the given string is valid. Since the length
  * of the string is unknown, we iterate through all characters of the string until \0 terminator,
  * confirming that the pages are mapped and have the passed flags set.
  * @param vs Virtual memory address that contains the string
- * @param rug_flags Flags to check pages
+ * @param rwxug_flags Flags to check pages
  * @return 0 on success; error on malformed pointer, unmapped page, or mismatching flags
  */
-extern int validate_vstr(const char* vs, int rug_flags);
+extern int validate_vstr(const char* vs, int rwxug_flags);
 
 /**
  * @brief Allocates a single new page using alloc_phys_pages().
