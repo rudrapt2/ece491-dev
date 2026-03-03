@@ -46,7 +46,6 @@ OBJS = \
 	thread.o \
 	thrasm.o \
 	device.o \
-	device.o \
 	sbi.o \
 	fs/ngfs.o \
 	fs/tarfs.o \
@@ -65,6 +64,11 @@ OBJS = \
     dev/viogpu.o \
 	board/qvirt.o \
 
+VIDEO_OBJS = \
+	$(OBJS) \
+	dev/viogpu.o \
+	dev/viohi.o
+
 CFLAGS = -Wall -Werror=implicit-function-declaration -Wno-unused-function
 CFLAGS += -fno-omit-frame-pointer -ggdb3 -gdwarf-2
 CFLAGS += -mcmodel=medany -fno-pie -no-pie -march=rv64imazicsr -mabi=lp64
@@ -74,7 +78,7 @@ CFLAGS += -I.
 
 # CFLAGS += -DDEBUG -DTRACE # Everything!
 
-CFLAGS += -DMEMORY_DEBUG -DMEMORY_TRACE
+# CFLAGS += -DMEMORY_DEBUG -DMEMORY_TRACE
 # CFLAGS += -DHEAP_DEBUG -DHEAP_TRACE
 
 # CFLAGS += -DTHREAD_DEBUG -DTHREAD_TRACE
@@ -110,8 +114,6 @@ QEMUOPTS += -serial pty
 QEMUOPTS += -serial pty
 QEMUOPTS += -device virtio-blk-device,drive=blk0
 QEMUOPTS += -drive file=fs/ngfs.raw,id=blk0,if=none,format=raw,readonly=false
-QEMUOPTS += -device virtio-blk-device,drive=blk1
-QEMUOPTS += -drive file=fs/tarfs.tar,id=blk1,if=none,format=raw,readonly=false
 
 VIDEO_QEMUOPTS = $(QEMUOPTS)
 VIDEO_QEMUOPTS += -device virtio-gpu-device -display gtk
@@ -137,10 +139,13 @@ debug: kernel.elf
 	$(QEMU) $(QEMUOPTS) -m 16M -kernel $< -S -s
 
 # NOTE: need to link against viogpu and viohi drivers; this won't work as it currently is
-run-video: kernel.elf
+video-kernel.elf: $(VIDEO_OBJS) blob.o
+	$(LD) $(LDFLAGS) -o $@ $^
+
+run-video: video-kernel.elf
 	$(QEMU) $(VIDEO_QEMUOPTS) -m 16M -kernel $<
 
-debug-video: kernel.elf
+debug-video: video-kernel.elf
 	$(QEMU) $(VIDEO_QEMUOPTS) -m 16M -kernel $< -S -s
 
 BLOB_OBJCOPY_FLAGS = \

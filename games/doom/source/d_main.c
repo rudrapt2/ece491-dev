@@ -20,10 +20,10 @@
 //
 
 
-// #include <ctype.h>
-#include "../usr/string.h"
+
+
 #include <stdlib.h>
-#include "../usr/syscall.h"
+#include <string.h>
 
 #include "config.h"
 #include "deh_main.h"
@@ -74,8 +74,6 @@
 
 #include "d_main.h"
 
-extern int gpu_fd;
-
 //
 // D-DoomLoop()
 // Not a globally visible function,
@@ -86,6 +84,10 @@ extern int gpu_fd;
 //  calls I_GetTime, I_StartFrame, and I_StartTic
 //
 void D_DoomLoop (void);
+
+// Location where savegames are stored
+
+char *          savegamedir;
 
 // location of IWAD and WAD files
 
@@ -128,6 +130,7 @@ int             show_endoom = 1;
 
 void D_ConnectNetGame(void);
 void D_CheckNetGame(void);
+
 
 //
 // D_ProcessEvents
@@ -371,7 +374,7 @@ void D_BindVariables(void)
     {
         char buf[12];
 
-        M_snprintf(buf, sizeof(buf), "chatmacro%d", i);
+        M_snprintf(buf, sizeof(buf), "chatmacro%i", i);
         M_BindVariable(buf, &chat_macros[i]);
     }
 }
@@ -385,7 +388,6 @@ void D_BindVariables(void)
 boolean D_GrabMouseCallback(void)
 {
     // Drone players don't need mouse focus
-    return false;
 
     if (drone)
         return false;
@@ -605,31 +607,31 @@ static char *banners[] =
 {
     // doom2.wad
     "                         "
-    "DOOM 2: Hell on Earth v%d.%d"
+    "DOOM 2: Hell on Earth v%i.%i"
     "                           ",
     // doom1.wad
     "                            "
-    "DOOM Shareware Startup v%d.%d"
+    "DOOM Shareware Startup v%i.%i"
     "                           ",
     // doom.wad
     "                            "
-    "DOOM Registered Startup v%d.%d"
+    "DOOM Registered Startup v%i.%i"
     "                           ",
     // Registered DOOM uses this
     "                          "
-    "DOOM System Startup v%d.%d"
+    "DOOM System Startup v%i.%i"
     "                          ",
     // doom.wad (Ultimate DOOM)
     "                         "
-    "The Ultimate DOOM Startup v%d.%d"
+    "The Ultimate DOOM Startup v%i.%i"
     "                        ",
     // tnt.wad
     "                     "
-    "DOOM 2: TNT - Evilution v%d.%d"
+    "DOOM 2: TNT - Evilution v%i.%i"
     "                           ",
     // plutonia.wad
     "                   "
-    "DOOM 2: Plutonia Experiment v%d.%d"
+    "DOOM 2: Plutonia Experiment v%i.%i"
     "                           ",
 };
 
@@ -664,12 +666,12 @@ static char *GetGameName(char *gamename)
             M_snprintf(gamename, gamename_size, deh_sub,
                        version / 100, version % 100);
 
-            while (gamename[0] != '\0' && gamename[0]==' ')
+            while (gamename[0] != '\0' && isspace((int)gamename[0]))
             {
                 memmove(gamename, gamename + 1, gamename_size - 1);
             }
 
-            while (gamename[0] != '\0' && gamename[strlen(gamename)-1]==' ')
+            while (gamename[0] != '\0' && isspace((int)gamename[strlen(gamename)-1]))
             {
                 gamename[strlen(gamename) - 1] = '\0';
             }
@@ -1080,8 +1082,7 @@ static void D_Endoom(void)
 
     I_Endoom(endoom);
 
-    _close(gpu_fd);
-	_exit();
+	exit(0);
 }
 
 #if ORIGCODE
@@ -1294,6 +1295,32 @@ void D_DoomMain (void)
 
     if (devparm)
 	DEH_printf(D_DEVSTR);
+    
+    // find which dir to use for config files
+
+#ifdef _WIN32
+
+    //!
+    // @platform windows
+    // @vanilla
+    //
+    // Save configuration data and savegames in c:\doomdata,
+    // allowing play from CD.
+    //
+
+    if (M_ParmExists("-cdrom"))
+    {
+        printf(D_CDROM);
+
+        M_SetConfigDir("c:\\doomdata\\");
+    }
+    else
+#endif
+    {
+        // Auto-detect the configuration dir.
+
+        M_SetConfigDir(NULL);
+    }
 
     //!
     // @arg <x>
@@ -1310,12 +1337,12 @@ void D_DoomMain (void)
 	extern int sidemove[2];
 	
 	if (p<myargc-1)
-	    scale = strtoul(myargv[p+1], NULL, 10);
+	    scale = atoi (myargv[p+1]);
 	if (scale < 10)
 	    scale = 10;
 	if (scale > 400)
 	    scale = 400;
-        DEH_printf("turbo scale: %d%%\n", scale);
+        DEH_printf("turbo scale: %i%%\n", scale);
 	forwardmove[0] = forwardmove[0]*scale/100;
 	forwardmove[1] = forwardmove[1]*scale/100;
 	sidemove[0] = sidemove[0]*scale/100;
@@ -1511,13 +1538,25 @@ void D_DoomMain (void)
             }
         }
 
-        printf("  loaded %d DEHACKED lumps from PWAD files.\n", loaded);
+        printf("  loaded %i DEHACKED lumps from PWAD files.\n", loaded);
     }
 #endif
 
     // Set the gamedescription string. This is only possible now that
     // we've finished loading Dehacked patches.
     D_SetGameDescription();
+
+#ifdef _WIN32
+    // In -cdrom mode, we write savegames to c:\doomdata as well as configs.
+    if (M_ParmExists("-cdrom"))
+    {
+        savegamedir = configdir;
+    }
+    else
+#endif
+    {
+        savegamedir = M_GetSaveGameDir(D_SaveGameIWADName(gamemission));
+    }
 
     // Check for -file in shareware
     if (modifiedgame)
@@ -1635,7 +1674,7 @@ void D_DoomMain (void)
 
     if (p)
     {
-	timelimit = (int)strtoul(myargv[p+1], NULL, 10);
+	timelimit = atoi(myargv[p+1]);
     }
 
     //!
@@ -1665,7 +1704,7 @@ void D_DoomMain (void)
     if (p)
     {
         if (gamemode == commercial)
-            startmap = (int)strtoul(myargv[p+1], NULL, 10);
+            startmap = atoi (myargv[p+1]);
         else
         {
             startepisode = myargv[p+1][0]-'0';
@@ -1710,7 +1749,7 @@ void D_DoomMain (void)
     
     if (p)
     {
-        startloadgame = (int)strtoul(myargv[p+1], NULL, 10);
+        startloadgame = atoi(myargv[p+1]);
     }
     else
     {

@@ -20,7 +20,7 @@
 
 
 
-#include "../usr/string.h"
+
 
 #include "i_system.h"
 #include "i_video.h"
@@ -452,7 +452,7 @@ ST_Responder (event_t* ev)
 	break;
 	
       case AM_MSGEXITED:
-	//	dprintf(2, "AM exited\n");
+	//	fprintf(stderr, "AM exited\n");
 	st_gamestate = FirstPersonState;
 	break;
     }

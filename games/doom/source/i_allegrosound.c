@@ -19,11 +19,11 @@
 
 #include "config.h"
 
-#include "../usr/string.h"
+
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-// #include <ctype.h>
+
 
 #include "deh_str.h"
 #include "i_sound.h"

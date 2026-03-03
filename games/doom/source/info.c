@@ -18,7 +18,7 @@
 //	This one is the original DOOM version, preserved.
 //
 
-#include "../usr/string.h"
+
 #include <stdlib.h>
 
 // Data.

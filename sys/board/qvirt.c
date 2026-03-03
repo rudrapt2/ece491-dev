@@ -66,7 +66,7 @@ extern char _kimg_end[]; // from kernel.ld
 //
 
 static struct mregion qvirt_ram[] = {
-    { 0x80000000, 0x0800000 }, {0x0, 0}
+    { 0x80000000, 0x1000000 }, {0x0, 0}
 };
 
 static struct mregion qvirt_mmio[] = {
@@ -74,7 +74,7 @@ static struct mregion qvirt_mmio[] = {
 };
 
 static struct mregion qvirt_resv[] = {
-    { 0x80000000, 0x040000 }, {0x80040000, 0x020000}, {0x80600000, 0x200000}, {0x0, 0}
+    { 0x80000000, 0x040000 }, {0x80040000, 0x020000}, {0x80e00000, 0x200000}, {0x0, 0}
 };
 
 static struct matlas qvirt_matlas = {

@@ -3,9 +3,11 @@
 #include "doomgeneric.h"
 #include "../usr/syscall.h"
 #include "../usr/viohi.h"
+#include "../usr/heap.h"
 
 #include "../usr/string.h"
 #include "../usr/io.h"
+#include <stdint.h>
 
 #define QUEUE_SIZE 16
 //temp
@@ -133,13 +135,8 @@ static const unsigned char doom_key_map[VKEY_SCALE + 1] = {
 };
 
 void DG_Init(){
-  gpu_fd = _open(-1, "dev/viogpu0");
+  gpu_fd = _open(-1, "/dev/viogpu0");
 
-  if (gpu_fd < 0) {
-    _print("failed to open gpu device");
-    _exit();
-  }
-  
   int result = _ioctl(gpu_fd, IOC_MAPBUF, &DG_ScreenBuffer);
   if (result != 0) {
     _print("failed to obtain frame buffer");
@@ -168,20 +165,14 @@ static void addKeyToQueue(int pressed, unsigned int keyCode)
 }
 
 static void sleepGetKey(uint32_t us) {
-  struct viohi_event evt;
-  _write(alarm_pipe_in, &us, sizeof(uint32_t));
-  while (1) {
-    _read(input_pipe_out, &evt, sizeof(evt));
-    if (evt.code == 0) return; // alarm value
-    if (evt.code >= BTN_MOUSE && evt.code <= BTN_TASK) continue; //TODO mouse input
-    else {
-      if(evt.value){
-        addKeyToQueue(1, evt.code);
-      } else {
-        addKeyToQueue(0, evt.code);
-      }
+    struct viohi_event evt;
+    _write(alarm_pipe_in, &us, sizeof(uint32_t));
+    for (;;) {
+        _read(input_pipe_out, &evt, sizeof(evt));
+        if (evt.code == 0) return; // alarm value
+        if (evt.code >= BTN_MOUSE && evt.code <= BTN_TASK) continue; //TODO mouse input
+        addKeyToQueue(evt.value, evt.code);
     }
-  }
 }
 
 void DG_DrawFrame()
@@ -227,16 +218,15 @@ void DG_SetWindowTitle(const char * title)
   // unused
 }
 
-void main(int argc, char **argv)
+void main(int argc, char *argv[])
 {
-  input_pipe_out = (uint8_t)argv[0][0];
-  alarm_pipe_in = (uint8_t)argv[1][0];
+  input_pipe_out = (int)argv[argc - 1][0];
+  alarm_pipe_in = (int)argv[argc - 1][1];
   printf("input pipe out is: %d\n", input_pipe_out);
   printf("alarm pipe in is: %d\n", alarm_pipe_in);
 
-  doomgeneric_Create(argc - 2, argv + 2);
+  doomgeneric_Create(argc - 1, argv);
   
   for (;;)
-    doomgeneric_Tick();    
-
+    doomgeneric_Tick();
 }

@@ -16,8 +16,8 @@
 //
 
 
-// #include <ctype.h>
-#include "../usr/string.h"
+
+
 #include <stdlib.h>
 #include <string.h>
 

@@ -19,9 +19,8 @@
 
 
 #include <stdlib.h>
-// #include <ctype.h>
-#include "../usr/syscall.h"
-#include "../usr/string.h"
+
+
 
 #include "doomdef.h"
 #include "doomkeys.h"
@@ -503,7 +502,7 @@ menu_t  SaveDef =
 //
 void M_ReadSaveStrings(void)
 {
-    int   fd;
+    FILE   *handle;
     int     i;
     char    name[256];
 
@@ -511,15 +510,15 @@ void M_ReadSaveStrings(void)
     {
         M_StringCopy(name, P_SaveGameFile(i), sizeof(name));
 
-	fd = fsopen(-1, name);
-        if (fd < 0)
+	handle = fopen(name, "rb");
+        if (handle == NULL)
         {
             M_StringCopy(savegamestrings[i], EMPTYSTRING, SAVESTRINGSIZE);
             LoadMenu[i].status = 0;
             continue;
         }
-	_read(fd, &savegamestrings[i], SAVESTRINGSIZE);
-	_close(fd);
+	fread(&savegamestrings[i], 1, SAVESTRINGSIZE, handle);
+	fclose(handle);
 	LoadMenu[i].status = 1;
     }
 }
@@ -968,7 +967,7 @@ void M_Episode(int choice)
     if ( (gamemode == registered)
 	 && (choice > 2))
     {
-      dprintf( 2,
+      fprintf( stderr,
 	       "M_Episode: 4th episode requires UltimateDOOM\n");
       choice = 0;
     }

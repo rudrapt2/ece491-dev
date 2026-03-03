@@ -677,11 +677,10 @@ long iopipe_read(struct io * io, void * buf, long bufsz) {
     while(p->rpos == p->wpos && iorefcnt(&p->wio) != 0)
         condition_wait(&p->updated);
 
-    assert(p->rpos <= p->wpos);
     // data is waiting in pipe
     // since short reads are acceptable, we consume as much
     // data as is available and return that
-    while (p->rpos < p->wpos && bufread < bufsz) {
+    while (p->rpos != p->wpos && bufread < bufsz) {
         int const woff = p->wpos % PAGE_SIZE;
         int const roff = p->rpos % PAGE_SIZE;
         int copylen = (woff > roff) ? woff - roff : PAGE_SIZE - roff;

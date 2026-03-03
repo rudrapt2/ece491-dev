@@ -17,11 +17,9 @@
 
 
 
+#include <string.h>
 #include <stdlib.h>
 #include <math.h>
-#include "../usr/io.h"
-#include "../usr/syscall.h"
-#include "../usr/string.h"
 
 #include "doomdef.h" 
 #include "doomkeys.h"
@@ -231,7 +229,7 @@ int		bodyqueslot;
  
 int             vanilla_savegame_limit = 1;
 int             vanilla_demo_limit = 1;
-
+ 
 int G_CmdChecksum (ticcmd_t* cmd) 
 { 
     size_t		i;
@@ -369,12 +367,12 @@ void G_BuildTiccmd (ticcmd_t* cmd, int maketic)
     { 
 	if (gamekeydown[key_right]) 
 	{
-	    // dprintf(2, "strafe right\n");
+	    // fprintf(stderr, "strafe right\n");
 	    side += sidemove[speed]; 
 	}
 	if (gamekeydown[key_left]) 
 	{
-	    //	dprintf(2, "strafe left\n");
+	    //	fprintf(stderr, "strafe left\n");
 	    side -= sidemove[speed]; 
 	}
 	if (joyxmove > 0) 
@@ -397,12 +395,12 @@ void G_BuildTiccmd (ticcmd_t* cmd, int maketic)
  
     if (gamekeydown[key_up]) 
     {
-	// dprintf(2, "up\n");
+	// fprintf(stderr, "up\n");
 	forward += forwardmove[speed]; 
     }
     if (gamekeydown[key_down]) 
     {
-	// dprintf(2, "down\n");
+	// fprintf(stderr, "down\n");
 	forward -= forwardmove[speed]; 
     }
 
@@ -793,7 +791,7 @@ boolean G_Responder (event_t* ev)
         // Perform a low pass filter on this so that the thermometer 
         // appears to move smoothly.
 
-        testcontrols_mousespeed = ev->data2 < 0 ? -ev->data2 : ev->data2;//abs(ev->data2);
+        testcontrols_mousespeed = abs(ev->data2);
     }
 
     // If the next/previous weapon keys are pressed, set the next_weapon
@@ -950,7 +948,7 @@ void G_Ticker (void)
 		if (gametic > BACKUPTICS 
 		    && consistancy[i][buf] != cmd->consistancy) 
 		{ 
-		    I_Error ("consistency failure (%d should be %d)",
+		    I_Error ("consistency failure (%i should be %i)",
 			     cmd->consistancy, consistancy[i][buf]); 
 		} 
 		if (players[i].mo) 
@@ -1229,7 +1227,7 @@ void G_DeathMatchSpawnPlayer (int playernum)
 	 
     selections = deathmatch_p - deathmatchstarts; 
     if (selections < 4) 
-	I_Error ("Only %d deathmatch spots, 4 required", selections); 
+	I_Error ("Only %i deathmatch spots, 4 required", selections); 
  
     for (j=0 ; j<20 ; j++) 
     { 
@@ -1553,9 +1551,9 @@ void G_DoLoadGame (void)
 	 
     gameaction = ga_nothing; 
 	 
-    save_stream_fd = fsopen(-1, savename);
+    save_stream = fopen(savename, "rb");
 
-    if (save_stream_fd < 0)
+    if (save_stream == NULL)
     {
     	return;
     }
@@ -1564,7 +1562,7 @@ void G_DoLoadGame (void)
 
     if (!P_ReadSaveGameHeader())
     {
-        _close(save_stream_fd);
+        fclose(save_stream);
         return;
     }
 
@@ -1584,7 +1582,7 @@ void G_DoLoadGame (void)
     if (!P_ReadSaveGameEOF())
 	I_Error ("Bad savegame");
 
-    _close(save_stream_fd);
+    fclose(save_stream);
     
     if (setsizeneeded)
     	R_ExecuteSetViewSize ();
@@ -1623,15 +1621,15 @@ void G_DoSaveGame (void)
     // and then rename it at the end if it was successfully written.
     // This prevents an existing savegame from being overwritten by 
     // a corrupted one, or if a savegame buffer overrun occurs.
-    save_stream_fd = fsopen(-1, temp_savegame_file);
+    save_stream = fopen(temp_savegame_file, "wb");
 
-    if (save_stream_fd < 0)
+    if (save_stream == NULL)
     {
         // Failed to save the game, so we're going to have to abort. But
         // to be nice, save to somewhere else before we call I_Error().
         recovery_savegame_file = M_TempFile("recovery.dsg");
-        save_stream_fd = fsopen(-1, recovery_savegame_file);
-        if (save_stream_fd < 0)
+        save_stream = fopen(recovery_savegame_file, "wb");
+        if (save_stream == NULL)
         {
             I_Error("Failed to open either '%s' or '%s' to write savegame.",
                     temp_savegame_file, recovery_savegame_file);
@@ -1652,17 +1650,14 @@ void G_DoSaveGame (void)
     // Enforce the same savegame size limit as in Vanilla Doom, 
     // except if the vanilla_savegame_limit setting is turned off.
 
-    unsigned long long pos;
-    _ioctl(save_stream_fd, IOC_GETPOS, &pos);
-
-    if (vanilla_savegame_limit && pos > SAVEGAMESIZE)
+    if (vanilla_savegame_limit && ftell(save_stream) > SAVEGAMESIZE)
     {
         I_Error ("Savegame buffer overrun");
     }
     
     // Finish up, close the savegame file.
 
-    _close(save_stream_fd);
+    fclose(save_stream);
 
     if (recovery_savegame_file != NULL)
     {
@@ -1677,8 +1672,8 @@ void G_DoSaveGame (void)
     // Now rename the temporary savegame file to the actual savegame
     // file, overwriting the old savegame if there was one there.
 
-    // remove(savegame_file);
-    // rename(temp_savegame_file, savegame_file);
+    remove(savegame_file);
+    rename(temp_savegame_file, savegame_file);
     
     gameaction = ga_nothing;
     M_StringCopy(savedescription, "", sizeof(savedescription));
@@ -2034,7 +2029,7 @@ void G_RecordDemo (char *name)
 
     i = M_CheckParmWithArgs("-maxdemo", 1);
     if (i)
-	maxsize = (int)strtoul(myargv[i+1], NULL, 10) * 1024;//atoi(myargv[i+1])*1024;
+	maxsize = atoi(myargv[i+1])*1024;
     demobuffer = Z_Malloc (maxsize,PU_STATIC,NULL); 
     demoend = demobuffer + maxsize;
 	
@@ -2149,7 +2144,7 @@ static char *DemoVersionDescription(int version)
     else
     {
         M_snprintf(resultbuf, sizeof(resultbuf),
-                   "%d.%d (unknown)", version / 100, version % 100);
+                   "%i.%i (unknown)", version / 100, version % 100);
         return resultbuf;
     }
 }
@@ -2177,7 +2172,7 @@ void G_DoPlayDemo (void)
     else
     {
         char *message = "Demo is from a different game version!\n"
-                        "(read %d, should be %d)\n"
+                        "(read %i, should be %i)\n"
                         "\n"
                         "*** You may need to upgrade your version "
                             "of Doom to v1.9. ***\n"
@@ -2267,7 +2262,7 @@ boolean G_CheckDemoStatus (void)
         timingdemo = false;
         demoplayback = false;
 
-	I_Error ("timed %d gametics in %d realtics (%f fps)",
+	I_Error ("timed %i gametics in %i realtics (%f fps)",
                  gametic, realtics, fps);
     } 
 	 

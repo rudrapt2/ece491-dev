@@ -17,8 +17,21 @@
 //      Miscellaneous.
 //
 
-#include "../usr/syscall.h"
-#include "../usr/io.h"
+
+
+#include <stdlib.h>
+#include <string.h>
+
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <io.h>
+#ifdef _MSC_VER
+#include <direct.h>
+#endif
+#else
+#include <sys/types.h>
+#endif
 
 #include "doomtype.h"
 
@@ -32,28 +45,38 @@
 #include "w_wad.h"
 #include "z_zone.h"
 
-int fsopen(int fd, char* name) {
-    char* path = malloc(strlen(name) + 3);
-    snprintf(path, strlen(name) + 3, "c/%s", name);
-    return _open(fd, path);
+//
+// Create a directory
+//
+
+void M_MakeDirectory(char *path)
+{
+#ifdef _WIN32
+    mkdir(path);
+#else
+    mkdir(path, 0755);
+#endif
 }
 
 // Check if a file exists
 
 boolean M_FileExists(char *filename)
 {
-    int fd;
+    FILE *fstream;
 
-    fd = fsopen(-1, filename);
+    fstream = fopen(filename, "r");
 
-    if (fd >= 0)
+    if (fstream != NULL)
     {
-        _close(fd);
+        fclose(fstream);
         return true;
     }
     else
     {
-        return false;
+        // If we can't open because the file is a directory, the 
+        // "file" exists at least!
+
+        return errno == EISDIR;
     }
 }
 
@@ -61,24 +84,22 @@ boolean M_FileExists(char *filename)
 // Determine the length of an open file.
 //
 
-long M_FileLength(int fd)
+long M_FileLength(FILE *handle)
 { 
     long savedpos;
-    unsigned long long length;
+    long length;
 
     // save the current position in the file
-    // savedpos = _ioctl(fd, IOCTL_GETPOS, NULL);
+    savedpos = ftell(handle);
     
     // jump to the end and find the length
-    // fseek(fd, 0, SEEK_END);
-    // length = ftell(fd);
+    fseek(handle, 0, SEEK_END);
+    length = ftell(handle);
 
     // go back to the old location
-    // fseek(fd, savedpos, SEEK_SET);
+    fseek(handle, savedpos, SEEK_SET);
 
-    _ioctl(fd, IOC_GETPOS, &length);
-
-    return (long)length;
+    return length;
 }
 
 //
@@ -87,16 +108,16 @@ long M_FileLength(int fd)
 
 boolean M_WriteFile(char *name, void *source, int length)
 {
-    int fd;
+    FILE *handle;
     int	count;
 	
-    fd = fsopen(-1, name);
+    handle = fopen(name, "wb");
 
-    if (fd < 0)
+    if (handle == NULL)
 	return false;
 
-    count = _write(fd, source, length);
-    _close(fd);
+    count = fwrite(source, 1, length, handle);
+    fclose(handle);
 	
     if (count < length)
 	return false;
@@ -111,22 +132,22 @@ boolean M_WriteFile(char *name, void *source, int length)
 
 int M_ReadFile(char *name, byte **buffer)
 {
-    int fd;
+    FILE *handle;
     int	count, length;
     byte *buf;
 	
-    fd = fsopen(-1, name);
-    if (fd < 0)
+    handle = fopen(name, "rb");
+    if (handle == NULL)
 	I_Error ("Couldn't read file %s", name);
 
     // find the size of the file by seeking to the end and
     // reading the current position
 
-    length = M_FileLength(fd);
+    length = M_FileLength(handle);
     
     buf = Z_Malloc (length, PU_STATIC, NULL);
-    count = _read(fd, buf, length);
-    _close (fd);
+    count = fread(buf, 1, length, handle);
+    fclose (handle);
 	
     if (count < length)
 	I_Error ("Couldn't read file %s", name);
@@ -157,7 +178,8 @@ char *M_TempFile(char *s)
 #else
     // In Unix, just use /tmp.
 
-    tempdir = "/tmp";
+    // tempdir = "/tmp"; // original
+    tempdir = "/c/tmp"; // original
 #endif
 
     return M_StringJoin(tempdir, DIR_SEPARATOR_S, s, NULL);
@@ -165,23 +187,10 @@ char *M_TempFile(char *s)
 
 boolean M_StrToInt(const char *str, int *result)
 {
-    /* ORIGINAL
     return sscanf(str, " 0x%x", result) == 1
         || sscanf(str, " 0X%x", result) == 1
         || sscanf(str, " 0%o", result) == 1
         || sscanf(str, " %d", result) == 1;
-    */
-    char * endptr;
-    if (strncasecmp(str, " 0x", 3) == 0) { // hex
-        *result = (int)strtoul(str + 3, &endptr, 16);
-        return *endptr == '\0'; // ensure end of string
-    }
-    if (strncmp(str, " 0", 2) == 0) { // octal
-        *result = (int)strtoul(str + 2, &endptr, 8);
-        return *endptr == '\0'; // ensure end of string
-    }
-    *result = (int)strtoul(str + 1, &endptr, 10);
-    return *endptr == '\0'; // ensure end of string
 }
 
 void M_ExtractFileBase(char *path, char *dest)
@@ -286,7 +295,7 @@ char *M_StringDuplicate(const char *orig)
 
     if (result == NULL)
     {
-        I_Error("Failed to duplicate string (length %d)\n",
+        I_Error("Failed to duplicate string (length %i)\n",
                 strlen(orig));
     }
 

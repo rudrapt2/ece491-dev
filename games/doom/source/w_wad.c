@@ -19,7 +19,8 @@
 
 
 
-#include "../usr/string.h"
+
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -158,6 +159,7 @@ wad_file_t *W_AddFile (char *filename)
     }
 
     newnumlumps = numlumps;
+
     if (strcasecmp(filename+strlen(filename)-3 , "wad" ) )
     {
     	// single lump file
@@ -197,8 +199,6 @@ wad_file_t *W_AddFile (char *filename)
 		header.numlumps = LONG(header.numlumps);
 		header.infotableofs = LONG(header.infotableofs);
 		length = header.numlumps*sizeof(filelump_t);
-        char msg[64];
-        M_snprintf(msg, 64, "length=%d", length);
 		fileinfo = Z_Malloc(length, PU_STATIC, 0);
 
         W_Read(wad_file, header.infotableofs, fileinfo, length);
@@ -212,6 +212,7 @@ wad_file_t *W_AddFile (char *filename)
     lump_p = &lumpinfo[startlump];
 
     filerover = fileinfo;
+
     for (i=startlump; i<numlumps; ++i)
     {
 		lump_p->wad_file = wad_file;
@@ -264,12 +265,12 @@ int W_CheckNumForName (char* name)
         int hash;
         
         // We do! Excellent.
-        
+
         hash = W_LumpNameHash(name) % numlumps;
         
         for (lump_p = lumphash[hash]; lump_p != NULL; lump_p = lump_p->next)
         {
-            if (!strncasecmp(lump_p->name, name, 8)) 
+            if (!strncasecmp(lump_p->name, name, 8))
             {
                 return lump_p - lumpinfo;
             }
@@ -283,7 +284,7 @@ int W_CheckNumForName (char* name)
 
         for (i=numlumps-1; i >= 0; --i)
         {
-            if (!strncasecmp(lumpinfo[i].name, name, 8)) 
+            if (!strncasecmp(lumpinfo[i].name, name, 8))
             {
                 return i;
             }
@@ -325,7 +326,7 @@ int W_LumpLength (unsigned int lump)
 {
     if (lump >= numlumps)
     {
-	I_Error ("W_LumpLength: %d >= numlumps", lump);
+	I_Error ("W_LumpLength: %i >= numlumps", lump);
     }
 
     return lumpinfo[lump].size;
@@ -345,7 +346,7 @@ void W_ReadLump(unsigned int lump, void *dest)
 	
     if (lump >= numlumps)
     {
-	I_Error ("W_ReadLump: %d >= numlumps", lump);
+	I_Error ("W_ReadLump: %i >= numlumps", lump);
     }
 
     l = lumpinfo+lump;
@@ -356,7 +357,7 @@ void W_ReadLump(unsigned int lump, void *dest)
 
     if (c < l->size)
     {
-	I_Error ("W_ReadLump: only read %d of %d on lump %d",
+	I_Error ("W_ReadLump: only read %i of %i on lump %i",
 		 c, l->size, lump);	
     }
 
@@ -385,7 +386,7 @@ void *W_CacheLumpNum(int lumpnum, int tag)
 
     if ((unsigned)lumpnum >= numlumps)
     {
-	I_Error ("W_CacheLumpNum: %d >= numlumps", lumpnum);
+	I_Error ("W_CacheLumpNum: %i >= numlumps", lumpnum);
     }
 
     lump = &lumpinfo[lumpnum];
@@ -446,7 +447,7 @@ void W_ReleaseLumpNum(int lumpnum)
 
     if ((unsigned)lumpnum >= numlumps)
     {
-	I_Error ("W_ReleaseLumpNum: %d >= numlumps", lumpnum);
+	I_Error ("W_ReleaseLumpNum: %i >= numlumps", lumpnum);
     }
 
     lump = &lumpinfo[lumpnum];

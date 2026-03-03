@@ -15,7 +15,8 @@
 // DESCRIPTION:  none
 //
 
-#include "../usr/string.h"
+
+#include <stdlib.h>
 
 #include "i_sound.h"
 #include "i_system.h"
@@ -36,10 +37,6 @@
 #include "p_local.h"
 #include "w_wad.h"
 #include "z_zone.h"
-
-static int abs(int x) {
-    return x < 0 ? -x : x;
-}
 
 // when to clip out sounds
 // Does not fit the large outdoor areas.

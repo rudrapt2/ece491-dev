@@ -19,8 +19,8 @@
 
 
 
-#include "../usr/string.h"
 
+#include <stdlib.h>
 
 
 #include "deh_main.h"
@@ -39,9 +39,6 @@
 
 #define MINZ				(FRACUNIT*4)
 #define BASEYCENTER			100
-static int abs(int x) {
-    return x < 0 ? -x : x;
-}
 
 //void R_DrawColumn (void);
 //void R_DrawFuzzColumn (void);
@@ -110,7 +107,7 @@ R_InstallSpriteLump
 	
     if (frame >= 29 || rotation > 8)
 	I_Error("R_InstallSpriteLump: "
-		"Bad frame characters in lump %d", lump);
+		"Bad frame characters in lump %i", lump);
 	
     if ((int)frame > maxframe)
 	maxframe = frame;
@@ -500,13 +497,13 @@ void R_ProjectSprite (mobj_t* thing)
     // decide which patch to use for sprite relative to player
 #ifdef RANGECHECK
     if ((unsigned int) thing->sprite >= (unsigned int) numsprites)
-	I_Error ("R_ProjectSprite: invalid sprite number %d ",
+	I_Error ("R_ProjectSprite: invalid sprite number %i ",
 		 thing->sprite);
 #endif
     sprdef = &sprites[thing->sprite];
 #ifdef RANGECHECK
     if ( (thing->frame&FF_FRAMEMASK) >= sprdef->numframes )
-	I_Error ("R_ProjectSprite: invalid sprite frame %d : %d ",
+	I_Error ("R_ProjectSprite: invalid sprite frame %i : %i ",
 		 thing->sprite, thing->frame);
 #endif
     sprframe = &sprdef->spriteframes[ thing->frame & FF_FRAMEMASK];
@@ -653,13 +650,13 @@ void R_DrawPSprite (pspdef_t* psp)
     // decide which patch to use
 #ifdef RANGECHECK
     if ( (unsigned)psp->state->sprite >= (unsigned int) numsprites)
-	I_Error ("R_ProjectSprite: invalid sprite number %d ",
+	I_Error ("R_ProjectSprite: invalid sprite number %i ",
 		 psp->state->sprite);
 #endif
     sprdef = &sprites[psp->state->sprite];
 #ifdef RANGECHECK
     if ( (psp->state->frame & FF_FRAMEMASK)  >= sprdef->numframes)
-	I_Error ("R_ProjectSprite: invalid sprite frame %d : %d ",
+	I_Error ("R_ProjectSprite: invalid sprite frame %i : %i ",
 		 psp->state->sprite, psp->state->frame);
 #endif
     sprframe = &sprdef->spriteframes[ psp->state->frame & FF_FRAMEMASK ];

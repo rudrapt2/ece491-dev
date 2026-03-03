@@ -12,6 +12,7 @@ OBJDUMP=$(TOOLPREFIX)objdump
 ULIB_OBJS = \
 	io.o \
 	heap.o \
+	error.o \
 	string.o \
 	syscall.o \
 	start.o

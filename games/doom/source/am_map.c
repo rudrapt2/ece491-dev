@@ -17,7 +17,7 @@
 //
 
 
-#include "../usr/string.h"
+
 
 #include "deh_main.h"
 
@@ -1003,7 +1003,7 @@ AM_drawFline
 	   || fl->b.x < 0 || fl->b.x >= f_w
 	   || fl->b.y < 0 || fl->b.y >= f_h)
     {
-        DEH_dprintf(2, "fuck %d \r", fuck++);
+        DEH_fprintf(stderr, "fuck %d \r", fuck++);
 	return;
     }
 

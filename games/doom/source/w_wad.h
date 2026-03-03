@@ -20,7 +20,7 @@
 #ifndef __W_WAD__
 #define __W_WAD__
 
-#include "../usr/string.h"
+
 
 #include "doomtype.h"
 #include "d_mode.h"

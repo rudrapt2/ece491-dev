@@ -59,15 +59,8 @@ void * malloc(size_t size) {
         _exit();
     }
 
-    // touch each page so it exists in memory
-    for (uintptr_t page = ROUND_UP((uintptr_t)heap_low, PAGE_SIZE); 
-         page < ROUND_UP((uintptr_t)heap_low + size, PAGE_SIZE); 
-         page += PAGE_SIZE)
-        *(char *)page = 0;
-
     ptr = heap_low;
     heap_low += size;
-    
     return ptr;
 }
 

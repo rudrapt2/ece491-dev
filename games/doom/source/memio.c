@@ -16,7 +16,7 @@
 // memory.
 //
 
-#include "../usr/string.h"
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -189,7 +189,7 @@ int mem_fseek(MEMFILE *stream, signed long position, mem_rel_t whence)
 	}
 	else
 	{
-		printf("Error seeking to %d\n", newpos);
+		printf("Error seeking to %i\n", newpos);
 		return -1;
 	}
 }

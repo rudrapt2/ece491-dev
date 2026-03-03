@@ -17,10 +17,8 @@
 //
 
 
-#include "../usr/string.h"
+
 #include <stdlib.h>
-#include "../usr/io.h"
-#include "../usr/syscall.h"
 
 #include "dstrings.h"
 #include "deh_main.h"
@@ -38,7 +36,7 @@
 #define SAVEGAME_EOF 0x1d
 #define VERSIONSIZE 16 
 
-int save_stream_fd;
+FILE *save_stream;
 int savegamelength;
 boolean savegame_error;
 
@@ -52,7 +50,7 @@ char *P_TempSaveGameFile(void)
 
     if (filename == NULL)
     {
-        filename = "temp.dsg";
+        filename = M_StringJoin(savegamedir, "temp.dsg", NULL);
     }
 
     return filename;
@@ -68,12 +66,12 @@ char *P_SaveGameFile(int slot)
 
     if (filename == NULL)
     {
-        filename_size = 32;
+        filename_size = strlen(savegamedir) + 32;
         filename = malloc(filename_size);
     }
 
     DEH_snprintf(basename, 32, SAVEGAMENAME "%d.dsg", slot);
-    M_snprintf(filename, filename_size, "%s%s", basename);
+    M_snprintf(filename, filename_size, "%s%s", savegamedir, basename);
 
     return filename;
 }
@@ -84,11 +82,11 @@ static byte saveg_read8(void)
 {
     byte result;
 
-    if (_read(save_stream_fd, &result, 1) < 1)
+    if (fread(&result, 1, 1, save_stream) < 1)
     {
         if (!savegame_error)
         {
-            dprintf(2, "saveg_read8: Unexpected end of file while "
+            fprintf(stderr, "saveg_read8: Unexpected end of file while "
                             "reading save game\n");
 
             savegame_error = true;
@@ -100,11 +98,11 @@ static byte saveg_read8(void)
 
 static void saveg_write8(byte value)
 {
-    if (_write(save_stream_fd, &value, 1) < 1)
+    if (fwrite(&value, 1, 1, save_stream) < 1)
     {
         if (!savegame_error)
         {
-            dprintf(2, "saveg_write8: Error while writing save game\n");
+            fprintf(stderr, "saveg_write8: Error while writing save game\n");
 
             savegame_error = true;
         }
@@ -151,12 +149,11 @@ static void saveg_write32(int value)
 
 static void saveg_read_pad(void)
 {
-    unsigned long long pos;
+    unsigned long pos;
     int padding;
     int i;
 
-    // pos = ftell(save_stream);
-    _ioctl(save_stream_fd, IOC_GETPOS, &pos);
+    pos = ftell(save_stream);
 
     padding = (4 - (pos & 3)) & 3;
 
@@ -168,12 +165,11 @@ static void saveg_read_pad(void)
 
 static void saveg_write_pad(void)
 {
-    unsigned long long pos;
+    unsigned long pos;
     int padding;
     int i;
 
-    // pos = ftell(save_stream);
-    _ioctl(save_stream_fd, IOC_GETPOS, &pos);
+    pos = ftell(save_stream);
 
     padding = (4 - (pos & 3)) & 3;
 
@@ -1359,7 +1355,7 @@ void P_WriteSaveGameHeader(char *description)
         saveg_write8(0);
 
     memset(name, 0, sizeof(name));
-    M_snprintf(name, sizeof(name), "version %d", G_VanillaVersionCode());
+    M_snprintf(name, sizeof(name), "version %i", G_VanillaVersionCode());
 
     for (i=0; i<VERSIONSIZE; ++i)
         saveg_write8(name[i]);
@@ -1396,7 +1392,7 @@ boolean P_ReadSaveGameHeader(void)
         read_vcheck[i] = saveg_read8();
 
     memset(vcheck, 0, sizeof(vcheck));
-    M_snprintf(vcheck, sizeof(vcheck), "version %d", G_VanillaVersionCode());
+    M_snprintf(vcheck, sizeof(vcheck), "version %i", G_VanillaVersionCode());
     if (strcmp(read_vcheck, vcheck) != 0)
 	return false;				// bad version 
 
@@ -1668,7 +1664,7 @@ void P_UnArchiveThinkers (void)
 	    break;
 
 	  default:
-	    I_Error ("Unknown tclass %d in savegame",tclass);
+	    I_Error ("Unknown tclass %i in savegame",tclass);
 	}
 	
     }
@@ -1885,7 +1881,7 @@ void P_UnArchiveSpecials (void)
 	    break;
 				
 	  default:
-	    I_Error ("P_UnarchiveSpecials:Unknown tclass %d "
+	    I_Error ("P_UnarchiveSpecials:Unknown tclass %i "
 		     "in savegame",tclass);
 	}
 	

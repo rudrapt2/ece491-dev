@@ -18,6 +18,7 @@ ULIB_OBJS = \
 	../usr/build/io.o \
 	../usr/build/heap.o \
 	../usr/build/start.o \
+	../usr/build/error.o \
 	../usr/build/string.o \
 	../usr/build/syscall.o
 
@@ -25,7 +26,7 @@ CFLAGS = -Wall -fno-omit-frame-pointer -ggdb -gdwarf-2
 CFLAGS += -mcmodel=medany -fno-pie -no-pie -march=rv64g -mabi=lp64d
 CFLAGS += -ffreestanding -fno-common -nostdlib -mno-relax
 CFLAGS += -fno-asynchronous-unwind-tables
-CFLAGS += -I. -I.. -DUMODE
+CFLAGS += -I. -I.. -I../usr -DUMODE
 
 ULIB_LD = ../usr/umode.ld
 
@@ -116,7 +117,8 @@ SRC_DOOM = \
  doomgeneric.o \
  doomgeneric_illinix.o
 
-OBJS += $(addprefix $(OBJDIR)/, $(SRC_DOOM))
+OBJS += $(addprefix $(OBJDIR)/, $(SRC_DOOM)) \
+		../glue.o
 
 all:	 $(OUTPUT)
 	mv doomgeneric ../bin/doom

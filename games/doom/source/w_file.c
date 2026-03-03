@@ -16,7 +16,7 @@
 //	WAD I/O functions.
 //
 
-#include "../usr/string.h"
+
 
 #include "config.h"
 

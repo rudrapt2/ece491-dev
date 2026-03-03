@@ -2,7 +2,7 @@
 
 #include "doomgeneric.h"
 
-#include "../usr/string.h"
+
 
 #include <Windows.h>
 

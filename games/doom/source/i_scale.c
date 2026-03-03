@@ -18,7 +18,7 @@
 //         Aspect ratio-correcting stretch functions
 //
 
-#include "../usr/string.h"
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -375,9 +375,9 @@ static void I_InitStretchTables(byte *palette)
     // mix 100% =  just write line 2
 
     printf("I_InitStretchTables: Generating lookup tables..");
-    // fflush(1);
+    fflush(stdout);
     stretch_tables[0] = GenerateStretchTable(palette, 20);
-    printf(".."); //fflush(1);
+    printf(".."); fflush(stdout);
     stretch_tables[1] = GenerateStretchTable(palette, 40);
     puts("");
 }
@@ -392,7 +392,7 @@ static void I_InitSquashTable(byte *palette)
     }
 
     printf("I_InitSquashTable: Generating lookup table..");
-    // fflush(1);
+    fflush(stdout);
     half_stretch_table = GenerateStretchTable(palette, 50);
     puts("");
 }

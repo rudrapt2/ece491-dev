@@ -17,7 +17,7 @@
 //
 
 #include <stdlib.h>
-#include <../usr/string.h>
+#include <string.h>
 
 #include "doomfeatures.h"
 
@@ -173,7 +173,7 @@ static boolean BuildNewTic(void)
            return false;
     }
 
-    //printf ("mk:%d ",maketic);
+    //printf ("mk:%i ",maketic);
     memset(&cmd, 0, sizeof(ticcmd_t));
     loop_interface->BuildTiccmd(&cmd, maketic);
 

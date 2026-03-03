@@ -188,14 +188,12 @@ Z_Malloc
   void*		user )
 {
     int		extra;
-    int     orig_size;
     memblock_t*	start;
     memblock_t* rover;
     memblock_t* newblock;
     memblock_t*	base;
     void *result;
 
-    orig_size = size;
     size = (size + MEM_ALIGN - 1) & ~(MEM_ALIGN - 1);
     
     // scan through the block list,
@@ -221,7 +219,7 @@ Z_Malloc
         if (rover == start)
         {
             // scanned all the way around the list
-            I_Error ("Z_Malloc: failed on allocation of %d bytes", size);
+            I_Error ("Z_Malloc: failed on allocation of %i bytes", size);
         }
 	
         if (rover->tag != PU_FREE)
@@ -287,7 +285,6 @@ Z_Malloc
     mainzone->rover = base->next;	
 	
     base->id = ZONEID;
-    memset(result, 0, orig_size);
     
     return result;
 }
@@ -334,10 +331,10 @@ Z_DumpHeap
 {
     memblock_t*	block;
 	
-    printf ("zone size: %d  location: %p\n",
+    printf ("zone size: %i  location: %p\n",
 	    mainzone->size,mainzone);
     
-    printf ("tag range: %d to %d\n",
+    printf ("tag range: %i to %i\n",
 	    lowtag, hightag);
 	
     for (block = mainzone->blocklist.next ; ; block = block->next)
@@ -367,15 +364,15 @@ Z_DumpHeap
 //
 // Z_FileDumpHeap
 //
-void Z_FileDumpHeap (int f)
+void Z_FileDumpHeap (FILE* f)
 {
     memblock_t*	block;
 	
-    dprintf (f,"zone size: %d  location: %p\n",mainzone->size,mainzone);
+    fprintf (f,"zone size: %i  location: %p\n",mainzone->size,mainzone);
 	
     for (block = mainzone->blocklist.next ; ; block = block->next)
     {
-	dprintf (f,"block:%p    size:%7i    user:%p    tag:%3i\n",
+	fprintf (f,"block:%p    size:%7i    user:%p    tag:%3i\n",
 		 block, block->size, block->user, block->tag);
 		
 	if (block->next == &mainzone->blocklist)
@@ -385,13 +382,13 @@ void Z_FileDumpHeap (int f)
 	}
 	
 	if ( (byte *)block + block->size != (byte *)block->next)
-	    dprintf (f,"ERROR: block size does not touch the next block\n");
+	    fprintf (f,"ERROR: block size does not touch the next block\n");
 
 	if ( block->next->prev != block)
-	    dprintf (f,"ERROR: next block doesn't have proper back link\n");
+	    fprintf (f,"ERROR: next block doesn't have proper back link\n");
 
 	if (block->tag == PU_FREE && block->next->tag == PU_FREE)
-	    dprintf (f,"ERROR: two consecutive free blocks\n");
+	    fprintf (f,"ERROR: two consecutive free blocks\n");
     }
 }
 
@@ -436,11 +433,11 @@ void Z_ChangeTag2(void *ptr, int tag, char *file, int line)
     block = (memblock_t *) ((byte *)ptr - sizeof(memblock_t));
 
     if (block->id != ZONEID)
-        I_Error("%s:%d: Z_ChangeTag: block without a ZONEID!",
+        I_Error("%s:%i: Z_ChangeTag: block without a ZONEID!",
                 file, line);
 
     if (tag >= PU_PURGELEVEL && block->user == NULL)
-        I_Error("%s:%d: Z_ChangeTag: an owner is required "
+        I_Error("%s:%i: Z_ChangeTag: an owner is required "
                 "for purgable blocks", file, line);
 
     block->tag = tag;

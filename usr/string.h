@@ -92,6 +92,13 @@ extern int islower(const char c);
 extern char toupper(const char c);
 
 /*!
+  * @brief Return whether a char is a form of space.
+  * @param c A character.
+  * @return 1 if lowercase, 0 otherwise.
+  */
+extern int isspace(const char c);
+
+/*!
  * @brief Return the length of the given string
  * @param s A string.
  * @return Length of the string.
