@@ -8,7 +8,7 @@
 #include "ioimpl.h"
 #include "intr.h"
 #include "heap.h"
-#include "conf.h"
+#include "board-conf.h"
 #include "misc.h"
 #include "error.h"
 #include "device.h"

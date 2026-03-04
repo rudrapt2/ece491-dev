@@ -19,7 +19,7 @@
 #include "thread.h"
 #include "error.h"
 #include "string.h"
-#include "conf.h"
+#include "board-conf.h"
 #include "misc.h"
 #include "error.h"
 #include "console.h"

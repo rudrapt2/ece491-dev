@@ -14,7 +14,7 @@
 #define DEBUG
 #endif
 
-#include "conf.h"
+#include "board-conf.h"
 #include "intr.h"
 #include "heap.h"
 #include "thread.h"

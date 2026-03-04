@@ -9,7 +9,7 @@
 #include "string.h"
 #include "thread.h"
 #include "device.h"
-#include "conf.h"
+#include "board-conf.h"
 #include "intr.h"
 #include "misc.h"
 #include "ioimpl.h"
@@ -29,8 +29,8 @@
 #define VIORNG_NAME "viorng"
 #endif
 
-#ifndef VIORNG_IRQ_PRIO
-#define VIORNG_IRQ_PRIO 1
+#ifndef VIORNG_INTR_PRIO
+#define VIORNG_INTR_PRIO 1
 #endif
 
 // INTERNAL TYPE DEFINITIONS

@@ -12,7 +12,6 @@
 #define DEBUG
 #endif
 
-#include "conf.h"
 #include "misc.h"
 #include "device.h"
 #include "console.h"
