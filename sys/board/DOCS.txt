@@ -1,0 +1,7 @@
+In order to add and build the kernel for a new target:
+
+- Create a folder named after your target
+- Add a kernel.ld with the correct load address of the kernel
+- Add a init.c with the correct board_init()
+- Run ./configure [new_target] in the sys/ directory
+- Profit

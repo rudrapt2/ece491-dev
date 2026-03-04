@@ -11,12 +11,14 @@ OBJCOPY=$(PREFIX)objcopy
 OBJDUMP=$(PREFIX)objdump
 UNIFDEF=unifdef
 
+TARGET=qvirt
+
 CP1=0
 
 OBJS = \
 	start.o \
 	main.o \
-	board/qvirt.o \
+	board/$(TARGET)/init.o \
 	console.o \
 	dev/uart.o \
 	dev/rtc.o \
@@ -62,7 +64,7 @@ OBJS = \
 	dev/viorng.o \
 	dev/vioblk.o \
     dev/viogpu.o \
-	board/qvirt.o \
+	board/$(TARGET)/init.o \
 
 VIDEO_OBJS = \
 	$(OBJS) \
@@ -102,7 +104,7 @@ CFLAGS += -I.
 
 ASFLAGS = -march=rv64imazicsr
 
-LDFLAGS = -melf64lriscv -T board/qvirt.ld
+LDFLAGS = -melf64lriscv -T board/$(TARGET)/kernel.ld
 
 QEMUOPTS = -global virtio-mmio.force-legacy=false
 QEMUOPTS += -machine virt -nographic
@@ -127,7 +129,7 @@ endif
 all: kernel.elf
 
 clean:
-	rm -rf board/*.o dev/*.o fs/*.o *.o *.elf
+	rm -rf board/*/*.o dev/*.o fs/*.o *.o *.elf
 
 kernel.elf: $(OBJS) blob.o
 	$(LD) $(LDFLAGS) -o $@ $^
