@@ -46,16 +46,6 @@ struct mregion {
     unsigned long size;
 };
 
-struct matlas {
-    struct mregion * ram;
-    struct mregion * mmio;
-    struct mregion * resv;
-
-    uint64_t ram_size;
-    uint64_t mmio_size;
-    uint64_t resv_size;
-};
-
 // EXPORTED FUNCTION DECLARATIONS
 //
 
@@ -66,7 +56,7 @@ extern char memory_initialized;
  * the heap memory manager, and adds remaining memory to the free chunk list
  * @return None
  */
-extern void memory_init(struct matlas * mappings);
+extern void memory_init(struct mregion * mmio, struct mregion * ram, struct mregion * resv, unsigned long mmio_size, unsigned long ram_size, unsigned long resv_size);
 
 /**
  * @brief Gets the active memory space
