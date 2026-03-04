@@ -22,12 +22,13 @@ OBJS = \
 	dev/vioblk.o \
 	dev/virtio.o \
 	dev/viorng.o \
-	games/rule30-mp2.o \
-	games/trek-mp2.o \
+	dev/loop.o \
+	rbuf.o \
 	string.o \
 	plic.o \
 	string.o \
 	error.o \
+	iomux.o \
 	thrasm.o \
 	trap.o \
 	mp2-main.o \
