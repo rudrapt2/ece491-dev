@@ -7,6 +7,7 @@
 #include <stddef.h>
 
 #include "console.h" // console_init();
+#include "memory.h" // memory_init();
 
 // Run-time configuration
 //
@@ -49,6 +50,28 @@
 // Device attach function declarations
 //
 
+static struct mregion opi_ram[] = {
+	{0x40000000, 2UL * 1024 * 1024 * 1024}, {0x0, 0}
+};
+
+static struct mregion opi_mmio[] = {
+	{0x0, 0x40000000}, {0x0, 0}
+};
+
+static struct mregion opi_resv[] = {
+	{0x40000000, 0x80000}, {0x0, 0}
+};
+
+static struct matlas opi_matlas = {
+	.ram = opi_ram,
+	.mmio = opi_mmio,
+	.resv = opi_resv,
+
+	.ram_size = 1,
+	.mmio_size = 1,
+	.resv_size = 1
+};
+
 extern void plic_init(void * mmio_base); // plic.c
 extern void timer_init(unsigned int freq); // timer.c
 
@@ -60,7 +83,7 @@ void board_init(unsigned int hartid, void * dtb) {
     plic_init((void*)PLIC_MMIO_BASE);
     timer_init(TIMER_FREQ);
 
-    memory_init(); // FIXME MAANASA using RSV_START_PMA and RSV_END_PMA
+    memory_init(&opi_matlas);
 }
 
 void attach_board_devices(void) {
