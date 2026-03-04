@@ -15,7 +15,7 @@ fi
 
 # Look in the board directory and find all available targets
 BOARDS_DIR="./board/"
-SUPPORTED_TARGETS=($(basename -a "$BOARDS_DIR"/*))
+SUPPORTED_TARGETS=($(basename -a "$BOARDS_DIR"/*/))
 
 # Capture new target from first arg
 NEW_TARGET=$1
