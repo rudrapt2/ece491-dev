@@ -62,16 +62,6 @@ static struct mregion opi_resv[] = {
 	{0x40000000, 0x80000}, {0x0, 0}
 };
 
-static struct matlas opi_matlas = {
-	.ram = opi_ram,
-	.mmio = opi_mmio,
-	.resv = opi_resv,
-
-	.ram_size = 1,
-	.mmio_size = 1,
-	.resv_size = 1
-};
-
 extern void plic_init(void * mmio_base); // plic.c
 extern void timer_init(unsigned int freq); // timer.c
 
@@ -83,7 +73,7 @@ void board_init(unsigned int hartid, void * dtb) {
     plic_init((void*)PLIC_MMIO_BASE);
     timer_init(TIMER_FREQ);
 
-    memory_init(&opi_matlas);
+    memory_init(opi_mmio, opi_ram, opi_resv, 1, 1, 1);
 }
 
 void attach_board_devices(void) {

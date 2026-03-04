@@ -178,7 +178,7 @@ static struct page_chunk * free_chunk_list;
 //
 
 #ifdef STUDENT
-void memory_init(struct matlas * mappings) {
+void memory_init(struct mregion * mmio, struct mregion * ram, struct mregion * resv, unsigned long mmio_size, unsigned long ram_size, unsigned long resv_size) {
     const void * const text_start = _kimg_text_start;
     const void * const text_end = _kimg_text_end;
     const void * const rodata_start = _kimg_rodata_start;
@@ -309,7 +309,7 @@ void memory_init(struct matlas * mappings) {
     memory_initialized = 1;
 }
 #else
-void memory_init(struct matlas * mappings) {
+void memory_init(struct mregion * mmio, struct mregion * ram, struct mregion * resv, unsigned long mmio_size, unsigned long ram_size, unsigned long resv_size) {
     struct mregion kernel_text = {
         .pma = (uintptr_t)_kimg_text_start,
         .size = (uintptr_t)_kimg_text_end - (uintptr_t)_kimg_text_start
@@ -329,52 +329,52 @@ void memory_init(struct matlas * mappings) {
     debug("  Kernel image: [%p,%p)", _kimg_start, _kimg_end);
 
     //If there is no RAM, we fail. (Who's hopes and dreams did we load the kernel into and start the stack on???)
-    assert(mappings->ram_size > 0);
+    assert(ram_size > 0);
 
     //Add the kernel as a reserved region - we'll set up permissions later, this is to initialize the chunk list
-    mappings->resv_size+=1;
+    resv_size+=1;
 
     //Probably don't need to check this because elf files are guaranteed to be page aligned but I do it to be safe anyway.
-    mappings->resv[mappings->resv_size-1].pma = 
+    resv[resv_size-1].pma = 
         ROUND_DOWN((uintptr_t)(void *)_kimg_start, PAGE_SIZE);
-    mappings->resv[mappings->resv_size-1].size = 
+    resv[resv_size-1].size = 
         ROUND_UP((uintptr_t)(void *)_kimg_end, PAGE_SIZE) - 
         ROUND_DOWN((uintptr_t)(void *)_kimg_start, PAGE_SIZE);
 
     //Sort to avoid O(n^2) while initializing the free chunk list.
-    sort((uintptr_t)(void *)mappings->resv, sizeof(struct mregion), mappings->resv_size, cmp_mregion);
-    sort((uintptr_t)(void *)mappings->ram, sizeof(struct mregion), mappings->ram_size, cmp_mregion);
-    sort((uintptr_t)(void *)mappings->mmio, sizeof(struct mregion), mappings->mmio_size, cmp_mregion);
+    sort((uintptr_t)(void *)resv, sizeof(struct mregion), resv_size, cmp_mregion);
+    sort((uintptr_t)(void *)ram, sizeof(struct mregion), ram_size, cmp_mregion);
+    sort((uintptr_t)(void *)mmio, sizeof(struct mregion), mmio_size, cmp_mregion);
 
     //Merge overlapping regions and null out entries that have been subsumed
-    combine(mappings->resv, mappings->resv_size);
-    combine(mappings->ram, mappings->ram_size);
-    combine(mappings->mmio, mappings->mmio_size);
+    combine(resv, resv_size);
+    combine(ram, ram_size);
+    combine(mmio, mmio_size);
 
     //Initialize free_chunk_list to start of RAM.
     free_chunk_list = NULL;
     struct page_chunk** curr = &free_chunk_list;
-    uintptr_t chunk_start = mappings->ram->pma; //first entry guaranteed to be non-NULL
+    uintptr_t chunk_start = ram->pma; //first entry guaranteed to be non-NULL
 
     //Build free_chunk_list
     //ASSUME: Resv is a strict subset of RAM
-    for (int ram_idx = 0, resv_idx = 0; ram_idx < mappings->ram_size;) {
+    for (int ram_idx = 0, resv_idx = 0; ram_idx < ram_size;) {
         unsigned long sz = 0;
         uintptr_t start = chunk_start;
 
-        while (mappings->resv[resv_idx].size == 0x0 && resv_idx < mappings->resv_size)
+        while (resv[resv_idx].size == 0x0 && resv_idx < resv_size)
             resv_idx++; //Ignore NULLs
 
-        if (mappings->ram[ram_idx].pma + mappings->ram[ram_idx].size < mappings->resv[resv_idx].pma || resv_idx >= mappings->resv_size) {
-            sz = mappings->ram[ram_idx].pma + mappings->ram[ram_idx].size - start;
+        if (ram[ram_idx].pma + ram[ram_idx].size < resv[resv_idx].pma || resv_idx >= resv_size) {
+            sz = ram[ram_idx].pma + ram[ram_idx].size - start;
             ram_idx++;
-            while (mappings->ram[ram_idx].size == 0x0 && ram_idx <= mappings->ram_size)
+            while (ram[ram_idx].size == 0x0 && ram_idx <= ram_size)
                 ram_idx++; //Ignore NULLs
-            chunk_start = mappings->ram[ram_idx].pma;
+            chunk_start = ram[ram_idx].pma;
         }
         else {
-            sz = mappings->resv[resv_idx].pma - start;
-            chunk_start = mappings->resv[resv_idx].pma + mappings->resv[resv_idx].size;
+            sz = resv[resv_idx].pma - start;
+            chunk_start = resv[resv_idx].pma + resv[resv_idx].size;
             resv_idx++;
         }
 
@@ -393,13 +393,13 @@ void memory_init(struct matlas * mappings) {
     memset(main_pt2, 0, 4096);
 
     //Map MMIO
-    map_startup(mappings->mmio, mappings->mmio_size, PTE_R | PTE_W);
+    map_startup(mmio, mmio_size, PTE_R | PTE_W);
 
     //Map RAM (R/W)
-    map_startup(mappings->ram, mappings->ram_size, PTE_R | PTE_W);
+    map_startup(ram, ram_size, PTE_R | PTE_W);
 
     //Map Reserved regions (R)
-    modify_startup(mappings->resv, mappings->resv_size, PTE_R);
+    modify_startup(resv, resv_size, PTE_R);
 
     //Map Kernel (Text: RX, Rodata: R, Data: RW)
     modify_startup(&kernel_text, 1, PTE_R | PTE_X);
