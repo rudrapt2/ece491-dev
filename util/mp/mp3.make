@@ -11,8 +11,8 @@ TARGET_DIR  := /home/rudrapt2/sp26_ece391/mp3-sp26/gold/cp2_3
 # Format: "source:destination" OR "path" (if source and dest are same)
 FILES_FOR_COPYING   := \
     sys/bios/osbi181q.bin \
-    sys/board/qvirt.ld \
-    sys/board/qvirt.c \
+    sys/board/qvirt/kernel.ld \
+    sys/board/qvirt/init.c \
     sys/dev/rtc.c \
     sys/dev/uart.c \
     sys/dev/vioblk.c \

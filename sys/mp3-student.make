@@ -11,10 +11,12 @@ OBJCOPY=$(PREFIX)objcopy
 OBJDUMP=$(PREFIX)objdump
 UNIFDEF=unifdef
 
+TARGET=qvirt
+
 CP1=0
 
 OBJS = \
-	board/qvirt.o \
+	board/$(TARGET)/init.o \
 	dev/rtc.o \
 	dev/uart.o \
 	dev/vioblk.o \
@@ -78,7 +80,7 @@ CFLAGS += -I.
 
 ASFLAGS = -march=rv64imazicsr
 
-LDFLAGS = -melf64lriscv -T board/qvirt.ld
+LDFLAGS = -melf64lriscv -T board/$(TARGET)/kernel.ld
 
 QEMUOPTS = -global virtio-mmio.force-legacy=false
 QEMUOPTS += -machine virt -nographic
