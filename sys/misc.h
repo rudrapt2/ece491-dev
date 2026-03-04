@@ -18,6 +18,7 @@
 
 // The MIN and MAX macros find the minumum and maximum between /a/ and /b/
 // respectively.
+
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 

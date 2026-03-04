@@ -1,4 +1,4 @@
-// uart.c - NS8550-compatible UART
+// dw-uart.c - DesignWare APB UART
 //
 // Copyright (c) 2024-2026 University of Illinois
 // SPDX-License-identifier: NCSA
@@ -17,9 +17,11 @@
 #include "heap.h"
 #include "console.h"
 #include "device.h"
+#include "thread.h"
 #include "misc.h"
 #include "ioimpl.h"
 #include "error.h"
+#include "rbuf.h"
 
 #include <stdint.h>
 
@@ -97,13 +99,6 @@ struct uart_regs {
 #define IIR_NO_INT 0x01         // 0x01
 #define IIR_BUSY 0x07           // Busy detect
 
-// Simple fixed-size ring buffer
-
-struct ringbuf {
-    unsigned int hpos; // head of queue (from where elements are removed)
-    unsigned int tpos; // tail of queue (where elements are inserted)
-    char data[UART_RBUFSZ];
-};
 
 // UART device structure
 
@@ -121,37 +116,33 @@ struct uart_device {
     unsigned long rxovrcnt; // number of times OE was set on entry to ISR
 #endif
 
-    struct ringbuf rxbuf;
-    struct ringbuf txbuf;
+    struct rbuf rxbuf;
+    struct rbuf txbuf;
     unsigned int is_console;
+    char rxbufmem[UART_RBUFSZ];
+    char txbufmem[UART_RBUFSZ];
 };
 
 // INTERNAL FUNCTION DEFINITIONS
 //
 
-static int uart_open(struct io ** ioptr, void * aux);
-static void uart_reclaim(struct io * io);
-static long uart_read(struct io * io, void * buf, long bufsz);
-static long uart_write(struct io * io, const void * buf, long len);
+static int dwuart_open(struct io ** ioptr, void * aux);
+static void dwuart_reclaim(struct io * io);
+static long dwuart_read(struct io * io, void * buf, long bufsz);
+static long dwuart_write(struct io * io, const void * buf, long len);
+static int dwuart_ioctl(struct io * io, int op, void * arg);
 
-static void uart_isr(int srcno, void * aux);
-
-// Ring buffer (struct rbuf) functions
-
-static void rbuf_init(struct ringbuf * rbuf);
-static int rbuf_empty(const struct ringbuf * rbuf);
-static int rbuf_full(const struct ringbuf * rbuf);
-static void rbuf_putc(struct ringbuf * rbuf, char c);
-static char rbuf_getc(struct ringbuf * rbuf);
+static void dwuart_isr(int srcno, void * aux);
 
 // INTERNAL GLOBAL VARIABLES
 //
 
 static const struct iointf uart_intf = {
-    .implname = "uart",
-    .read = &uart_read,
-    .write = &uart_write,
-    .reclaim = &uart_reclaim
+    .implname = "dwuart",
+    .reclaim = &dwuart_reclaim,
+    .read = &dwuart_read,
+    .write = &dwuart_write,
+    .ioctl = &dwuart_ioctl
 };
 
 // EXPORTED FUNCTION DEFINITIONS
@@ -180,11 +171,11 @@ void attach_uart(void * mmio_base, int irqno) {
         uart->regs->fcr = FCR_ENABLE | FCR_RCVR_RST | FCR_XMIT_RST | FCR_TRIGGER_14;
     }
 
-    register_device(UART_DEVNAME, instcnt++, &uart_open, uart);
+    register_device(UART_DEVNAME, instcnt++, &dwuart_open, uart);
     ioinit(&uart->io, &uart_intf, 1, 0);
 }
 
-int uart_open(struct io ** ioptr, void * aux) {
+int dwuart_open(struct io ** ioptr, void * aux) {
     struct uart_device * const uart = aux;
 
     trace("%s()", __func__);
@@ -194,8 +185,8 @@ int uart_open(struct io ** ioptr, void * aux) {
     
     // Reset receive and transmit buffers
     
-    rbuf_init(&uart->rxbuf);
-    rbuf_init(&uart->txbuf);
+    rbuf_init(&uart->rxbuf, uart->rxbufmem, sizeof(uart->rxbufmem));
+    rbuf_init(&uart->txbuf, uart->txbufmem, sizeof(uart->txbufmem));
 
     // Read RBR to flush any stale data in hardware buffer
     uart->regs->iir;
@@ -208,7 +199,7 @@ int uart_open(struct io ** ioptr, void * aux) {
     if(!uart->is_console){
         uart->regs->fcr = FCR_ENABLE | FCR_RCVR_RST | FCR_XMIT_RST | FCR_TRIGGER_14;
         uart->regs->ier = IER_DRIE;
-        enable_intr_source(uart->irqno, UART_INTR_PRIO, uart_isr, uart);
+        enable_intr_source(uart->irqno, UART_INTR_PRIO, dwuart_isr, uart);
     } else {
         uart->regs->fcr = FCR_ENABLE | FCR_RCVR_RST | FCR_XMIT_RST | FCR_TRIGGER_14;
         uart->regs->ier = 0;
@@ -218,7 +209,7 @@ int uart_open(struct io ** ioptr, void * aux) {
     return 0;
 }
 
-void uart_reclaim(struct io * io) {
+void dwuart_reclaim(struct io * io) {
     struct uart_device * const uart =
         (void*)io - offsetof(struct uart_device, io);
 
@@ -232,7 +223,7 @@ void uart_reclaim(struct io * io) {
     }
 }
 
-long uart_read(struct io * io, void * buf, long bufsz) {
+long dwuart_read(struct io * io, void * buf, long bufsz) {
 
     struct uart_device * const uart =
         (void*)io - offsetof(struct uart_device, io);
@@ -279,10 +270,7 @@ long uart_read(struct io * io, void * buf, long bufsz) {
     return n;
 }
 
-long uart_write(struct io * io, const void * buf, long buflen) {
-#ifdef STUDENT
-    // YOUR CODE HERE
-#else
+long dwuart_write(struct io * io, const void * buf, long buflen) {
     struct uart_device * const uart =
         (void*)io - offsetof(struct uart_device, io);
     long n = 0; // number of bytes written so far
@@ -328,13 +316,13 @@ long uart_write(struct io * io, const void * buf, long buflen) {
     }
 
     return n;
-#endif
 }
 
-void uart_isr(int srcno, void * aux) {
-#ifdef STUDENT
-    // YOUR CODE HERE
-#else
+int dwuart_ioctl(struct io * io, int op, void * arg) {
+    return -ENOTSUP;
+}
+
+void dwuart_isr(int srcno, void * aux) {
     struct uart_device * const uart = aux;
     const uint32_t line_status = uart->regs->lsr;
     uint32_t iir = uart->regs->iir & 0x0F;
@@ -369,38 +357,4 @@ void uart_isr(int srcno, void * aux) {
             uart->regs->ier &= ~IER_THREIE;
         }
     }
-#endif
-}
-
-void rbuf_init(struct ringbuf * rbuf) {
-    rbuf->hpos = 0;
-    rbuf->tpos = 0;
-}
-
-int rbuf_empty(const struct ringbuf * rbuf) {
-    return (rbuf->hpos == rbuf->tpos);
-}
-
-int rbuf_full(const struct ringbuf * rbuf) {
-    return (rbuf->tpos - rbuf->hpos == UART_RBUFSZ);
-}
-
-void rbuf_putc(struct ringbuf * rbuf, char c) {
-    uint_fast16_t tpos;
-
-    tpos = rbuf->tpos;
-    rbuf->data[tpos % UART_RBUFSZ] = c;
-    asm volatile ("" ::: "memory");
-    rbuf->tpos = tpos + 1;
-}
-
-char rbuf_getc(struct ringbuf * rbuf) {
-    uint_fast16_t hpos;
-    char c;
-
-    hpos = rbuf->hpos;
-    c = rbuf->data[hpos % UART_RBUFSZ];
-    asm volatile ("" ::: "memory");
-    rbuf->hpos = hpos + 1;
-    return c;
 }
