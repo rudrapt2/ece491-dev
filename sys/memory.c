@@ -185,6 +185,14 @@ void memory_init(struct mregion * mmio, struct mregion * ram, struct mregion * r
     const void * const rodata_end = _kimg_rodata_end;
     const void * const data_start = _kimg_data_start;
 
+    // All parameters are used for running on real hardware; you can ignore them in this simplified memory_init() implementation
+    (void)mmio;
+    (void)ram;
+    (void)resv;
+    (void)mmio_size;
+    (void)ram_size;
+    (void)resv_size;
+
     void * heap_start;
     void * heap_end;
 
