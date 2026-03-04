@@ -421,7 +421,7 @@ long sysread(int fd, void * buf, size_t bufsz) {
 
     // Ensure memory region is user-writable
 
-    result = validate_vptr(buf, bufsz, PTE_W | PTE_U);
+    result = enforce_vptr(buf, bufsz, PTE_W | PTE_U);
 
     if (result != 0)
         return result;
@@ -450,7 +450,7 @@ long syswrite(int fd, const void *buf, size_t len) {
 
     // Ensure memory region is user-readable
 
-    result = validate_vptr(buf, len, PTE_R | PTE_U);
+    result = enforce_vptr(buf, len, PTE_R | PTE_U);
 
     if (result != 0)
         return result;
@@ -488,7 +488,7 @@ int sysioctl(int fd, int op, uintptr_t arg_uma) {
     case IOC_GETEND:
         flags |= PTE_R;
 
-        result = validate_vptr(
+        result = enforce_vptr(
             (void *)arg_uma, sizeof(unsigned long long), flags);
         if (result != 0)
             return result;
@@ -512,16 +512,16 @@ int syspipe(int * wfdptr, int * rfdptr) {
     int wfd, rfd;
     int result;
 
-    trace("%s(wfd=%d,rfd=%d)", __func__, wfd, rfd);
+    trace("%s(wfd=%d,rfd=%d)", __func__, *wfdptr, *rfdptr);
 
     // Ensure memory region is user-writable
 
-    result = validate_vptr(wfdptr, sizeof(int), PTE_W | PTE_U);
+    result = enforce_vptr(wfdptr, sizeof(int), PTE_W | PTE_U);
 
     if (result != 0)
         return result;
 
-    result = validate_vptr(rfdptr, sizeof(int), PTE_W | PTE_U);
+    result = enforce_vptr(rfdptr, sizeof(int), PTE_W | PTE_U);
 
     if (result != 0)
         return result;

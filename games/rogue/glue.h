@@ -4,7 +4,7 @@
 #ifndef _GLUE_H_
 #define _GLUE_H_
 
-#include <cstddef>
+#include <stddef.h>
 #include <stdint.h>
 
 extern const char * const termcap;
@@ -21,7 +21,7 @@ extern int fread(void *ptr, size_t size, size_t nmemb, int fd);
 extern void sleep(unsigned int cnt);
 extern int putchar(int c);
 extern int getchar(void);
-extern inline void exit(void);
+extern void exit(void);
 
 extern int random_seed(void);
 

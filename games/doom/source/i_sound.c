@@ -15,7 +15,7 @@
 // DESCRIPTION:  none
 //
 
-#include "../usr/string.h"
+
 #include <stdlib.h>
 
 #if defined(FEATURE_SOUND) && !defined(__DJGPP__)

@@ -4,6 +4,14 @@
 // SPDX-License-identifier: NCSA
 //
 
+#ifdef IOMUX_TRACE
+#define TRACE
+#endif
+
+#ifdef IOMUX_DEBUG
+#define DEBUG
+#endif
+
 #include "rbuf.h"
 #include "ioimpl.h"
 #include "thread.h"
@@ -37,9 +45,10 @@ struct iomux4 {
     struct io * cdevio;
     signed char rxchno;
     char rxesc, rxeof;
+    char rxbusy;
     int err;
-    struct rwlock rxlock;
     struct rwlock txlock;
+    struct condition rxupd;
     struct iomux4_chan ch[4];
 };
 
@@ -60,7 +69,7 @@ static int iomux4_chan_ioctl (
 
 static void iomux4_chan_reclaim(struct iomux4 * mux, int chno);
 
-static void iomux4_recv(struct iomux4 * mux);
+static void iomux4_receive(struct iomux4 * mux);
 
 // DEVICE AND IOINTF FUNCTION DECLARATIONS
 //
@@ -143,10 +152,12 @@ int attach_iomux4(const char * cdevname) {
     size_t namelen;
     int result = 0;
 
+    trace("%s(\"%s\")", __func__, cdevname);
+
     // Check if carrier device exists. We don't actually open it until one of
     // the channel devices is opened.
 
-    if (device_exists(cdevname))
+    if (!device_exists(cdevname))
         return -ENOENT;
 
     // We use the receive buffer memory as a string buffer to create channel
@@ -163,16 +174,17 @@ int attach_iomux4(const char * cdevname) {
 
     for (int i = 0; i < 4; i++) {
         snprintf(namebuf, sizeof(namebuf), "%sch%d", cdevname, i);
-        if (device_exists(namebuf))
+        if (device_exists(namebuf)) {
             return -EEXIST;
+        }
     }
 
     mux = kcalloc(1, sizeof(struct iomux4));
 
     // Initialize iomux4 structure members
     
-    rwlock_init(&mux->rxlock, "iomux4.rxlock");
     rwlock_init(&mux->txlock, "iomux4.txlock");
+    condition_init(&mux->rxupd, "iomux4.rxupd");
     mux->cdevname = cdevname;
 
     // Initialize I/O objects for each channel and register the channel devices.
@@ -200,8 +212,10 @@ int iomux4_chan_open(struct io ** ioptr, struct iomux4 * mux, int chno) {
     struct io * const chio = &mux->ch[chno].io;
     int result;
 
+    trace("%s(%p,%d)", __func__, mux, chno);
+
     if (iorefcnt(chio) != 0)
-        return -EBUSY;    
+        return -EBUSY;
 
     // We wait to open the carrier device until one of the channels is opened. 
 
@@ -239,7 +253,8 @@ int iomux4_chan_open(struct io ** ioptr, struct iomux4 * mux, int chno) {
     rbuf_reset(&mux->ch[chno].rxbuf);
     mux->ch[chno].dropcnt = 0;
 
-    return mux->err; // 0 if no error
+    *ioptr = ioaddref(&mux->ch[chno].io);
+    return 0;
 }
 
 void iomux4_chan_reclaim(struct iomux4 * mux, int chno __attribute__ ((unused))) {
@@ -260,30 +275,46 @@ long iomux4_chan_read(struct iomux4 * mux, void * buf, long bufsz, int chno) {
     struct iomux4_chan * const ch = mux->ch+chno;
     struct rbuf * const rxbuf = &ch->rxbuf;
 
+    trace("%s(%p,%ld,%d)", __func__, mux, bufsz, chno);
+
     if (bufsz == 0)
         return 0;
     
-    if (rbuf_empty(rxbuf)) {
+    while (rbuf_empty(rxbuf)) {
+        debug("%s(chno=%d): ch[%d].rxbuf is empty", __func__, chno, chno);
         if (ch->dropcnt != 0)
             return -EIO;
         
-        rwlock_acquire(&mux->rxlock, /* exclusive */ 1);
-        
-        while (rbuf_empty(rxbuf) && mux->err == 0 && !mux->rxeof)
-            iomux4_recv(mux);
-        
-        rwlock_release(&mux->rxlock);
-
-        if (mux->err != 0)
+        if (mux->err != 0 || mux->rxeof)
             return mux->err;
-    }
+            
+        if (mux->rxbusy) {
+            debug("%s(chno=%d): Another thread is receiving; waiting for rxupd", __func__, chno);
+            condition_wait(&mux->rxupd);
+            continue;
+        }
+        
+        debug("%s(chno=%d): Taking control of receiver", __func__, chno);
+        mux->rxbusy = 1;
 
+        while (rbuf_empty(rxbuf) && mux->err == 0 && !mux->rxeof) {
+            iomux4_receive(mux); // receive some data from carrier
+            condition_broadcast(&mux->rxupd);
+        }
+
+        mux->rxbusy = 0;
+    }
+        
     return rbuf_getb(rxbuf, buf, bufsz);
 }
 
-void iomux4_recv(struct iomux4 * mux) {
+void iomux4_receive(struct iomux4 * mux) {
     unsigned char cbuf[64];
     long rlen;
+
+    trace("%s()", __func__);
+
+    assert (mux->rxbusy); // should be holding lock
 
     rlen = ioread(mux->cdevio, cbuf, sizeof(cbuf));
 
@@ -322,6 +353,8 @@ long iomux4_chan_write(struct iomux4 * mux, const void * buf, long buflen, int c
     long n, wlen;
     unsigned char c;
     long retval;
+
+    trace("%s(%p,%ld,%d)", __func__, mux, buflen, chno);
 
     if (buflen == 0)
         return 0;
@@ -409,6 +442,8 @@ done_release_txlock:
 int iomux4_chan_ioctl(struct iomux4 * mux, int op, void * arg, int chno) {
     struct iomux4_chan * const ch = mux->ch+chno;
     struct rbuf * const rxbuf = &ch->rxbuf;
+
+    trace("%s(%p,%d,%d)", __func__, mux, op, chno);
 
     switch (op) {
     case IOC_RESET:

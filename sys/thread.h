@@ -154,6 +154,7 @@ extern const char * running_thread_name(void);
 // See also: thread_name(), running_thread().
 
 #ifndef MP2
+#ifndef STUDENT
 extern void submit_running_thread(void);
 
 // Suspends the calling thread if it has used up its running time allocation.
@@ -164,6 +165,7 @@ extern void submit_running_thread(void);
 // * This function must _not_ be called from an ISR.
 // 
 // See also: yield_running_thread().
+#endif
 #endif
 
 

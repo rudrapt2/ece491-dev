@@ -17,7 +17,7 @@
 #include "../../io.h"
 
 extern void board_init(unsigned int hartid, void * dtb); // from board/xxx.c
-extern void attach_devices(void); // from board/xxx.c
+extern void attach_board_devices(void); // from board/xxx.c
 
 struct cache * init_cache() {
     struct io * bkgio = create_memio(alloc_phys_pages(2), 4096*2, NULL);
@@ -28,13 +28,13 @@ struct cache * init_cache() {
 void test_cache(struct cache * cache) {
     char * data;
     for (int i = 0; i < 4096; i++) {
-        cache_fetch(cache, 4096, (void**)&data);
+        cache_fetch(cache, 4096, 1, (void**)&data);
         data[i] = (char)i;
         cache_release(cache, data, 1);
 
         yield_running_thread();
 
-        cache_fetch(cache, 4096, (void**)&data);
+        cache_fetch(cache, 4096, 1, (void**)&data);
         for (int j=0; j<=i; j++)
             assert(data[j] == (char)j);
         cache_release(cache, data, 0);
@@ -53,7 +53,7 @@ void main(unsigned int hartid, void * dtb) {
     procmgr_init();
     fsmgr_init();
 
-    attach_devices();
+    attach_board_devices();
     enable_interrupts();
 
     struct cache * cache = init_cache();

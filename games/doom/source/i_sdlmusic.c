@@ -17,10 +17,10 @@
 //
 
 
-#include "../usr/string.h"
+
 #include <stdlib.h>
 #include <string.h>
-// #include <ctype.h>
+
 #include <SDL.h>
 #include <SDL_mixer.h>
 
@@ -645,7 +645,7 @@ static boolean ReadSubstituteConfig(char *filename)
 
         if (error != NULL)
         {
-            dprintf(2, "%s:%d: Error: %s\n", filename, linenum, error);
+            fprintf(stderr, "%s:%i: Error: %s\n", filename, linenum, error);
         }
 
         ++linenum;
@@ -688,7 +688,7 @@ static void LoadSubstituteConfigs(void)
 
     if (subst_music_len > 0)
     {
-        printf("Loaded %d music substitutions from config files.\n",
+        printf("Loaded %i music substitutions from config files.\n",
                subst_music_len);
     }
 }
@@ -930,11 +930,11 @@ static boolean I_SDL_InitMusic(void)
     {
         if (SDL_Init(SDL_INIT_AUDIO) < 0)
         {
-            dprintf(2, "Unable to set up sound.\n");
+            fprintf(stderr, "Unable to set up sound.\n");
         }
         else if (Mix_OpenAudio(snd_samplerate, AUDIO_S16SYS, 2, 1024) < 0)
         {
-            dprintf(2, "Error initializing SDL_mixer: %s\n",
+            fprintf(stderr, "Error initializing SDL_mixer: %s\n",
                     Mix_GetError());
             SDL_QuitSubSystem(SDL_INIT_AUDIO);
         }
@@ -1153,7 +1153,7 @@ static void *I_SDL_RegisterSong(void *data, int len)
         {
             // Fall through and play MIDI normally, but print an error
             // message.
-            dprintf(2, "Failed to load substitute music file: %s: %s\n",
+            fprintf(stderr, "Failed to load substitute music file: %s: %s\n",
                     filename, Mix_GetError());
         }
         else
@@ -1192,7 +1192,7 @@ static void *I_SDL_RegisterSong(void *data, int len)
     {
         // Failed to load
 
-        dprintf(2, "Error loading midi: %s\n", Mix_GetError());
+        fprintf(stderr, "Error loading midi: %s\n", Mix_GetError());
     }
 
     // Remove the temporary MIDI file; however, when using an external

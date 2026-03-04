@@ -16,8 +16,7 @@
 //       Generate a checksum of the WAD directory.
 //
 
-#include "../usr/string.h"
-#include "../usr/heap.h"
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -45,12 +44,8 @@ static int GetFileNumber(wad_file_t *handle)
     // Not found in list.  This is a new file we haven't seen yet.
     // Allocate another slot for this file.
 
-    // open_wadfiles = realloc(open_wadfiles,
-    //                         sizeof(wad_file_t *) * (num_open_wadfiles + 1));
-    wad_file_t **new_open_wadfiles = malloc(sizeof(wad_file_t *) * (num_open_wadfiles + 1));
-    memcpy(new_open_wadfiles, open_wadfiles, sizeof(wad_file_t *) * (num_open_wadfiles));
-    free(open_wadfiles);
-    open_wadfiles = new_open_wadfiles;
+    open_wadfiles = realloc(open_wadfiles,
+                            sizeof(wad_file_t *) * (num_open_wadfiles + 1));
     open_wadfiles[num_open_wadfiles] = handle;
 
     result = num_open_wadfiles;

@@ -11,12 +11,14 @@ OBJCOPY=$(PREFIX)objcopy
 OBJDUMP=$(PREFIX)objdump
 UNIFDEF=unifdef
 
+TARGET=qvirt
+
 CP1=0
 
 OBJS = \
 	start.o \
 	main.o \
-	board/qvirt.o \
+	board/$(TARGET)/init.o \
 	console.o \
 	dev/uart.o \
 	dev/rtc.o \
@@ -27,30 +29,47 @@ OBJS = \
 	iomux.o \
 	string.o \
 	plic.o \
-	string.o \
 	error.o \
 	thread.o \
 	thrasm.o \
 	trap.o \
 	io.o \
 	filesys.o \
-	trap.o \
 	excp.o \
 	intr.o \
 	heap.o \
 	misc.o \
 	rbuf.o \
-	device.o \
 	elf.o \
 	cache.o \
 	timer.o \
+	string.o \
+	string.o \
+	thread.o \
+	thrasm.o \
 	device.o \
 	sbi.o \
 	fs/ngfs.o \
 	fs/tarfs.o \
 	memory.o \
+	console.o \
+	dev/rtc.o \
+	filesys.o \
+	fs/ngfs.o \
 	process.o \
-	syscall.o 
+	syscall.o \
+	dev/uart.o \
+	dev/viohi.o \
+    dev/virtio.o \
+	dev/viorng.o \
+	dev/vioblk.o \
+    dev/viogpu.o \
+	board/$(TARGET)/init.o \
+
+VIDEO_OBJS = \
+	$(OBJS) \
+	dev/viogpu.o \
+	dev/viohi.o
 
 CFLAGS = -Wall -Werror=implicit-function-declaration -Wno-unused-function
 CFLAGS += -fno-omit-frame-pointer -ggdb3 -gdwarf-2
@@ -85,7 +104,7 @@ CFLAGS += -I.
 
 ASFLAGS = -march=rv64imazicsr
 
-LDFLAGS = -melf64lriscv -T board/qvirt.ld
+LDFLAGS = -melf64lriscv -T board/$(TARGET)/kernel.ld
 
 QEMUOPTS = -global virtio-mmio.force-legacy=false
 QEMUOPTS += -machine virt -nographic
@@ -97,8 +116,6 @@ QEMUOPTS += -serial pty
 QEMUOPTS += -serial pty
 QEMUOPTS += -device virtio-blk-device,drive=blk0
 QEMUOPTS += -drive file=fs/ngfs.raw,id=blk0,if=none,format=raw,readonly=false
-QEMUOPTS += -device virtio-blk-device,drive=blk1
-QEMUOPTS += -drive file=fs/tarfs.tar,id=blk1,if=none,format=raw,readonly=false
 
 VIDEO_QEMUOPTS = $(QEMUOPTS)
 VIDEO_QEMUOPTS += -device virtio-gpu-device -display gtk
@@ -112,20 +129,26 @@ endif
 all: kernel.elf
 
 clean:
-	rm -rf board/*.o dev/*.o fs/*.o *.o *.elf
+	rm -rf board/*/*.o dev/*.o fs/*.o *.o *.elf
 
 kernel.elf: $(OBJS) blob.o
 	$(LD) $(LDFLAGS) -o $@ $^
 
 run: kernel.elf
-	$(QEMU) $(QEMUOPTS) -m 8M -kernel $<
+	$(QEMU) $(QEMUOPTS) -m 16M -kernel $<
 
 debug: kernel.elf
-	$(QEMU) $(QEMUOPTS) -m 8M -kernel $< -S -s
+	$(QEMU) $(QEMUOPTS) -m 16M -kernel $< -S -s
 
 # NOTE: need to link against viogpu and viohi drivers; this won't work as it currently is
-run-video: kernel.elf
+video-kernel.elf: $(VIDEO_OBJS) blob.o
+	$(LD) $(LDFLAGS) -o $@ $^
+
+run-video: video-kernel.elf
 	$(QEMU) $(VIDEO_QEMUOPTS) -m 16M -kernel $<
+
+debug-video: video-kernel.elf
+	$(QEMU) $(VIDEO_QEMUOPTS) -m 16M -kernel $< -S -s
 
 BLOB_OBJCOPY_FLAGS = \
 	--add-section .data.blob=blob.raw \

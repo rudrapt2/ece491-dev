@@ -26,7 +26,6 @@ OBJS = \
 	rbuf.o \
 	string.o \
 	plic.o \
-	string.o \
 	error.o \
 	iomux.o \
 	thrasm.o \
@@ -77,10 +76,10 @@ kernel.elf: $(OBJS)
 	$(LD) $(LDFLAGS) -o $@ $^
 
 run: kernel.elf
-	$(QEMU) $(QEMUOPTS) -m 8M -kernel $<
+	$(QEMU) $(QEMUOPTS) -m 16M -kernel $<
 
 debug: kernel.elf
-	$(QEMU) $(QEMUOPTS) -m 8M -kernel $< -S -s
+	$(QEMU) $(QEMUOPTS) -m 16M -kernel $< -S -s
 
 mp2-%.o: %.c
 	$(CC) -c -o $@ $(CFLAGS) -DMP2 $<

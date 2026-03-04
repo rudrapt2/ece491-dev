@@ -8,13 +8,13 @@
 
 #include "console.h" // console_init();
 #include "heap.h" // heap_init()
-#include "memory.h"
+#include "memory.h" // memory_init()
 
 // Run-time QEMU configuration
 //
 
 #define NUART 3
-#define RAM_SIZE_MB (8-2)
+#define RAM_SIZE_MB (16)
 
 // QEMU constants
 //
@@ -66,7 +66,7 @@ extern char _kimg_end[]; // from kernel.ld
 //
 
 static struct mregion qvirt_ram[] = {
-    { 0x80000000, 0x0800000 }, {0x0, 0}
+    { 0x80000000, 0x1000000 }, {0x0, 0}
 };
 
 static struct mregion qvirt_mmio[] = {
@@ -74,28 +74,31 @@ static struct mregion qvirt_mmio[] = {
 };
 
 static struct mregion qvirt_resv[] = {
-    { 0x80000000, 0x040000 }, {0x80040000, 0x020000}, {0x80600000, 0x200000}, {0x0, 0}
+    { 0x80000000, 0x040000 }, {0x80040000, 0x020000}, {0x80e00000, 0x200000}, {0x0, 0}
 };
 
-static const struct matlas qvirt_matlas = {
+static struct matlas qvirt_matlas = {
     .ram = qvirt_ram,
     .mmio = qvirt_mmio,
-    .resv = qvirt_resv
+    .resv = qvirt_resv,
+
+    .ram_size = 1,
+    .mmio_size = 1,
+    .resv_size = 3
 };
 
 void board_init(unsigned int hartid, void * dtb) {    
     console_init();
     plic_init((void*)PLIC_MMIO_BASE);
     timer_init(TIMER_FREQ);
-
-    #if !(defined(MP2) || defined(MP3CP1))
+#if !(defined(MP2) || defined(MP3CP1))
     memory_init(&qvirt_matlas);
-    #else
-    heap_init(_kimg_end, RAM_END - (void*)_kimg_end);
-    #endif
+#else
+    heap_init(_kimg_end, RAM_END - (void*)MEGA_SIZE - (void*)_kimg_end);
+#endif
 }
 
-void attach_devices(void) {
+void attach_board_devices(void) {
     int i;
 
     attach_rtc((void*)RTC_MMIO_BASE);

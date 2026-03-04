@@ -23,9 +23,6 @@ SECTIONS {
 
   .rodata : {
     PROVIDE(_kimg_rodata_start = .);
-    PROVIDE(_kimg_blob_start = .);
-    *(*.rodata.blob)
-    PROVIDE(_kimg_blob_end = .);
     . = ALIGN(16);
     *(.srodata .srodata.*)
     . = ALIGN(16);

@@ -17,8 +17,8 @@
 //
 
 
-#include "../usr/string.h"
-// #include <ctype.h>
+
+
 
 // Functions.
 #include "deh_main.h"
@@ -652,7 +652,7 @@ void F_BunnyScroll (void)
 	laststage = stage;
     }
 	
-    DEH_snprintf(name, 10, "END%d", stage);
+    DEH_snprintf(name, 10, "END%i", stage);
     V_DrawPatch((SCREENWIDTH - 13 * 8) / 2, 
                 (SCREENHEIGHT - 8 * 8) / 2, 
                 W_CacheLumpName (name,PU_CACHE));

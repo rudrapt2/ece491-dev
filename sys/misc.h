@@ -1,8 +1,6 @@
-/*! @file misc.h
-    @brief Miscellaneous functions
-    @copyright Copyright (c) 2024-2025 University of Illinois
-
-*/
+// misc.h
+// Miscellaneous functions
+// Copyright (c) 2024-2025 University of Illinois
 
 #ifndef _MISC_H_
 #define _MISC_H_
@@ -20,6 +18,7 @@
 
 // The MIN and MAX macros find the minumum and maximum between /a/ and /b/
 // respectively.
+
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 

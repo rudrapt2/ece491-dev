@@ -1,0 +1,48 @@
+#!/bin/bash
+
+#This script takes care of automatically allowing you to configure which board from the board directory
+#you want to target.
+#
+#Documentation for adding a new target can be found in the board/ folder.
+
+# First, check if we are in the correct directory by seeing if there is an mp3.make
+MAKEFILE="mp3.make"
+
+if [ ! -f "$MAKEFILE" ]; then
+	echo "$MAKEFILE not found. Are you in the right directory?"
+	exit 1
+fi
+
+# Look in the board directory and find all available targets
+BOARDS_DIR="./board/"
+SUPPORTED_TARGETS=($(basename -a "$BOARDS_DIR"/*/))
+
+# Capture new target from first arg
+NEW_TARGET=$1
+
+# Print usage if used without target
+if [ -z "$NEW_TARGET" ]; then
+	echo "Usage: ./configure <target>"
+	exit 1
+fi
+
+# Check if target is valid
+MATCH=false
+for t in "${SUPPORTED_TARGETS[@]}"; do
+	if [[ "$t" == "$NEW_TARGET" ]]; then
+		MATCH=true
+		break
+	fi
+done
+
+# Print supported targets if we are not one of them
+if [ "$MATCH" = false ]; then
+	echo "'$NEW_TARGET' is not a supported target."
+	echo "Supported targets are:"
+	printf " - %s\n" "${SUPPORTED_TARGETS[@]}"
+	exit 1
+fi
+
+# Set target if arg is valid.
+sed -i "s|^TARGET=.*|TARGET=$NEW_TARGET|" "$MAKEFILE"
+	echo "Target changed to $NEW_TARGET."

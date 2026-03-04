@@ -16,7 +16,7 @@
 //	Put all global tate variables here.
 //
 
-#include "../usr/string.h"
+
 
 #include "doomstat.h"
 

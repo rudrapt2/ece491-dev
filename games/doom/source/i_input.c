@@ -15,11 +15,11 @@
 
 
 #include <stdlib.h>
-// #include <ctype.h>
+
 #include <math.h>
 #include <string.h>
 #include <fcntl.h>
-#include "../usr/string.h"
+
 
 #include "config.h"
 #include "deh_str.h"

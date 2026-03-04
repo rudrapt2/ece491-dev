@@ -85,7 +85,9 @@ static void tarfs_flush(struct filesystem * fs);
 static int tarfs_open_fileio(struct tarfs * tarfs, const char * name, struct io ** ioptr);
 static void tarfs_fileio_reclaim(struct io * io);
 static long tarfs_fileio_fetch(struct io * io, unsigned long long pos, void * buf, long bufsz);
+#ifndef STUDENT
 static long tarfs_fileio_store(struct io * io, unsigned long long pos, const void * buf, long len);
+#endif
 static int tarfs_fileio_ioctl(struct io * io, int op, void * arg);
 
 static int tarfs_open_lsio(struct tarfs * tarfs, struct io ** ioptr);
@@ -101,7 +103,9 @@ static const struct iointf tarfs_file_intf = {
     .read = &seekio_read,
     .write = &seekio_write,
     .fetch = &tarfs_fileio_fetch,
+#ifndef STUDENT
     .store = &tarfs_fileio_store,
+#endif
     .ioctl = &tarfs_fileio_ioctl
 };
 
@@ -131,7 +135,7 @@ int mount_tarfs(const char * mpname, struct io * bkgio) {
     unsigned long blkcnt;
     unsigned int blksz;
 
-    trace("%s(%p,%p)", __func__, fsptr, bkgio);
+    trace("%s(%s,%p)", __func__, mpname, bkgio);
 
     fs = kcalloc(1, sizeof(*fs));
 
@@ -332,7 +336,7 @@ long tarfs_fileio_fetch (
         blkno = (fio->file->blkno * TAR_BLKSZ + pos) / TAR_BLKSZ;
         off = pos % TAR_BLKSZ;   // offset from where we want data
 
-        result = cache_fetch(cache, blkno * TAR_BLKSZ, &blk);
+        result = cache_fetch(cache, blkno * TAR_BLKSZ, 1, &blk);
         
         if (result < 0)
             return result;
@@ -353,6 +357,7 @@ long tarfs_fileio_fetch (
     return bufp - buf;
 }
 
+#ifndef STUDENT
 long tarfs_fileio_store (
     struct io * io, unsigned long long pos, const void * buf, long len)
 {
@@ -386,7 +391,7 @@ long tarfs_fileio_store (
         blkno = (fio->file->blkno * TAR_BLKSZ + pos) / TAR_BLKSZ;
         off = pos % TAR_BLKSZ;   // offset from where we want data
 
-        result = cache_fetch(cache, blkno * TAR_BLKSZ, &blk);
+        result = cache_fetch(cache, blkno * TAR_BLKSZ, 1, &blk);
 
         if (result < 0)
             return result;
@@ -407,6 +412,7 @@ long tarfs_fileio_store (
 
     return bufp - buf;
 }
+#endif
 
 int tarfs_fileio_ioctl(struct io * io, int op, void * arg) {
     struct tarfs_fileio * const fio =

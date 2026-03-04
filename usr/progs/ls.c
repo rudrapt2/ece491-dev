@@ -1,3 +1,7 @@
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
+
 #include "../syscall.h"
 #include "../string.h"
 #include "../shell.h"
@@ -35,3 +39,5 @@ void main (int argc, char** argv)
         dprintf(STDOUT, "%s\n", buffer);
     }
 }
+
+#endif

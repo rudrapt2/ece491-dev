@@ -18,7 +18,8 @@
 //	that are associated with states/frames. 
 //
 
-#include "../usr/string.h"
+
+#include <stdlib.h>
 
 #include "m_random.h"
 #include "i_system.h"
@@ -37,9 +38,8 @@
 // Data.
 #include "sounds.h"
 
-static int abs(int x) {
-    return x < 0 ? -x : x;
-}
+
+
 
 typedef enum
 {

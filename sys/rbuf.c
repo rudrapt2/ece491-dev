@@ -80,10 +80,10 @@ unsigned int rbuf_getb(struct rbuf * rb, void * buf, unsigned int bufsz) {
 
     if (m < len) {
         memcpy(buf, rb->buf + ridx, m);
-        memcpy(buf+m, rb->buf, m-len);
+        memcpy(buf+m, rb->buf, len-m);
     } else
         memcpy(buf, rb->buf + ridx, len);
-    
+
     rb->rpos += len;
     return len;
 }
@@ -104,10 +104,11 @@ unsigned int rbuf_putb (
 
     if (m < len) {
         memcpy(rb->buf + widx, buf, m);
-        memcpy(rb->buf, buf+m, m-len);
-    } else
+        memcpy(rb->buf, buf+m, len-m);
+    } else {
         memcpy(rb->buf + widx, buf, len);
-    
+    }
+
     rb->wpos += len;
     return len;
 }

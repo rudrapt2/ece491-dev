@@ -2,8 +2,8 @@
 
 #include "doomgeneric.h"
 
-// #include <ctype.h>
-#include "../usr/string.h"
+
+
 #include <string.h>
 #include <unistd.h>
 #include <sys/time.h>

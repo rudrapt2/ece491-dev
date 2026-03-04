@@ -5,14 +5,14 @@
 # =========================
 
 SRC_DIR     := /home/rudrapt2/sp26_ece391/glycine-max
-TARGET_DIR  := /home/rudrapt2/sp26_ece391/mp3-sp26/gold/cp1
+TARGET_DIR  := /home/rudrapt2/sp26_ece391/mp3-sp26/gold/cp2_3
 
 # List of files to copy.
 # Format: "source:destination" OR "path" (if source and dest are same)
 FILES_FOR_COPYING   := \
     sys/bios/osbi181q.bin \
-    sys/board/qvirt.ld \
-    sys/board/qvirt.c \
+    sys/board/qvirt/kernel.ld \
+    sys/board/qvirt/init.c \
     sys/dev/rtc.c \
     sys/dev/uart.c \
     sys/dev/vioblk.c \
@@ -48,7 +48,7 @@ FILES_FOR_COPYING   := \
     sys/memory.h \
     sys/misc.c \
     sys/misc.h \
-    sys/mp3.make:sys/Makefile \
+    sys/mp3-student.make:sys/Makefile \
     sys/plic.c \
     sys/plic.h \
     sys/process.c \
@@ -70,7 +70,22 @@ FILES_FOR_COPYING   := \
     sys/trap.s \
     \
     usr/games/trek-mp3-cp1 \
+    usr/games/trek \
+    usr/games/zork \
+    usr/games/rogue \
+    usr/games/nudoku \
+    usr/games/tetris \
+    usr/progs/cat.c \
+    usr/progs/date.c \
+    usr/progs/echo.c \
+    usr/progs/hello-mp3-cp1.c \
     usr/progs/hello.c \
+    usr/progs/ls.c \
+    usr/progs/rm.c \
+    usr/progs/shell.c \
+    usr/progs/touch.c \
+    usr/progs/wc.c \
+    usr/progs/xargs.c \
     usr/error.c \
     usr/error.h \
     usr/heap.c \
@@ -80,6 +95,7 @@ FILES_FOR_COPYING   := \
     usr/Makefile \
     usr/no_umode.ld \
     usr/scnum.h \
+    usr/shell.h \
     usr/start.s \
     usr/string.c \
     usr/string.h \
@@ -87,11 +103,6 @@ FILES_FOR_COPYING   := \
     usr/syscall.S \
     usr/umode.ld \
     util/fs/mkfs_ngfs \
-    \
-    \
-    \
-    sys/fs/ngfs.raw
-# TODO delete this
 
 # Assembly files to preprocess (Must match DESTINATION paths)
 ASSEMBLY_FILES_FOR_PREPROCESSING := \
@@ -117,7 +128,9 @@ TARGET_ASM_PREPROCESSING_FILES := $(addprefix $(TARGET_DIR)/,$(ASSEMBLY_FILES_FO
 # The syntax `cmd || [ $? -eq 1 ]` ensures the shell returns true (0) if unifdef returns 1.
 define run-unifdef
 	@echo "Running unifdef with flags: $(1)"
-	unifdef $(1) -m $(UNIFDEF_FILES) || [ $$? -eq 1 ]
+	@for f in $(UNIFDEF_FILES); do \
+		unifdef $(1) -m "$$f" || [ $$? -eq 1 ] || { echo "unifdef failed on $$f"; exit 1; }; \
+	done
 endef
 
 # =========================

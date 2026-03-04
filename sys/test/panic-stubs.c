@@ -24,6 +24,7 @@ DEFINE_STUB(disable_intr_source);
 
 // process.h
 DEFINE_STUB(process_exit);
+DEFINE_STUB(process_exec);
 
 // syscall.h
 DEFINE_STUB(handle_syscall);

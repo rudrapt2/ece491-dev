@@ -30,14 +30,11 @@
 
 #ifndef STUDENT
 
-/** \brief An entry in a cache
- *
- * Think of a cache as an array (or linkedlist or red-black tree? Do your design) of cache entries.
- * Each cache entry should store some helpful information about every block cached.
- * Hint: At least we need a mechanism for race condition
- * 
- *
- */
+// An entry in a cache
+//
+// Think of a cache as an array (or linkedlist or red-black tree? Do your design) of cache entries.
+// Each cache entry should store some helpful information about every block cached.
+// Hint: At least we need a mechanism for race condition
 struct cache_entry {
     unsigned long long pos; // position of cached block on device
     unsigned int refcnt; // number of references to this entry
@@ -49,13 +46,10 @@ struct cache_entry {
 #endif
 };
 
-/** \brief Literally the cache itself
- *
- *  There's a huge room for your creative design. 
- *  As long as you satisfy the update/eviction functionality, it is a good cache.
- * 
- *
- */
+// Literally the cache itself
+//
+//  There's a huge room for your creative design.
+//  As long as you satisfy the update/eviction functionality, it is a good cache.
 struct cache {
     struct io * bkgio;
     struct condition unlocked; // an entry has been unlocked
@@ -101,27 +95,27 @@ static int writable(const struct cache_entry * ent) {
 
 #ifndef STUDENT
 
-/// @brief Converts a cache block index to a block psysical pointer.
-/// @param cache The cache for which the index should be convered.
-/// @param idx The block index in the cache.
-/// @return A physical pointer to the block.
+// Converts a cache block index to a block psysical pointer.
+// The /cache/ argument specifies The cache for which the index should be convered.
+// The /idx/ argument specifies The block index in the cache.
+// Returns A physical pointer to the block.
 
 static void * blkidx_to_blkptr (
     const struct cache * cache, unsigned long idx);
 
-/// @brief Converts a physical pointer to a cache block into a block index.
-/// @param cache The cache containing the physical block.
-/// @param pblk the physical block address.
-/// @return An index of the block in the cache.
+// Converts a physical pointer to a cache block into a block index.
+// The /cache/ argument specifies The cache containing the physical block.
+// The /pblk/ argument specifies the physical block address.
+// Returns An index of the block in the cache.
 
 static unsigned long blkptr_to_blkidx (
     const struct cache * cache, void * pblk);
 
-/// @brief Returns the index of a block that can be evicted from the cache.
-/// @param cache The cache in which the evictable block is to be found.
-/// @return An index to the evicable block.
-/// The referenced block is guaranteed to be unreferenced. This function may
-/// block until an evictable block becomes available.
+// Returns the index of a block that can be evicted from the cache.
+// The /cache/ argument specifies The cache in which the evictable block is to be found.
+// Returns An index to the evicable block.
+// The referenced block is guaranteed to be unreferenced. This function may
+// block until an evictable block becomes available.
 static int find_evictable(struct cache * cache);
 
 static void cache_writeback_thrfn(struct cache * cache);
@@ -188,7 +182,9 @@ struct cache * create_cache(struct io * bkgio, unsigned long cache_blksz) {
 #endif
 }
 
-int cache_fetch(struct cache * cache, unsigned long long pos, void ** pptr) {
+int cache_fetch(
+    struct cache * cache, unsigned long long pos, int exclusive, void ** pptr)
+{
 #ifdef STUDENT
     // YOUR CODE HERE
     return 0;
@@ -198,6 +194,9 @@ int cache_fetch(struct cache * cache, unsigned long long pos, void ** pptr) {
     int i; // block index
 
     trace("%s(0x%llx)", __func__, pos);
+
+    if (!exclusive)
+        return -ENOTSUP;
 
     if (pos % cache->blksz != 0)
         return -EINVAL;

@@ -225,6 +225,20 @@ char toupper(const char c) {
     return (islower(c) ? c - 'a' + 'A' : c);
 }
 
+int isspace(const char c) {
+    switch(c) {
+    case ' ':
+    case '\f':
+    case '\n':
+    case '\r':
+    case '\t':
+    case '\v':
+        return 1;
+    default:
+        return 0;
+    }
+}
+
 int strcmp(const char * s1, const char * s2) {
     // A null pointer compares before any non-null pointer
 
@@ -515,7 +529,11 @@ size_t vgprintf (
 
             // Parse width specifier
             
-            zpad = (*p == '0');
+            // "." is technically incorrect, but the 
+            // difference is subtle enough that it 
+            // hopefully wont be an issue
+            zpad = (*p == '0') || (*p == '.');
+            if (*p == '.') p += 1;
             len = 0;
 
             while ('0' <= *p && *p <= '9') {
@@ -553,6 +571,7 @@ size_t vgprintf (
 
             switch (*p) {
             case 'd':
+            case 'i':
                 if (lcnt > 0)
                     if (lcnt > 1)
                         ival = va_arg(ap, long long);
@@ -724,6 +743,6 @@ void vprintf_putc(char c, void * __attribute__ ((unused)) aux) {
     putc(c);
 }
 
-void dvprintf_putc(char c, void *  aux) {
+void dvprintf_putc(char c, void * aux) {
     dputc(*((int*)aux), c);
 }

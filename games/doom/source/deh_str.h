@@ -18,7 +18,7 @@
 #ifndef DEH_STR_H
 #define DEH_STR_H
 
-#include "../usr/string.h"
+
 
 #include "doomfeatures.h"
 
@@ -37,7 +37,7 @@ void DEH_AddStringReplacement(char *from_text, char *to_text);
 
 #define DEH_String(x) (x)
 #define DEH_printf printf
-#define DEH_dprintf dprintf
+#define DEH_fprintf fprintf
 #define DEH_snprintf snprintf
 #define DEH_AddStringReplacement(x, y)
 

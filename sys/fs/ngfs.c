@@ -662,7 +662,7 @@ long read_from_block(
 
     assert(offset + bufsz <= NGFS_BLKSZ); // bad requests
     assert(block != NGFS_BLOCK_END);
-    if (cache_fetch(cache, block * NGFS_BLKSZ, &block_data) != 0) {
+    if (cache_fetch(cache, block * NGFS_BLKSZ, 1, &block_data) != 0) {
         return -1;
     }
 
@@ -683,7 +683,7 @@ long write_to_block(
 
     assert(offset + bufsz <= NGFS_BLKSZ); // bad requests
     assert(block != NGFS_BLOCK_END);
-    if (cache_fetch(cache, block * NGFS_BLKSZ, &block_data) != 0) {
+    if (cache_fetch(cache, block * NGFS_BLKSZ, 1, &block_data) != 0) {
         return -1;
     }
 
@@ -698,7 +698,7 @@ uint32_t get_free_data_block(struct ngfs * fs) {
     uint32_t free_block;
 
     for (uint32_t fat_block = 0; fat_block < fs->num_fat_blocks; fat_block++) {
-        cache_fetch(fs->cache, fat_block * NGFS_BLKSZ, (void**)&fat);
+        cache_fetch(fs->cache, fat_block * NGFS_BLKSZ, 1, (void**)&fat);
 
         for (int idx = 0; idx < NGFS_FAT_ENTRIES_PER_BLOCK; idx++) {
             if (fat->fat[idx] == NGFS_BLOCK_FREE) {
@@ -757,7 +757,7 @@ void free_blocks(struct cache * cache, uint32_t start) {
 
 void * get_cache_from_block(struct cache * cache, uint32_t block) {
     void* ptr;
-    if (cache_fetch(cache, block * NGFS_BLKSZ, &ptr))
+    if (cache_fetch(cache, block * NGFS_BLKSZ, 1, &ptr))
         return NULL;
     return ptr;
 }

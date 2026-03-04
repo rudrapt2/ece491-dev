@@ -21,6 +21,22 @@
 #ifndef __DOOMTYPE__
 #define __DOOMTYPE__
 
+// #define macros to provide functions missing in Windows.
+// Outside Windows, we use strings.h for str[n]casecmp.
+
+
+#ifdef _WIN32
+
+#define strcasecmp _stricmp
+#define strncasecmp _strnicmp
+
+#else
+
+#include <strings.h>
+
+#endif
+
+
 //
 // The packed attribute forces structures to be packed into the minimum 
 // space necessary.  If this is not done, the compiler may align structure

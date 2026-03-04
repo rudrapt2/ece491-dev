@@ -355,10 +355,8 @@ void exit_running_thread(void) {
 }
 
 #ifndef MP2
+#ifndef STUDENT
 void submit_running_thread(void) {
-#ifdef STUDENT
-    // YOUR CODE HERE
-#else
     unsigned long long time_must_suspend; // time thread must suspend
     unsigned long long time_now;
 
@@ -367,9 +365,9 @@ void submit_running_thread(void) {
 
     if (time_must_suspend <= time_now)
         yield_running_thread();
-#endif // STUDENT
 }
-#endif // NOVMEM
+#endif // STUDENT
+#endif // MP2
 
 void yield_running_thread(void) {
     extern void switch_running_thread(struct thread *); // thrasm.s
@@ -736,7 +734,7 @@ void rwlock_acquire(struct rwlock * rwlk, int exclusive) {
             rwlk->owner = TP;
         }
     } else {
-        while (rwlk->owner != NULL)
+        while (rwlk->owner != NULL && rwlk->owner != TP)
             condition_wait(&rwlk->released);
     }
 

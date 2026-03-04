@@ -17,8 +17,8 @@
 //	Shooting and aiming.
 //
 
-#include "../usr/string.h"
 
+#include <stdlib.h>
 
 #include "deh_misc.h"
 
@@ -58,9 +58,6 @@
 // with -spechit.
 
 //#define DEFAULT_SPECHIT_MAGIC 0x84f968e8
-static int abs(int x) {
-    return x < 0 ? -x : x;
-}
 
 
 fixed_t		tmbbox[4];
@@ -1442,8 +1439,8 @@ static void SpechitOverrun(line_t *ld)
             nofit = addr; 
             break;
         default:
-            dprintf(2, "SpechitOverrun: Warning: unable to emulate"
-                            "an overrun where numspechit=%d\n",
+            fprintf(stderr, "SpechitOverrun: Warning: unable to emulate"
+                            "an overrun where numspechit=%i\n",
                             numspechit);
             break;
     }

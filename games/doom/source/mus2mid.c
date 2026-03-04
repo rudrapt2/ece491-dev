@@ -16,7 +16,7 @@
 // mus2mid.c - Ben Ryves 2006 - http://benryves.com - benryves@benryves.com
 // Use to convert a MUS file into a single track, type 0 MIDI file.
 
-#include "../usr/string.h"
+
 
 #include "doomtype.h"
 #include "i_swap.h"
@@ -720,7 +720,7 @@ int main(int argc, char *argv[])
 
     if (mus2mid(src, dst))
     {
-        dprintf(2, "mus2mid() failed\n");
+        fprintf(stderr, "mus2mid() failed\n");
         exit(-1);
     }
 

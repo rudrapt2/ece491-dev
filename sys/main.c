@@ -20,24 +20,21 @@
 
 #ifndef MP2
 #include "fs/ngfs.h"
-#include "fs/tarfs.h"
 #include "filesys.h"
 #include "process.h"
 #endif
 
 #ifndef MP2
 #ifndef MP3CP1
-#define INITEXE "shell"
+    #define INITEXE "shell"
 #else
-#define INITEXE "trek-mp3-cp1"
-#define CONSOLEDEV "uart1"
+    #define INITEXE "trek-mp3-cp1"
+    #define CONSOLEDEV "uart1"
 #endif
 
 #define CMNTNAME "c" // ngfs
-#define DMNTNAME "d" // tarfs
 #define DEVMNTNAME "dev"
-#define CDEVNAME "vioblk1"
-#define DDEVNAME "vioblk0"
+#define CDEVNAME "vioblk0"
 
 #ifndef NUART // number of UARTs
 #define NUART 3
@@ -53,13 +50,13 @@ static void run_games(void);
 #endif // MP2
 
 extern void board_init(unsigned int hartid, void * dtb); // from board/xxx.c
-extern void attach_devices(void); // from board/xxx.c
+extern void attach_board_devices(void); // from board/xxx.c
 
 void main(unsigned int hartid, void * dtb) {
     board_init(hartid, dtb);
     intrmgr_init();
-    devmgr_init();
     thrmgr_init();
+    devmgr_init();
 
 #ifndef MP2
     // MP3 stuff
@@ -69,14 +66,14 @@ void main(unsigned int hartid, void * dtb) {
     fsmgr_init();
 #endif
 
-    attach_devices();
+    attach_board_devices();
     enable_interrupts();
 
 #ifndef MP2
     mount_devfs(DEVMNTNAME);
     mount_drive(CMNTNAME, CDEVNAME, mount_ngfs);
-    mount_drive(DMNTNAME, DDEVNAME, mount_tarfs);
     exec_init();
+    flush_all_filesys();
 #else
     run_games();
 #endif
@@ -119,7 +116,7 @@ void exec_init() {
         halt();
     }
 
-#ifdef MP3CP1
+#ifdef STUDENT
 #if 0
     char * argv[] = { NULL };
     // Make descriptor 0 be a null io object, which the shell will need
@@ -131,8 +128,8 @@ void exec_init() {
     void (*entry)(void);
     int tid;
     struct io * uartio;
-    result = open_device(CONSOLEDEV, &uartio);
 
+    result = open_device(CONSOLEDEV, &uartio);
     if (result != 0) {
         kprintf(CONSOLEDEV ": %s; terminating\n", error_name(result));
         halt();
@@ -157,12 +154,42 @@ void exec_init() {
     join_thread(tid);
 #endif
 #else
+#ifdef MP3CP1
+    void (*entry)(void);
+    int tid;
+    struct io * uartio;
+
+    result = open_device(CONSOLEDEV, &uartio);
+    if (result != 0) {
+        kprintf(CONSOLEDEV ": %s; terminating\n", error_name(result));
+        halt();
+    }
+
+    // load the executable into memory
+    result = elf_load(initexe, &entry);
+
+    if (result != 0) {
+        kprintf(INITEXE ": %s; terminating\n", error_name(result));
+        halt();
+    }
+
+    // launch the executable
+    tid = spawn_thread(INITEXE, entry, uartio);
+
+    if (tid < 0) {
+        kprintf("spawn thread: %s; terminating\n", error_name(result));
+        halt();
+    }
+
+    join_thread(tid);
+#else
     char * argv[] = { NULL };
     // Make descriptor 0 be a null io object, which the shell will need
 
     current_process()->iotab[0] = create_nullio();
 
     process_exec(initexe, 0, argv);
+#endif
 #endif
 }
 #endif

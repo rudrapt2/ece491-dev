@@ -106,12 +106,12 @@ struct uart_device {
 // INTERNAL FUNCTION DEFINITIONS
 //
 
-static int uart_open(struct io ** ioptr, void * aux);
-static void uart_reclaim(struct io * io);
-static long uart_read(struct io * io, void * buf, long bufsz);
-static long uart_write(struct io * io, const void * buf, long len);
+static int dwuart_open(struct io ** ioptr, void * aux);
+static void dwuart_reclaim(struct io * io);
+static long dwuart_read(struct io * io, void * buf, long bufsz);
+static long dwuart_write(struct io * io, const void * buf, long len);
 
-static void uart_isr(int srcno, void * aux);
+static void dwuart_isr(int srcno, void * aux);
 
 // Ring buffer (struct rbuf) functions
 
@@ -126,9 +126,9 @@ static char rbuf_getc(struct ringbuf * rbuf);
 
 static const struct iointf uart_intf = {
     .implname = "uart",
-    .read = &uart_read,
-    .write = &uart_write,
-    .reclaim = &uart_reclaim
+    .read = &dwuart_read,
+    .write = &dwuart_write,
+    .reclaim = &dwuart_reclaim
 };
 
 // EXPORTED FUNCTION DEFINITIONS
@@ -160,11 +160,11 @@ void attach_uart(void * mmio_base, int irqno) {
     // fence o,o ?
     uart->regs->lcr = 0; // DLAB=0
 
-    register_device(UART_DEVNAME, instcnt++, &uart_open, uart);
+    register_device(UART_DEVNAME, instcnt++, &dwuart_open, uart);
     ioinit(&uart->io, &uart_intf, 1, 0);
 }
 
-int uart_open(struct io ** ioptr, void * aux) {
+int dwuart_open(struct io ** ioptr, void * aux) {
     struct uart_device * const uart = aux;
 
     trace("%s()", __func__);
@@ -187,14 +187,14 @@ int uart_open(struct io ** ioptr, void * aux) {
     // Enable interrupts when data ready (DR) status asserted
 
     uart->regs->ier = IER_DRIE;
-    enable_intr_source(uart->irqno, UART_INTR_PRIO, uart_isr, uart);
+    enable_intr_source(uart->irqno, UART_INTR_PRIO, dwuart_isr, uart);
 #endif
 
     *ioptr = ioaddref(&uart->io);
     return 0;
 }
 
-void uart_reclaim(struct io * io) {
+void dwuart_reclaim(struct io * io) {
     struct uart_device * const uart =
         (void*)io - offsetof(struct uart_device, io);
 
@@ -210,7 +210,7 @@ void uart_reclaim(struct io * io) {
 #endif
 }
 
-long uart_read(struct io * io, void * buf, long bufsz) {
+long dwuart_read(struct io * io, void * buf, long bufsz) {
 #ifdef STUDENT
     // YOUR CODE HERE
 #else
@@ -248,7 +248,7 @@ long uart_read(struct io * io, void * buf, long bufsz) {
 #endif
 }
 
-long uart_write(struct io * io, const void * buf, long buflen) {
+long dwuart_write(struct io * io, const void * buf, long buflen) {
 #ifdef STUDENT
     // YOUR CODE HERE
 #else
@@ -283,7 +283,7 @@ long uart_write(struct io * io, const void * buf, long buflen) {
 #endif
 }
 
-void uart_isr(int srcno, void * aux) {
+void dwuart_isr(int srcno, void * aux) {
 #ifdef STUDENT
     // YOUR CODE HERE
 #else

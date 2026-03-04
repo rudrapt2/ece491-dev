@@ -21,10 +21,10 @@
 //
 
 
-#include "../usr/string.h"
+
 #include <stdlib.h>
 #include <string.h>
-// #include <ctype.h>
+
 
 #include "w_wad.h"
 #include "z_zone.h"
@@ -217,7 +217,7 @@ static boolean WriteTimidityConfig(char *path, gus_config_t *config)
         if (config->mapping[i] >= 0 && config->mapping[i] < MAX_INSTRUMENTS
          && config->patch_names[config->mapping[i]] != NULL)
         {
-            fprintf(fstream, "%d %s\n",
+            fprintf(fstream, "%i %s\n",
                     i, config->patch_names[config->mapping[i]]);
         }
     }
@@ -229,7 +229,7 @@ static boolean WriteTimidityConfig(char *path, gus_config_t *config)
         if (config->mapping[i] >= 0 && config->mapping[i] < MAX_INSTRUMENTS
          && config->patch_names[config->mapping[i]] != NULL)
         {
-            fprintf(fstream, "%d %s\n",
+            fprintf(fstream, "%i %s\n",
                     i - 128, config->patch_names[config->mapping[i]]);
         }
     }
