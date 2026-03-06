@@ -50,7 +50,12 @@ struct cache_entry {
 //
 //  There's a huge room for your creative design.
 //  As long as you satisfy the update/eviction functionality, it is a good cache.
+#endif
+
 struct cache {
+#ifdef STUDENT
+    // YOUR CODE HERE
+#else
     struct io * bkgio;
     struct condition unlocked; // an entry has been unlocked
     struct condition evictable; // a entry became evictable
@@ -65,8 +70,10 @@ struct cache {
     void * blkbuf; // all block are in a single contiguous buffer
 #endif
     struct cache_entry entries[CACHE_CAPACITY];
+#endif
 };
 
+#ifndef STUDENT
 // Some definitions:
 //
 // A cache entry is DIRTY if its dirty flag is set. This happens

@@ -84,7 +84,7 @@ void board_init(unsigned int hartid, void * dtb) {
 #if !(defined(MP2) || defined(MP3CP1))
     memory_init(qvirt_mmio, qvirt_ram, qvirt_resv, 1, 1, 3);
 #else
-    heap_init(_kimg_end, RAM_END - (void*)MEGA_SIZE - (void*)_kimg_end);
+    heap_init(_kimg_end, (void*)(RAM_END - (void*)MEGA_SIZE) - (void*)_kimg_end);
 #endif
 }
 

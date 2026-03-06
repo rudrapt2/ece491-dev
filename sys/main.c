@@ -24,12 +24,21 @@
 #include "process.h"
 #endif
 
+#ifdef STUDENT
+#if 0
+    #define INITEXE "shell"
+#else
+    #define INITEXE "trek-mp3-cp1"
+    #define CONSOLEDEV "uart1"
+#endif
+#else
 #ifndef MP2
 #ifndef MP3CP1
     #define INITEXE "shell"
 #else
     #define INITEXE "trek-mp3-cp1"
     #define CONSOLEDEV "uart1"
+#endif
 #endif
 
 #define CMNTNAME "c" // ngfs

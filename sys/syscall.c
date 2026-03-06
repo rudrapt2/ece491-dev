@@ -550,7 +550,7 @@ int syspipe(int * wfdptr, int * rfdptr) {
 }
 
 int sysiodup(int oldfd, int newfd) {
-#ifdef STUENT
+#ifdef STUDENT
     // YOUR CODE HERE
     return 0;
 #else

@@ -5,12 +5,13 @@
 # =========================
 
 SRC_DIR     := /home/rudrapt2/sp26_ece391/glycine-max
-TARGET_DIR  := /home/rudrapt2/sp26_ece391/mp3-sp26/gold/cp2_3
+TARGET_DIR  := /home/rudrapt2/sp26_ece391/mp3-sp26/release
 
 # List of files to copy.
 # Format: "source:destination" OR "path" (if source and dest are same)
 FILES_FOR_COPYING   := \
     sys/bios/osbi181q.bin \
+    sys/board/qvirt/board-conf.h \
     sys/board/qvirt/kernel.ld \
     sys/board/qvirt/init.c \
     sys/dev/rtc.c \
