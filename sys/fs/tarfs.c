@@ -101,9 +101,9 @@ static const struct iointf tarfs_file_intf = {
     .implname = "tarfs_fileio",
     .reclaim = (void(*)(struct io*))&kfree,
     .read = &seekio_read,
-    .write = &seekio_write,
     .fetch = &tarfs_fileio_fetch,
 #ifndef STUDENT
+    .write = &seekio_write,
     .store = &tarfs_fileio_store,
 #endif
     .ioctl = &tarfs_fileio_ioctl
