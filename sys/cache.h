@@ -144,7 +144,8 @@ extern int cache_flush(struct cache * ca);
 //
 // On successful return cache_flush() guarantees:
 // - Return value is 0.
-// - There are no dirty blocks pending write-back in /ca/.
+// - All blocks marked dirty that are not owned exclusively by another thread
+//   are written back to disk and are no longer marked dirty.
 //
 // On error cache_flush() returns a negative error code.
 //
