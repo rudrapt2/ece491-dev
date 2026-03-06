@@ -247,13 +247,18 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    if (strcmp(argv[1], "-R") == 0) {
-        // Enable RANDOMIZE_ON
-        RANDOMIZE_ON = 1;
-        // Shift arguments
-        argv++;
-        argc--;
+    int i;
+    for (i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-R") == 0) {
+            RANDOMIZE_ON = 1;
+            argc--;
+            break;
+        }
     }
+
+    // shift args
+    for (int j = i; j < argc; j++)
+        argv[j] = argv[j+1];
 
     const char *output_file = argv[1];
     uint32_t disk_size = parse_size(argv[2]);

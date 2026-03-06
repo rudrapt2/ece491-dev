@@ -193,50 +193,12 @@ static unsigned long long inline get_time() {
     return time;
 }
 
-void sleep_kill(int out_fd) {
-    uint8_t sleep = 0;
-    unsigned long long sleepuntil = get_time();
-    unsigned long long ctime;
-
-    while (1) {
-        sleepuntil += (MTIME_FREQ / TICKS_PER_SECOND);
-        ctime = get_time();
-        if (ctime < sleepuntil)
-            _usleep((sleepuntil - ctime) / (MTIME_FREQ / 1000000));
-        if (_write(out_fd, &sleep, sizeof(sleep)) <= 0) 
-            _exit(); // broken pipe 
-    }
-}
-
-void kill_proc(int out_fd) {
-    char c;
-    uint8_t kill = 1;
-    while (_read(CONSOLEOUT, &c, 1) > 0) {
-        if (c == (char)3) break; // killed
-    }
-    _write(out_fd, &kill, 1);
-    _exit();
-}
-
 void main(void) {
     // open gpu device
     int result, gpu_fd;
-    int in_fd = -1;
-    int out_fd = -1;
 
-    result = _pipe(&out_fd, &in_fd);
-
-    if (result < 0) {
-        printf("Failed to create pipe");
-    }
-
-    if (_fork() == 0) {
-        _close(in_fd);
-        if (_fork()) sleep_kill(out_fd);
-        else kill_proc(out_fd);
-    }
-
-    _close(out_fd);
+    unsigned long long sleepuntil = get_time();
+    unsigned long long ctime;
 
     gpu_fd = _open(-1, "dev/viogpu0");
     if (gpu_fd < 0) {
@@ -253,8 +215,9 @@ void main(void) {
     rand_init();
 
     for (;;) {
-        if (_read(in_fd, &result, 1) <= 0 || result)
-            break;
+        sleepuntil += (MTIME_FREQ / TICKS_PER_SECOND);
+        ctime = get_time();
+        if (sleepuntil > ctime) _usleep((sleepuntil - ctime) / (MTIME_FREQ / 1000000));
 
         tickcnt++;
         demo_step();
@@ -266,6 +229,4 @@ void main(void) {
             _exit();
         }
     }
-
-    _close(gpu_fd);
 }

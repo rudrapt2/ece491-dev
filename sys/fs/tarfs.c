@@ -101,9 +101,9 @@ static const struct iointf tarfs_file_intf = {
     .implname = "tarfs_fileio",
     .reclaim = (void(*)(struct io*))&kfree,
     .read = &seekio_read,
-    .write = &seekio_write,
     .fetch = &tarfs_fileio_fetch,
 #ifndef STUDENT
+    .write = &seekio_write,
     .store = &tarfs_fileio_store,
 #endif
     .ioctl = &tarfs_fileio_ioctl
@@ -113,6 +113,12 @@ static const struct iointf tarfs_lsio_intf = {
     .implname = "tarfs_lsio",
     .reclaim = (void(*)(struct io*))&kfree,
     .read = &tarfs_lsio_read
+};
+
+static const struct filesystem tarfs_intf = {
+    .implname = "tarfs",
+    .openfile = &tarfs_openfile,
+    .flush = &tarfs_flush
 };
 
 // EXPORTED FUNCTION DEFINITIONS
@@ -241,9 +247,7 @@ int mount_tarfs(const char * mpname, struct io * bkgio) {
         panic("create_cache() failed");
     
     fs->bkgio = ioaddref(bkgio);
-    fs->base.implname = "tarfs";
-    fs->base.openfile = &tarfs_openfile;
-    fs->base.flush = &tarfs_flush;
+    fs->base = tarfs_intf;
 
     result = mount_filesys(mpname, &fs->base);
     return result;

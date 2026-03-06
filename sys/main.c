@@ -20,6 +20,7 @@
 
 #ifndef MP2
 #include "fs/ngfs.h"
+#include "fs/tarfs.h"
 #include "filesys.h"
 #include "process.h"
 #endif
@@ -42,8 +43,10 @@
 #endif
 
 #define CMNTNAME "c" // ngfs
+#define DMNTNAME "d" // tarfs
 #define DEVMNTNAME "dev"
-#define CDEVNAME "vioblk0"
+#define CDEVNAME "vioblk1"
+#define DDEVNAME "vioblk0"
 
 #ifndef NUART // number of UARTs
 #define NUART 3
@@ -81,6 +84,9 @@ void main(unsigned int hartid, void * dtb) {
 #ifndef MP2
     mount_devfs(DEVMNTNAME);
     mount_drive(CMNTNAME, CDEVNAME, mount_ngfs);
+    mount_drive(DMNTNAME, DDEVNAME, mount_tarfs);
+    exec_init();
+
     exec_init();
     flush_all_filesys();
 #else
