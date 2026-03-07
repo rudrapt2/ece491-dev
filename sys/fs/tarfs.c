@@ -80,7 +80,9 @@ struct tarfs_lsio {
 
 
 static int tarfs_openfile(struct filesystem * fs, const char * name, struct io ** ioptr);
+#ifndef STUDENT
 static void tarfs_flush(struct filesystem * fs);
+#endif
 
 static int tarfs_open_fileio(struct tarfs * tarfs, const char * name, struct io ** ioptr);
 static long tarfs_fileio_fetch(struct io * io, unsigned long long pos, void * buf, long bufsz);
@@ -117,7 +119,9 @@ static const struct iointf tarfs_lsio_intf = {
 static const struct filesystem tarfs_intf = {
     .implname = "tarfs",
     .openfile = &tarfs_openfile,
+#ifndef STUDENT
     .flush = &tarfs_flush
+#endif
 };
 
 // EXPORTED FUNCTION DEFINITIONS
@@ -267,12 +271,14 @@ int tarfs_openfile (
         return tarfs_open_lsio(tarfs, ioptr);
 }
 
+#ifndef STUDENT
 void tarfs_flush(struct filesystem * fs) {
     struct tarfs * const tarfs = (void*)fs;
     assert (fs != NULL);
 
     cache_flush(tarfs->cache);
 }
+#endif
 
 int tarfs_open_fileio (
     struct tarfs * fs,
