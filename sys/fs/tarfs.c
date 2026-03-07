@@ -83,7 +83,6 @@ static int tarfs_openfile(struct filesystem * fs, const char * name, struct io *
 static void tarfs_flush(struct filesystem * fs);
 
 static int tarfs_open_fileio(struct tarfs * tarfs, const char * name, struct io ** ioptr);
-static void tarfs_fileio_reclaim(struct io * io);
 static long tarfs_fileio_fetch(struct io * io, unsigned long long pos, void * buf, long bufsz);
 #ifndef STUDENT
 static long tarfs_fileio_store(struct io * io, unsigned long long pos, const void * buf, long len);
@@ -298,13 +297,6 @@ int tarfs_open_fileio (
     *ioptr = seekio_init(&fio->io, &tarfs_file_intf, 1, 1);
 
     return 0;
-}
-
-void tarfs_file_reclaim(struct io * io) {
-    struct tarfs_fileio * const fio =
-        (void*)io - offsetof(struct tarfs_fileio, io);
-    trace("%s(io=%p)", __func__, io);
-    kfree(fio);
 }
 
 long tarfs_fileio_fetch (
