@@ -153,7 +153,7 @@ long iostore(struct io * io, unsigned long long pos, const void * buf, long bufl
     assert (io->refcnt != 0);
     assert (buf != NULL || buflen == 0);
 
-    if (io->intf->fetch == NULL)
+    if (io->intf->store == NULL)
         return -ENOTSUP;
     
     if (buflen < 0)

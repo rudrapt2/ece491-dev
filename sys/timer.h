@@ -97,9 +97,9 @@ extern void sleep_until(unsigned long long twake);
 // argument is an absolute time, referenced to the same reference clock as the
 // rdtime() function (riscv.h).
 //
-// If /twake/ is at or after the current time, as obtained by rdtime(),
-// leep_until() returns immediately. Otherwise, the calling thread is suspended
-// until /twake/.
+// If /twake/ is at or before the current time, as obtained by rdtime(), 
+// sleep_until() returns immediately. Otherwise, the calling thread is
+// suspended until /twake/.
 //
 // On return sleep_until() guarantees:
 // - The current time, as returned by rdtime(), it not before /twake/.
