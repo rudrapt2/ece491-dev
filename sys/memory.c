@@ -178,14 +178,21 @@ static struct page_chunk * free_chunk_list;
 //
 
 #ifdef STUDENT
-void memory_init(struct mregion * mmio, struct mregion * ram, struct mregion * resv, unsigned long mmio_size, unsigned long ram_size, unsigned long resv_size) {
+void memory_init(struct mregion * mmio, 
+                 struct mregion * ram, 
+                 struct mregion * resv, 
+                 unsigned long mmio_size, 
+                 unsigned long ram_size, 
+                 unsigned long resv_size
+		 ) {
     const void * const text_start = _kimg_text_start;
     const void * const text_end = _kimg_text_end;
     const void * const rodata_start = _kimg_rodata_start;
     const void * const rodata_end = _kimg_rodata_end;
     const void * const data_start = _kimg_data_start;
 
-    // All parameters are used for running on real hardware; you can ignore them in this simplified memory_init() implementation
+    // All parameters are used for running on real hardware; you can ignore them 
+    // in this simplified memory_init() implementation
     (void)mmio;
     (void)ram;
     (void)resv;
@@ -765,7 +772,8 @@ int enforce_vptr(const void * vp, size_t size, int rwxug_flags) {
     for (vpn = VPN(vma); vpn <= VPN(vma+size-1); vpn++) {
         pte = ptab_fetch(ptab, vpn);
 
-        if ((pte == NULL || !PTE_VALID((*pte))) && !(rwxug_flags & PTE_X)) { //If the page is invalid and we don't care about execute
+	//If the page is invalid and we don't care about execute
+        if ((pte == NULL || !PTE_VALID((*pte))) && !(rwxug_flags & PTE_X)) { 
 
             if (free_phys_page_count() < 3)
                 return 0;
