@@ -39,21 +39,17 @@
 #else
     #define INITEXE "trek-mp3-cp1"
     #define CONSOLEDEV "uart1"
-#endif
-#endif
+#endif // MP3CP1
+#endif // MP2
+#endif // !STUDENT
 
+#ifndef MP2
 #define CMNTNAME "c" // ngfs
 #define DMNTNAME "d" // tarfs
 #define DEVMNTNAME "dev"
 #define CDEVNAME "vioblk1"
 #define DDEVNAME "vioblk0"
 
-#ifndef NUART // number of UARTs
-#define NUART 3
-#endif
-#endif
-
-#ifndef MP2
 static void exec_init();
 static void mount_drive(char * mntname, char * devname,
     int (*mount)(const char * mpname, struct io * bkgio));

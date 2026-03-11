@@ -22,6 +22,8 @@ FILES_FOR_COPYING   := \
     sys/dev/virtio.h \
     sys/fs/ngfs.c \
     sys/fs/ngfs.h \
+    sys/fs/tarfs.c \
+    sys/fs/tarfs.h \
     sys/cache.c \
     sys/cache.h \
     sys/conf.h \
@@ -70,7 +72,6 @@ FILES_FOR_COPYING   := \
     sys/trap.h \
     sys/trap.s \
     \
-    usr/games/trek-mp3-cp1 \
     usr/games/trek \
     usr/games/zork \
     usr/games/rogue \
@@ -93,7 +94,7 @@ FILES_FOR_COPYING   := \
     usr/heap.h \
     usr/io.c \
     usr/io.h \
-    usr/Makefile \
+    usr/mp3-student.make:usr/Makefile \
     usr/no_umode.ld \
     usr/scnum.h \
     usr/shell.h \
@@ -104,6 +105,7 @@ FILES_FOR_COPYING   := \
     usr/syscall.S \
     usr/umode.ld \
     util/fs/mkfs_ngfs \
+    util/fs/unmkfs_ngfs \
 
 # Assembly files to preprocess (Must match DESTINATION paths)
 ASSEMBLY_FILES_FOR_PREPROCESSING := \

@@ -68,14 +68,6 @@ static int allocfd(struct process * proc, int reqfd, int notfd);
 // EXPORTED FUNCTION DEFINITIONS
 //
 
-/**
- * @brief Initiates syscall present in trap frame struct and stores the return address into the sepc
- * @details sepc will be used to return back to program execution after interrupt is handled and
- * sret is called
- * @param tfr pointer to trap frame struct
- * @return void
- */
-
 void handle_syscall(struct trap_frame * tfr) {
 #ifdef STUDENT
     // YOUR CODE HERE
@@ -89,14 +81,6 @@ void handle_syscall(struct trap_frame * tfr) {
 
 // INTERNAL FUNCTION DEFINITIONS
 //
-
-/**
- * @brief Calls specified syscall and passes arguments
- * @details Function uses register a7 to determine syscall number and arguments are passed in from
- * a0-a5 depending on the function
- * @param tfr pointer to trap frame struct
- * @return result of syscall
- */
 
 long syscall(const struct trap_frame * tfr) {
 #ifdef STUDENT

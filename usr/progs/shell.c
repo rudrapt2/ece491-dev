@@ -344,8 +344,7 @@ static void parse_and_exec(char* head) {
     exec(argc, argv);
 }
 
-void main()
-{
+void main() {
     char buf[BUFSIZE];
     int child;
 
@@ -359,14 +358,15 @@ void main()
 
 	for (;;) {
         // Your shell prompt
-        // Make sure your prompt ends in one of '>', '#', '$'
+        // Make sure your prompt ends in one of '>', '#', '$', '%'
 		printf(/* CHANGE ME */ "LUMON OS> ");
 		getsn(buf, BUFSIZE - 1);
 
 		if (0 == strcmp(buf, "exit"))
 			return;
 
-#ifdef MP3CP1
+#ifndef STUDENT
+#ifdef MP3CP2
         parse_and_exec(buf);
 #else
 		child = _fork();
@@ -378,6 +378,14 @@ void main()
 			// Child process: parse and execute
             parse_and_exec(buf);
 		}
+#endif // MP3CP2
+#else 
+        // Now exec the inputted string
+        // 
+        // For CP3, you should reset the loop 
+        // after the exec call has finished
+        //
+        // YOUR CODE HERE
 #endif
 	}
 }

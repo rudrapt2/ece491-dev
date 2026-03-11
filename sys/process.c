@@ -38,9 +38,6 @@ static void fork_func(struct condition * forked, struct trap_frame * tfr);
 // INTERNAL GLOBAL VARIABLES
 //
 
-/*!
- * @brief The main user process struct
- */
 static struct process main_proc;
 
 // EXPORTED GLOBAL VARIABLES
@@ -193,13 +190,6 @@ int process_fork(const struct trap_frame * tfr) {
 #endif
 }
 
-/** \brief
- *
- *  
- *  Discard memory space, close your associated uio, free the memory you're supposed to free.
- *  
- *
- */
 void process_exit(void) {
 #ifdef STUDENT
     // YOUR CODE HERE

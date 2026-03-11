@@ -78,6 +78,8 @@ struct ngfs {
 // INTERNAL FUNCTION DECLARATIONS
 //
 
+#ifndef STUDENT
+
 static int ngfs_open(struct filesystem * fs, const char * name, struct io ** ioptr);
 static void ngfs_reclaim(struct io* io);
 static int ngfs_ioctl(struct io * io, int op, void * arg);
@@ -90,8 +92,6 @@ static void ngfs_flush(struct filesystem * fs);
 static int ngfs_open_file(struct ngfs * fs, const char * name, struct io ** ioptr);
 static int ngfs_open_listing(struct ngfs * fs, struct io ** ioptr);
 static long ngfs_listing_read(struct io * io, void * buf, long bufsz);
-
-#ifndef STUDENT
 
 // Interal helper functions
 static long read_from_block(struct cache * cache, uint32_t block, uint32_t offset, void* buf, long bufsz);
@@ -112,9 +112,9 @@ static void clear_block(struct cache * cache, uint32_t block, uint32_t offset, u
 #endif
 
 // INTERNAL GLOBAL VARIABLES
+//
 
 #ifndef STUDENT
-
 static const struct filesystem ngfs_fs = {
     .implname = "ngfs",
     .openfile = &ngfs_open,
@@ -208,7 +208,7 @@ int mount_ngfs(const char * name, struct io * bkgio) {
 }
 
 #ifdef STUDENT
-    // YOUR CODE HERE
+// YOUR CODE HERE
 #else
 
 int ngfs_open(struct filesystem * fs, const char * name, struct io ** ioptr) {
