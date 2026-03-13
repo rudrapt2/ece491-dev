@@ -14,6 +14,7 @@
 
 #include "memory.h"
 #include "conf.h"
+#include "board/conf.h"
 #include "console.h"
 #include "error.h"
 #include "heap.h"
@@ -104,6 +105,26 @@ struct pte {
 #define PT_INDEX(lvl, vpn) \
     (((vpn) & (0x1FF << (lvl * (PAGE_ORDER - PTE_ORDER)))) >> (lvl * (PAGE_ORDER - PTE_ORDER)))
 
+// CONSTANTS
+//
+const char * art = 
+" _\0"
+" \\`*-.\0"
+"  )  _`-.\0"
+" .  : `. .\0"
+" : _   '  \\ \0"
+" ; *` _.   `*-._\0"
+" `-.-'          `-.\0"
+"   ;       `       `.\0"
+"   :.       .        \\ \0"
+"   . \\  .   :   .-'   .\0"
+"   '  `+.;  ;  '      :\0"
+"   :  '  |    ;       ;-.\0"
+"   ; '   : :`-:     _.`* ;\0"
+".*' /  .*' ; .*`- +'  `*'\0"
+"`*-*   `*-*  `*-*'\0";
+
+
 // INTERNAL FUNCTION DECLARATIONS
 //
 
@@ -154,6 +175,11 @@ static void heapSort(uintptr_t arr, uintptr_t elem_sz, uint32_t n_elem, int(*cmp
 static void sort(uintptr_t arr, uintptr_t elem_sz, uint32_t n_elem, int(*cmp)(void * a, void * b));
 #endif
 
+static int print_memory_info(struct mregion * mmio_imm, unsigned long mmiocnt,
+                             struct mregion * ram_imm, unsigned long ramcnt,
+                             struct mregion * resv_imm, unsigned long resvcnt);
+
+
 // INTERNAL GLOBAL VARIABLES
 //
 
@@ -178,27 +204,52 @@ static struct page_chunk * free_chunk_list;
 //
 
 #ifdef STUDENT
-void memory_init(struct mregion * mmio, 
-                 struct mregion * ram, 
-                 struct mregion * resv, 
-                 unsigned long mmio_size, 
-                 unsigned long ram_size, 
-                 unsigned long resv_size
-		 ) {
+void memory_init (
+    const struct mregion * ram_og, unsigned long ramcnt,
+    const struct mregion * mmio_og, unsigned long mmiocnt,
+    const struct mregion * resv_og, unsigned long resvcnt)
+{
+
     const void * const text_start = _kimg_text_start;
     const void * const text_end = _kimg_text_end;
     const void * const rodata_start = _kimg_rodata_start;
     const void * const rodata_end = _kimg_rodata_end;
     const void * const data_start = _kimg_data_start;
 
-    // All parameters are used for running on real hardware; you can ignore them 
-    // in this simplified memory_init() implementation
-    (void)mmio;
-    (void)ram;
-    (void)resv;
-    (void)mmio_size;
-    (void)ram_size;
-    (void)resv_size;
+    // All parameters are used for running on real hardware and printing memory info; 
+    // you can ignore them in this simplified memory_init() implementation
+
+
+    struct mregion mmio[mmiocnt];
+    struct mregion ram[ramcnt];
+    struct mregion resv[resvcnt+1];
+
+    memcpy(mmio, mmio_og, mmiocnt * sizeof(struct mregion));
+    memcpy(ram, ram_og, ramcnt * sizeof(struct mregion));
+    memcpy(resv, resv_og, resvcnt * sizeof(struct mregion));
+
+    //The memory print function expects the kernel to be mapped as a reserved
+    //region and the array to be sorted. For the qvirt target, the second 
+    //reserved region is in high memory, so we move it right one and insert our
+    //kernel as the second to last entry.
+    resvcnt++;
+    resv[resvcnt-1].pma = resv[resvcnt-2].pma;
+    resv[resvcnt-1].size = resv[resvcnt-2].size;
+    resv[resvcnt-2].pma = 
+        ROUND_DOWN((uintptr_t)(void *)_kimg_start, PAGE_SIZE);
+    resv[resvcnt-2].size = 
+        ROUND_UP((uintptr_t)(void *)_kimg_end, PAGE_SIZE) - 
+        ROUND_DOWN((uintptr_t)(void *)_kimg_start, PAGE_SIZE);
+
+    kprintfluffy(40, &art, "");   
+    kprintfluffy(40, &art, "System Memory Map:");
+    kprintfluffy(40, &art, "");
+
+    int fluffy = print_memory_info(mmio, mmiocnt, ram, ramcnt, resv, resvcnt);
+
+    for(int i = 0; i < 10 - fluffy; i++){ 
+        kprintfluffy(40, &art, "");
+    }
 
     void * heap_start;
     void * heap_end;
@@ -206,10 +257,6 @@ void memory_init(struct mregion * mmio,
     uintptr_t pma;
     const void * pp;
 
-    trace("%s()", __func__);
-
-    debug("           RAM: [%p,%p): %zu MB", RAM_START, RAM_END, RAM_SIZE / 1024 / 1024);
-    debug("  Kernel image: [%p,%p)", _kimg_start, _kimg_end);
 
     // Kernel must fit inside 2MB megapage (one level 1 PTE)
 
@@ -277,6 +324,7 @@ void memory_init(struct mregion * mmio,
 
     main_mtag = ptab_to_mtag(main_pt2, 0);
     csrw_satp(main_mtag);
+    sfence_vma();
 
     // Give the memory between the end of the kernel image and the next page
     // boundary to the heap allocator, but make sure it is at least
@@ -302,14 +350,18 @@ void memory_init(struct mregion * mmio,
     debug("Heap allocator: [%p,%p): %zu KB free",
             heap_start, heap_end, (heap_end - heap_start) / 1024);
 
-#ifdef STUDENT
+#ifndef STUDENT
     // YOUR CODE HERE
     // Initialize free chunk list
 #else
     free_chunk_list = heap_end; // heap_end is page aligned
-    free_chunk_list->pagecnt = (RAM_END - MEGA_SIZE - heap_end) / PAGE_SIZE;
+    free_chunk_list->pagecnt = (RAM_SIZE - (heap_end - RAM_START) - MEGA_SIZE) / PAGE_SIZE;
     free_chunk_list->next = NULL;
 #endif
+    
+    kprintfluffy(40, &art, "Free Chunk List Initialized!");
+    kprintfluffy(40, &art, "%d Free Pages.", free_phys_page_count());
+    kprintfluffy(40, &art, "");
 
     debug("Page allocator: [%p,%p): %u pages free",
             heap_end, RAM_END, free_chunk_list->pagecnt);
@@ -324,7 +376,12 @@ void memory_init(struct mregion * mmio,
     memory_initialized = 1;
 }
 #else
-void memory_init(struct mregion * mmio, struct mregion * ram, struct mregion * resv, unsigned long mmio_size, unsigned long ram_size, unsigned long resv_size) {
+void memory_init (
+    const struct mregion * ram_og, unsigned long ramcnt,
+    const struct mregion * mmio_og, unsigned long mmiocnt,
+    const struct mregion * resv_og, unsigned long resvcnt)
+{
+    
     struct mregion kernel_text = {
         .pma = (uintptr_t)_kimg_text_start,
         .size = (uintptr_t)_kimg_text_end - (uintptr_t)_kimg_text_start
@@ -338,33 +395,49 @@ void memory_init(struct mregion * mmio, struct mregion * ram, struct mregion * r
         .size = (uintptr_t)_kimg_end - (uintptr_t)_kimg_data_start
     };
 
+    //Copy mregions to not destroy them
+   
+    struct mregion mmio[mmiocnt];
+    struct mregion ram[ramcnt];
+    struct mregion resv[resvcnt+1];
+
+    memcpy(mmio, mmio_og, mmiocnt * sizeof(struct mregion));
+    memcpy(ram, ram_og, ramcnt * sizeof(struct mregion));
+    memcpy(resv, resv_og, resvcnt * sizeof(struct mregion));
+
     trace("%s()", __func__);
 
-    debug("           RAM: [%p,%p): %zu MB", RAM_START, RAM_END, RAM_SIZE / 1024 / 1024);
-    debug("  Kernel image: [%p,%p)", _kimg_start, _kimg_end);
-
     //If there is no RAM, we fail. (Who's hopes and dreams did we load the kernel into and start the stack on???)
-    assert(ram_size > 0);
+    assert (ramcnt > 0);
 
     //Add the kernel as a reserved region - we'll set up permissions later, this is to initialize the chunk list
-    resv_size+=1;
+    resvcnt += 1;
 
     //Probably don't need to check this because elf files are guaranteed to be page aligned but I do it to be safe anyway.
-    resv[resv_size-1].pma = 
+    resv[resvcnt-1].pma = 
         ROUND_DOWN((uintptr_t)(void *)_kimg_start, PAGE_SIZE);
-    resv[resv_size-1].size = 
+    resv[resvcnt-1].size = 
         ROUND_UP((uintptr_t)(void *)_kimg_end, PAGE_SIZE) - 
         ROUND_DOWN((uintptr_t)(void *)_kimg_start, PAGE_SIZE);
 
     //Sort to avoid O(n^2) while initializing the free chunk list.
-    sort((uintptr_t)(void *)resv, sizeof(struct mregion), resv_size, cmp_mregion);
-    sort((uintptr_t)(void *)ram, sizeof(struct mregion), ram_size, cmp_mregion);
-    sort((uintptr_t)(void *)mmio, sizeof(struct mregion), mmio_size, cmp_mregion);
+    sort((uintptr_t)(void *)resv, sizeof(struct mregion), resvcnt, cmp_mregion);
+    sort((uintptr_t)(void *)ram, sizeof(struct mregion), ramcnt, cmp_mregion);
+    sort((uintptr_t)(void *)mmio, sizeof(struct mregion), mmiocnt, cmp_mregion);
 
     //Merge overlapping regions and null out entries that have been subsumed
-    combine(resv, resv_size);
-    combine(ram, ram_size);
-    combine(mmio, mmio_size);
+    combine(resv, resvcnt);
+    combine(ram, ramcnt);
+    combine(mmio, mmiocnt);
+
+    kprintfluffy(40, &art, "");   
+    kprintfluffy(40, &art, "System Memory Map:");
+    kprintfluffy(40, &art, "");
+
+    int fluffy = print_memory_info(mmio, mmiocnt, ram, ramcnt, resv, resvcnt);
+    for(int i = 0; i < 10 - fluffy; i++){ 
+        kprintfluffy(40, &art, "");
+    }
 
     //Initialize free_chunk_list to start of RAM.
     free_chunk_list = NULL;
@@ -373,17 +446,17 @@ void memory_init(struct mregion * mmio, struct mregion * ram, struct mregion * r
 
     //Build free_chunk_list
     //ASSUME: Resv is a strict subset of RAM
-    for (int ram_idx = 0, resv_idx = 0; ram_idx < ram_size;) {
+    for (int ram_idx = 0, resv_idx = 0; ram_idx < ramcnt;) {
         unsigned long sz = 0;
         uintptr_t start = chunk_start;
 
-        while (resv[resv_idx].size == 0x0 && resv_idx < resv_size)
+        while (resv[resv_idx].size == 0x0 && resv_idx < resvcnt)
             resv_idx++; //Ignore NULLs
 
-        if (ram[ram_idx].pma + ram[ram_idx].size < resv[resv_idx].pma || resv_idx >= resv_size) {
+        if (ram[ram_idx].pma + ram[ram_idx].size < resv[resv_idx].pma || resv_idx >= resvcnt) {
             sz = ram[ram_idx].pma + ram[ram_idx].size - start;
             ram_idx++;
-            while (ram[ram_idx].size == 0x0 && ram_idx <= ram_size)
+            while (ram[ram_idx].size == 0x0 && ram_idx <= ramcnt)
                 ram_idx++; //Ignore NULLs
             chunk_start = ram[ram_idx].pma;
         }
@@ -404,17 +477,21 @@ void memory_init(struct mregion * mmio, struct mregion * ram, struct mregion * r
     //If everything is reserved, fail. (Why does this look like a load access fault?)
     assert(free_chunk_list != NULL);
 
+    kprintfluffy(40, &art, "Free Chunk List Initialized!");
+    kprintfluffy(40, &art, "%d Free Pages.", free_phys_page_count());
+    kprintfluffy(40, &art, "");
+
     //Redundant, but clear the main table.
     memset(main_pt2, 0, 4096);
 
     //Map MMIO
-    map_startup(mmio, mmio_size, PTE_R | PTE_W);
+    map_startup(mmio, mmiocnt, PTE_R | PTE_W);
 
     //Map RAM (R/W)
-    map_startup(ram, ram_size, PTE_R | PTE_W);
+    map_startup(ram, ramcnt, PTE_R | PTE_W);
 
     //Map Reserved regions (R)
-    modify_startup(resv, resv_size, PTE_R);
+    modify_startup(resv, resvcnt, PTE_R);
 
     //Map Kernel (Text: RX, Rodata: R, Data: RW)
     modify_startup(&kernel_text, 1, PTE_R | PTE_X);
@@ -425,6 +502,7 @@ void memory_init(struct mregion * mmio, struct mregion * ram, struct mregion * r
 
     main_mtag = ptab_to_mtag(main_pt2, 0);
     csrw_satp(main_mtag);
+    sfence_vma();
 
     //Since our RAM can be non-contiguous I just initialize with no grant and let the heap allocate
     //for itself later
@@ -665,6 +743,7 @@ void * map_page(uintptr_t vma, void * pp, int rwxug_flags) {
     return NULL;
 #else
     ptab_insert(active_space_ptab(), VPN(vma), pp, rwxug_flags);
+    sfence_vma();
     return (void *)vma;
 #endif
 }
@@ -685,7 +764,7 @@ void * map_range(uintptr_t vma, size_t size, void * pp, int rwxug_flags) {
         pp += PAGE_SIZE;
         size -= PAGE_SIZE;
     }
-
+    sfence_vma();
     return (void *)vma_start;
 #endif
 }
@@ -704,7 +783,7 @@ void * alloc_and_map_range(uintptr_t vma, size_t size, int rwxug_flags) {
 
     for (vpn = VPN(vma); vpn < VPN(vma+size); vpn++)
         ptab_insert(ptab, vpn, alloc_phys_page(), rwxug_flags);
-
+    sfence_vma();
     return (void *)vma;
 #endif
 }
@@ -724,6 +803,7 @@ void set_range_flags(const void * vp, size_t size, int rwxug_flags) {
 
     for (vpn = VPN(vma); vpn < VPN(vma+size); vpn++)
         ptab_adjust(root, vpn, rwxug_flags);
+    sfence_vma();
 #endif
 }
 
@@ -745,6 +825,7 @@ void unmap_and_free_range(void * vp, size_t size) {
         pp = ptab_remove(ptab, vpn);
         free_phys_page(pp); // ok if null
     }
+    sfence_vma();
 #endif
 }
 
@@ -772,8 +853,7 @@ int enforce_vptr(const void * vp, size_t size, int rwxug_flags) {
     for (vpn = VPN(vma); vpn <= VPN(vma+size-1); vpn++) {
         pte = ptab_fetch(ptab, vpn);
 
-	//If the page is invalid and we don't care about execute
-        if ((pte == NULL || !PTE_VALID((*pte))) && !(rwxug_flags & PTE_X)) { 
+        if ((pte == NULL || !PTE_VALID((*pte))) && !(rwxug_flags & PTE_X)) { //If the page is invalid and we don't care about execute
 
             if (free_phys_page_count() < 3)
                 return 0;
@@ -1171,4 +1251,146 @@ static inline struct pte ptab_pte(const struct pte * pt, uint_fast8_t g_flag) {
 
 static inline struct pte null_pte(void) {
     return (struct pte) { };
+}
+
+//This function assumes:
+//- resv strictly overlaps with RAM
+//- MMIO and RAM do not overlap
+//- Arrays are sorted
+//- 0 size entries are invalid
+//- That I'm very sorry to whoever has to read this.
+//
+// * THIS FUNCTION IS DESTRUCTIVE TO MREGION ARRAYS.
+//
+//...returns how many times kprintfluffy was called :innocent:
+static int print_memory_info(struct mregion * mmio_imm, unsigned long mmiocnt,
+                             struct mregion * ram_imm, unsigned long ramcnt,
+                             struct mregion * resv_imm, unsigned long resvcnt) {
+    unsigned long mmio_idx = 0;
+    unsigned long ram_idx = 0;
+    unsigned long resv_idx = 0;
+
+    int fluffy = 0;
+
+    //The first thing we do is copy out the arguments to prevent destruction of
+    //the arguments.
+
+    struct mregion mmio[mmiocnt];
+    struct mregion ram[ramcnt];
+    struct mregion resv[resvcnt];
+
+    memcpy(mmio, mmio_imm, mmiocnt * sizeof(struct mregion));
+    memcpy(ram, ram_imm, ramcnt * sizeof(struct mregion));
+    memcpy(resv, resv_imm, resvcnt * sizeof(struct mregion));
+
+    while (mmio_idx < mmiocnt || ram_idx < ramcnt) {
+        uintptr_t mmio_loc = mmio[mmio_idx].pma;
+        uintptr_t ram_loc = ram[ram_idx].pma;
+        uintptr_t resv_loc = resv[resv_idx].pma;
+        
+        if (mmio_loc < ram_loc && mmio_idx < mmiocnt) {
+            kprintfluffy(40, &art, "%08p - %08p - MMIO", 
+                         mmio_loc, 
+                         mmio_loc + mmio[mmio_idx].size - 1);
+            fluffy++;
+            mmio_idx++;
+        } else {
+
+            if (ram_loc <= resv_loc && 
+               ram_loc + ram[ram_idx].size > resv_loc && resv_idx < resvcnt) {
+
+                if (ram_loc < resv_loc) {
+                    kprintfluffy(40, 
+                                 &art, 
+                                 "%p - %p - Free RAM", 
+                                 ram_loc, 
+                                 resv_loc - 1);
+                    ram[ram_idx].size -= resv_loc - ram_loc;
+                    ram[ram_idx].pma = resv_loc;
+                    fluffy++;
+                } else {
+
+                    if (resv_loc <= (uintptr_t)_kimg_start && 
+                        resv_loc + resv[resv_idx].size > (uintptr_t)_kimg_start) {
+
+                        if (resv_loc < (uintptr_t)_kimg_start) {
+                            kprintfluffy(40, 
+                                         &art, 
+                                         "%p - %p - SBI Reserved", 
+                                         resv_loc, 
+                                         (uintptr_t)_kimg_start - 1);
+
+                            resv[resv_idx].size -= 
+                                (uintptr_t)_kimg_start - resv_loc;
+                            resv[resv_idx].pma = (uintptr_t)_kimg_start;
+                            ram[ram_idx].pma = (uintptr_t)_kimg_start;
+                            ram[ram_idx].size -= 
+                                (uintptr_t)_kimg_start - resv_loc;
+                            fluffy++;
+                        } else {
+                            kprintfluffy(40, 
+                                         &art, 
+                                         "%p - %p - Kernel TEXT", 
+                                         _kimg_text_start, 
+                                         ROUND_UP((uintptr_t)_kimg_text_end, 
+                                                  PAGE_SIZE) - 1);
+
+                            kprintfluffy(40, 
+                                         &art, 
+                                         "%p - %p - Kernel RODATA", 
+                                         _kimg_rodata_start, 
+                                         ROUND_UP((uintptr_t)_kimg_rodata_end, 
+                                                  PAGE_SIZE) - 1);
+
+                            kprintfluffy(40, 
+                                         &art, 
+                                         "%p - %p - Kernel DATA", 
+                                         _kimg_data_start, 
+                                         ROUND_UP((uintptr_t)_kimg_data_end, 
+                                                  PAGE_SIZE) - 1);
+
+                            resv[resv_idx].pma = 
+                                ROUND_UP((uintptr_t)_kimg_end, PAGE_SIZE);
+                            resv[resv_idx].size -= 
+                                ROUND_UP((uintptr_t)_kimg_end, PAGE_SIZE) - resv_loc;
+                            ram[ram_idx].pma = 
+                                ROUND_UP((uintptr_t)_kimg_end, PAGE_SIZE);
+                            ram[ram_idx].size -= 
+                                ROUND_UP((uintptr_t)_kimg_end, PAGE_SIZE) - resv_loc;
+                            fluffy+=3;
+                        }
+                    } else {
+                        kprintfluffy(40, 
+                                     &art, 
+                                     "%p - %p - SBI Reserved", 
+                                     resv_loc, 
+                                     resv_loc + resv[resv_idx].size - 1);
+                        ram[ram_idx].pma = resv_loc + resv[resv_idx].size;
+                        ram[ram_idx].size -= resv[resv_idx].size;
+                        resv_idx++;
+                        fluffy++;
+                    }
+                }
+            } else {
+                kprintfluffy(40, 
+                             &art, 
+                             "%p - %p - Free RAM", 
+                             ram_loc, 
+                             ram_loc + ram[ram_idx].size - 1);
+                fluffy++;
+                ram_idx++;
+            }
+        }
+
+        //Ignore NULL entries (don't need to do this first because first entries 
+        //are guaranteed to be populated)
+        while(mmio[mmio_idx].size == 0 && mmio_idx < mmiocnt)
+                mmio_idx++;
+        while(ram[ram_idx].size == 0 && ram_idx < ramcnt)
+                ram_idx++;
+        while(resv[resv_idx].size == 0 && resv_idx < resvcnt)
+                resv_idx++;
+
+    }
+    return fluffy;
 }

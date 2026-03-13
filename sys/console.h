@@ -26,4 +26,6 @@ extern void kprintf(const char * fmt, ...);
 
 extern void kvprintf(const char * fmt, va_list ap);
 
+extern void kprintfluffy(int cols, const char ** artptr, const char * fmt, ...);
+
 #endif // _CONSOLE_H_

@@ -79,15 +79,15 @@ char kgetc(void) {
 }
 
 void kputs(const char * str) {
-    int pie;
+    int sie;
 
-    pie = disable_interrupts();
+    sie = disable_interrupts();
 
     while (*str != '\0')
         kputc(*str++);
     kputc('\n');
 
-    restore_interrupts(pie);
+    restore_interrupts(sie);
 }
 
 char * kgetsn(char * buf, size_t n) {
@@ -135,11 +135,45 @@ void kprintf(const char * fmt, ...) {
 }
 
 void kvprintf(const char * fmt, va_list ap) {
-    int pie;
+    int sie;
 
-    pie = disable_interrupts();
+    sie = disable_interrupts();
     vgprintf(vprintf_putc, NULL, fmt, ap);
-    restore_interrupts(pie);
+    restore_interrupts(sie);
+}
+
+void kprintfluffy(int cols, const char ** artptr, const char * fmt, ...) {
+    char linebuf[128];
+    const char * arts;
+    size_t artlen;
+    va_list ap;
+    int n;
+
+    if (cols < 0)
+        return;
+    
+    if (cols > sizeof(linebuf)-1)
+        cols = sizeof(linebuf)-1;
+    
+    if (cols > 0) {
+        va_start(ap, artptr);
+        n = vsnprintf(linebuf, cols, fmt, ap);
+        va_end(ap);
+
+        if (n < cols)
+            memset(linebuf+n, ' ', cols-n);
+        linebuf[cols] = '\0';
+    } else
+        linebuf[0] = '\0';
+    
+    
+    arts = (artptr != NULL && *artptr != NULL) ? *artptr : "";
+    artlen = strlen(arts);
+
+    kprintf("%s %s\n", linebuf, arts);
+
+    if (artlen != 0)
+        *artptr = arts + artlen+1;
 }
 
 // INTERNAL FUNCTION DEFINITIONS

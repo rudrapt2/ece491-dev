@@ -82,7 +82,7 @@ void board_init(unsigned int hartid, void * dtb) {
     plic_init((void*)PLIC_MMIO_BASE);
     timer_init(TIMER_FREQ);
 #if !(defined(MP2) || defined(MP3CP1))
-    memory_init(qvirt_mmio, qvirt_ram, qvirt_resv, 1, 1, 3);
+    memory_init(qvirt_ram, 1, qvirt_mmio, 1, qvirt_resv, 3);
 #else
     heap_init(_kimg_end, (void*)(RAM_END - (void*)MEGA_SIZE) - (void*)_kimg_end);
 #endif
