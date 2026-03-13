@@ -324,6 +324,7 @@ void memory_init (
 
     main_mtag = ptab_to_mtag(main_pt2, 0);
     csrw_satp(main_mtag);
+    kprintf("Enabled Address Translation.\n");
     sfence_vma();
 
     // Give the memory between the end of the kernel image and the next page
@@ -502,6 +503,7 @@ void memory_init (
 
     main_mtag = ptab_to_mtag(main_pt2, 0);
     csrw_satp(main_mtag);
+    kprintf("Enabled Address Translation.\n");
     sfence_vma();
 
     //Since our RAM can be non-contiguous I just initialize with no grant and let the heap allocate
