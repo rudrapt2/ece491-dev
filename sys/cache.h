@@ -24,11 +24,11 @@ struct cache; // opaque decl.
 //
 // REQUIRED BEHAVIOR FOR THIS ASSIGNMENT
 //
-// - Cache capacity is at least 64 blocks.
+// - Cache size in blocks is exactly CACHE_CAPACITY.
 // - The cache is empty immediately after create_cache() returns.
 // - If the cache starts empty and callers fetch blocks
-//   [N, N+1, N+2, ..., N+63], subsequent fetches of any of
-//   those 64 blocks must be cache hits (no backing-device read request).
+//   [N, N+1, N+2, ..., N+CACHE_CAPACITY], subsequent fetches of any of
+//   those blocks must be cache hits (no backing-device read request).
 // - If block /k/ is fetched and no subsequent cache_fetch() occurs, block /k/
 //   must remain in the cache.
 //
@@ -59,7 +59,8 @@ struct cache; // opaque decl.
 // - cache_release() called with a pointer that is not currently owned by the
 //   calling thread through a successful cache_fetch()
 //
-//
+// Those are just some example of UB for this module, other edge behaviors can
+// be treated similarly (within reason).
 
 extern struct cache * create_cache(
     struct io * bkgio, unsigned long cache_blksz);
