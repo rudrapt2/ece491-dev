@@ -81,11 +81,7 @@ void board_init(unsigned int hartid, void * dtb) {
     console_init();
     plic_init((void*)PLIC_MMIO_BASE);
     timer_init(TIMER_FREQ);
-#if !(defined(MP2) || defined(MP3CP1))
     memory_init(qvirt_ram, 1, qvirt_mmio, 1, qvirt_resv, 3);
-#else
-    heap_init(_kimg_end, (void*)(RAM_END - (void*)MEGA_SIZE) - (void*)_kimg_end);
-#endif
 }
 
 void attach_board_devices(void) {
@@ -99,3 +95,18 @@ void attach_board_devices(void) {
     for (i = 0; i < 8; i++)
         attach_virtio((void*)VIRTIO_MMIO_BASE(i), VIRTIO0_INTR_SRCNO+i);
 }
+
+// When memory is not present, we call this function so we don't have to change
+// the main function.
+//
+// We will otherwise call the actual one.
+
+void __attribute__ ((weak)) memory_init(const struct mregion * ram,
+                                          unsigned long ramcnt,
+                                          const struct mregion * mmio,
+                                          unsigned long mmiocnt,
+                                          const struct mregion * resv,
+                                          unsigned long resvcnt) {
+    heap_init(_kimg_end, (void*)(RAM_END - (void*)MEGA_SIZE) - (void*)_kimg_end);
+}
+

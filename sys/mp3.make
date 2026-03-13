@@ -25,8 +25,6 @@ OBJS = \
 	dev/virtio.o \
 	dev/viorng.o \
 	dev/vioblk.o \
-	dev/loop.o \
-	iomux.o \
 	string.o \
 	plic.o \
 	error.o \
@@ -51,19 +49,15 @@ OBJS = \
 	sbi.o \
 	fs/ngfs.o \
 	fs/tarfs.o \
-	memory.o \
 	console.o \
 	dev/rtc.o \
 	filesys.o \
 	fs/ngfs.o \
-	process.o \
-	syscall.o \
 	dev/uart.o \
 	dev/viohi.o \
     dev/virtio.o \
 	dev/viorng.o \
 	dev/vioblk.o \
-    dev/viogpu.o \
 	board/$(TARGET)/init.o \
 
 VIDEO_OBJS = \
@@ -128,6 +122,12 @@ VIDEO_QEMUOPTS += -device virtio-keyboard-device -device virtio-tablet-device
 ifeq ($(CP1), 1)
 	CFLAGS += -DMP3CP1
 	ASFLAGS += -defsym MP3CP1=1
+else
+	OBJS += memory.o \
+		process.o \
+		syscall.o \
+		dev/loop.o \
+		iomux.o 
 endif
 
 all: kernel.elf
