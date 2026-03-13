@@ -25,4 +25,6 @@
 #define SYSCALL_PIPE 20    // create a pipe
 #define SYSCALL_IODUP 21   // duplicate an fd
 
+#define SYSCALL_AB1043 22  // age verification API
+
 #endif  // _SCNUM_H_
