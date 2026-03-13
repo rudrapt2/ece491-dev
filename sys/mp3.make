@@ -126,7 +126,6 @@ else
 	OBJS += memory.o \
 		process.o \
 		syscall.o \
-		dev/loop.o \
 		iomux.o 
 endif
 
