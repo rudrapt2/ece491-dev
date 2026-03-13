@@ -55,7 +55,10 @@ mp3-cp2:
 
 mp3-cp3: mp3-cp2
 	make -C flying-toasters/toasters_gold
-	mv flying-toasters/toasters_gold/toasters $(USR_GAMES_FOLDER)/toasters
+	cp flying-toasters/toasters_gold/toasters $(USR_GAMES_FOLDER)/toasters
+
+	make -C skyline
+	cp skyline/bin/skyline 			$(USR_GAMES_FOLDER)/skyline
 
 	make -C snake
 	cp snake/bin/snake $(USR_GAMES_FOLDER)/snake

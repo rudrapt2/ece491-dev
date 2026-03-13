@@ -146,7 +146,7 @@ void main(void) {
             if (evt.value) continue; // release
 
             key = evt.code;
-            if (_write(wpipe_fd, &key, sizeof(key)) < 0)
+            if (_write(wpipe_fd, &key, sizeof(key)) <= 0)
                 _exit();
         } while (key != VKEY_Q);
 
