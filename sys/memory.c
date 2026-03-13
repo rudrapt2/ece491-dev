@@ -107,6 +107,7 @@ struct pte {
 
 // CONSTANTS
 //
+#define CAT_SIZE 15
 const char * art = 
 " _\0"
 " \\`*-.\0"
@@ -247,7 +248,7 @@ void memory_init (
 
     int fluffy = print_memory_info(mmio, mmiocnt, ram, ramcnt, resv, resvcnt);
 
-    for(int i = 0; i < 10 - fluffy; i++){ 
+    for(int i = 0; i < CAT_SIZE - 5 - fluffy; i++){ 
         kprintfluffy(40, &art, "");
     }
 
@@ -436,7 +437,7 @@ void memory_init (
     kprintfluffy(40, &art, "");
 
     int fluffy = print_memory_info(mmio, mmiocnt, ram, ramcnt, resv, resvcnt);
-    for(int i = 0; i < 10 - fluffy; i++){ 
+    for(int i = 0; i < CAT_SIZE - 5 - fluffy; i++){ 
         kprintfluffy(40, &art, "");
     }
 
