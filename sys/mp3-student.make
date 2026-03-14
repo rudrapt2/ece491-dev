@@ -13,39 +13,38 @@ UNIFDEF=unifdef
 
 TARGET=qvirt
 
-CP1=0
+STUDENT_CP1=1
 
 OBJS = \
 	board/$(TARGET)/init.o \
 	dev/rtc.o \
 	dev/uart.o \
 	dev/vioblk.o \
-	dev/viorng.o \
 	dev/virtio.o \
+	dev/viorng.o \
 	fs/ngfs.o \
+	fs/tarfs.o \
 	cache.o \
 	console.o \
 	device.o \
-	elf.o \
+	elf.o\
 	error.o \
 	excp.o \
 	filesys.o \
 	heap.o \
 	intr.o \
 	io.o \
-	main.o \
-	memory.o \
 	misc.o \
 	plic.o \
-	process.o \
 	sbi.o \
 	start.o \
 	string.o \
-	syscall.o \
 	thrasm.o \
 	thread.o \
 	timer.o \
 	trap.o
+
+
 
 CFLAGS = -Wall -Werror=implicit-function-declaration -Wno-unused-function
 CFLAGS += -fno-omit-frame-pointer -ggdb3 -gdwarf-2
@@ -93,18 +92,26 @@ QEMUOPTS += -serial pty
 QEMUOPTS += -serial pty
 QEMUOPTS += -device virtio-blk-device,drive=blk0
 QEMUOPTS += -drive file=fs/ngfs.raw,id=blk0,if=none,format=raw,readonly=false
+QEMUOPTS += -device virtio-blk-device,drive=blk1
+QEMUOPTS += -drive file=fs/tarfs.tar,id=blk1,if=none,format=raw,readonly=false
 
-ifeq ($(CP1), 1)
-	CFLAGS += -DMP3CP1
-	ASFLAGS += -defsym MP3CP1=1
+
+ifeq ($(STUDENT_CP1), 1)
+	CFLAGS += -DSTUDENT_CP1
+	ASFLAGS += -defsym STUDENT_CP1=1
+else
+	OBJS += \
+		memory.o \
+		process.o \
+		syscall.o
 endif
 
 all: kernel.elf
 
 clean:
-	rm -rf board/*.o dev/*.o fs/*.o *.o *.elf
+	rm -rf board/*/*.o dev/*.o fs/*.o *.o *.elf
 
-kernel.elf: $(OBJS) blob.o
+kernel.elf: $(OBJS) blob.o main.o
 	$(LD) $(LDFLAGS) -o $@ $^
 
 run: kernel.elf

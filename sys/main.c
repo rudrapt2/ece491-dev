@@ -26,7 +26,7 @@
 #endif
 
 #ifdef STUDENT
-#if 0
+#ifndef STUDENT_CP1
     #define INITEXE "shell"
 #else
     #define INITEXE "trek-mp3-cp1"
@@ -67,11 +67,17 @@ void main(unsigned int hartid, void * dtb) {
     devmgr_init();
 
 #ifndef MP2
+#ifdef STUDENT
+#ifndef STUDENT_CP1
+	procmgr_init();
+#endif
+#else
     // MP3 stuff
 #ifndef MP3CP1
     procmgr_init();
 #endif
     fsmgr_init();
+#endif
 #endif
 
     attach_board_devices();
@@ -81,7 +87,6 @@ void main(unsigned int hartid, void * dtb) {
     mount_devfs(DEVMNTNAME);
     mount_drive(CMNTNAME, CDEVNAME, mount_ngfs);
     mount_drive(DMNTNAME, DDEVNAME, mount_tarfs);
-    exec_init();
 
     exec_init();
     flush_all_filesys();
@@ -128,7 +133,7 @@ void exec_init() {
     }
 
 #ifdef STUDENT
-#if 0
+#ifndef STUDENT_CP1
     char * argv[] = { NULL };
     // Make descriptor 0 be a null io object, which the shell will need
 

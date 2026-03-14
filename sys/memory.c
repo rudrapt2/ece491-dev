@@ -14,7 +14,7 @@
 
 #include "memory.h"
 #include "conf.h"
-#include "board/conf.h"
+#include "board-conf.h"
 #include "console.h"
 #include "error.h"
 #include "heap.h"

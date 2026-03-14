@@ -73,10 +73,9 @@ FILES_FOR_COPYING   := \
     sys/trap.s \
     \
     usr/games/trek \
+	usr/games/trek-mp3-cp1 \
     usr/games/zork \
     usr/games/rogue \
-    usr/games/nudoku \
-    usr/games/tetris \
     usr/progs/cat.c \
     usr/progs/date.c \
     usr/progs/echo.c \
@@ -94,7 +93,7 @@ FILES_FOR_COPYING   := \
     usr/heap.h \
     usr/io.c \
     usr/io.h \
-    usr/mp3-student.make:usr/Makefile \
+    usr/Makefile \
     usr/no_umode.ld \
     usr/scnum.h \
     usr/shell.h \
