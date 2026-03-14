@@ -35,4 +35,4 @@ skyline: $(ULIB_OBJS) demo.o gpu.o rand.o mp1.o demo_scene.o | bin
 	mv skyline bin/skyline
 
 clean:
-	rm -rf *.o ../*.o skyline bin
+	rm -rf *.o usr/*.o skyline bin
