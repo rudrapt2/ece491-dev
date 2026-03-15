@@ -54,8 +54,8 @@ mp3-cp2:
 	cp rogue/bin/rogue-mp3-cp2 		$(USR_GAMES_FOLDER)/rogue
 
 mp3-cp3: mp3-cp2
-	make -C flying-toasters/toasters_gold
-	cp flying-toasters/toasters_gold/toasters $(USR_GAMES_FOLDER)/toasters
+	make -C flying-toasters/
+	cp flying-toasters/bin/toasters $(USR_GAMES_FOLDER)/toasters
 
 	make -C skyline
 	cp skyline/bin/skyline 			$(USR_GAMES_FOLDER)/skyline
@@ -81,3 +81,4 @@ clean:
 	make -C doom clean
 	make -C nudoku clean
 	make -C flying-toasters clean
+	make -C skyline clean

@@ -42,6 +42,7 @@ sprites.o:
 toasters: $(ULIB_OBJS) toasters.o mp1.o sprites.o
 	$(LD) $(LDFLAGS) -T $(ULIB_LD) -o $@ $^
 	mv toasters.o sprites.o ../toasters 
+	mv toasters ../bin/toasters_gold
 
 clean:
 	rm -rf *.o toasters ../*.o
