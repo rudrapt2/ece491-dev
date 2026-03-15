@@ -352,7 +352,7 @@ void memory_init (
     debug("Heap allocator: [%p,%p): %zu KB free",
             heap_start, heap_end, (heap_end - heap_start) / 1024);
 
-#ifndef STUDENT
+#ifdef STUDENT
     // YOUR CODE HERE
     // Initialize free chunk list
 #else
@@ -718,7 +718,7 @@ void reset_active_mspace(void) {
 
 mtag_t discard_active_mspace(void) {
 #ifdef STUDENT
-    //FIXME Your code here
+    // YOUR CODE HERE
     return 0;
 #else
     struct pte * ptab;
@@ -911,7 +911,7 @@ int validate_vstr(const char * vs, int rwxug_flags) {
 void * alloc_phys_page(void) {
 #ifdef STUDENT
     // YOUR CODE HERE
-    return 0;
+    return NULL;
 #else
     return alloc_phys_pages(1);
 #endif
