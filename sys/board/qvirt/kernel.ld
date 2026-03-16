@@ -6,14 +6,20 @@ PHDRS {
   data PT_LOAD;
 }
 
+phys_base = 0x80060000;
+
+ENTRY(boot)
+
+virt_offset = 0xFFFFFFC000000000;
+
 SECTIONS {
-  . = 0x80060000;
+  . = phys_base + virt_offset;
 
   PROVIDE(_kimg_start = .);
 
-  .text : {
+  .text : AT(ADDR(.text) - virt_offset) {
     PROVIDE(_kimg_text_start = .);
-    *(.text.start) /* entry */
+    *(.text.boot) /* entry */
     *(.text .text.*)
     . = ALIGN(16);
     PROVIDE(_kimg_text_end = .);
@@ -21,7 +27,7 @@ SECTIONS {
 
   . = ALIGN(4096);
 
-  .rodata : {
+  .rodata : AT(ADDR(.rodata) - virt_offset) {
     PROVIDE(_kimg_rodata_start = .);
     . = ALIGN(16);
     *(.srodata .srodata.*)
@@ -32,7 +38,7 @@ SECTIONS {
 
   . = ALIGN(4096);
 
-  .data : {
+  .data : AT(ADDR(.data) - virt_offset) {
     PROVIDE(_kimg_data_start = .);
     PROVIDE(_kimg_blob_start = .);
     *(*.data.blob)
@@ -43,7 +49,7 @@ SECTIONS {
     . = ALIGN(16);
   } :data
 
-  .bss : {
+  .bss : AT(ADDR(.bss) - virt_offset) {
     *(.data.pagetable)
     *(.sbss .sbss.*)
     . = ALIGN(16);

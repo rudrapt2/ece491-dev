@@ -1,5 +1,9 @@
-#include "string.h"
-void main(void) {
-    // outputs to io in fd2
-    printf("Hello, world!\n");
+#include <stdio.h>
+
+int main(int argc, char * argv[], char * envp[]) {
+	(void)argc;
+	(void)argv;
+	(void)envp;
+	printf("Hello rudra\n");
+	return 0;
 }

@@ -129,7 +129,6 @@ const char * art =
 // INTERNAL FUNCTION DECLARATIONS
 //
 
-#ifndef STUDENT
 static void ptab_reset(struct pte * ptab);
 
 static struct pte * ptab_clone (struct pte * ptab);
@@ -148,7 +147,6 @@ static void * ptab_remove(struct pte * ptab, unsigned long vpn);
 static void ptab_adjust(struct pte * ptab, unsigned long vpn, int rwxug_flags);
 
 struct pte * ptab_fetch(struct pte * ptab, unsigned long vpn);
-#endif
 
 static inline mtag_t active_space_mtag(void);
 static inline mtag_t ptab_to_mtag(struct pte * root, unsigned int asid);
@@ -163,7 +161,6 @@ static inline struct pte leaf_pte(const void * pp, uint_fast8_t rwxug_flags);
 static inline struct pte ptab_pte(const struct pte * pt, uint_fast8_t g_flag);
 static inline struct pte null_pte(void);
 
-#ifndef STUDENT
 static void map_startup(struct mregion* regions, uint32_t size, int rwx_flags);
 static void modify_startup(struct mregion* regions, uint32_t size, int rwx_flags);
 static void subdivide(struct pte * entry, uintptr_t size);
@@ -174,7 +171,6 @@ static int cmp_mregion(void * a, void * b);
 static void heapify(uintptr_t arr, uintptr_t elem_sz, uint32_t n_elem, uint32_t i, int(*cmp)(void * a, void * b));
 static void heapSort(uintptr_t arr, uintptr_t elem_sz, uint32_t n_elem, int(*cmp)(void * a, void * b));
 static void sort(uintptr_t arr, uintptr_t elem_sz, uint32_t n_elem, int(*cmp)(void * a, void * b));
-#endif
 
 static int print_memory_info(struct mregion * mmio_imm, unsigned long mmiocnt,
                              struct mregion * ram_imm, unsigned long ramcnt,
@@ -188,196 +184,12 @@ static mtag_t main_mtag;
 
 static struct pte main_pt2[PTE_CNT] __attribute__((section(".bss.pagetable"), aligned(4096)));
 
-#ifdef STUDENT
-static struct pte main_pt1_0x80000[PTE_CNT]
-__attribute__((section(".bss.pagetable"), aligned(4096)));
-
-static struct pte main_pt0_0x80000[PTE_CNT]
-__attribute__((section(".bss.pagetable"), aligned(4096)));
-
-static struct pte main_pt0_0x80001[PTE_CNT]
-__attribute__((section(".bss.pagetable"), aligned(4096)));
-#endif
 
 static struct page_chunk * free_chunk_list;
 
 // EXPORTED FUNCTION DECLARATIONS
 //
 
-#ifdef STUDENT
-void memory_init (
-    const struct mregion * ram_og, unsigned long ramcnt,
-    const struct mregion * mmio_og, unsigned long mmiocnt,
-    const struct mregion * resv_og, unsigned long resvcnt)
-{
-
-    const void * const text_start = _kimg_text_start;
-    const void * const text_end = _kimg_text_end;
-    const void * const rodata_start = _kimg_rodata_start;
-    const void * const rodata_end = _kimg_rodata_end;
-    const void * const data_start = _kimg_data_start;
-
-    // All parameters are used for running on real hardware and printing memory info; 
-    // you can ignore them in this simplified memory_init() implementation
-
-
-    struct mregion mmio[mmiocnt];
-    struct mregion ram[ramcnt];
-    struct mregion resv[resvcnt+1];
-
-    memcpy(mmio, mmio_og, mmiocnt * sizeof(struct mregion));
-    memcpy(ram, ram_og, ramcnt * sizeof(struct mregion));
-    memcpy(resv, resv_og, resvcnt * sizeof(struct mregion));
-
-    //The memory print function expects the kernel to be mapped as a reserved
-    //region and the array to be sorted. For the qvirt target, the second 
-    //reserved region is in high memory, so we move it right one and insert our
-    //kernel as the second to last entry.
-    resvcnt++;
-    resv[resvcnt-1].pma = resv[resvcnt-2].pma;
-    resv[resvcnt-1].size = resv[resvcnt-2].size;
-    resv[resvcnt-2].pma = 
-        ROUND_DOWN((uintptr_t)(void *)_kimg_start, PAGE_SIZE);
-    resv[resvcnt-2].size = 
-        ROUND_UP((uintptr_t)(void *)_kimg_end, PAGE_SIZE) - 
-        ROUND_DOWN((uintptr_t)(void *)_kimg_start, PAGE_SIZE);
-
-    kprintfluffy(40, &art, "");   
-    kprintfluffy(40, &art, "System Memory Map:");
-    kprintfluffy(40, &art, "");
-
-    int fluffy = print_memory_info(mmio, mmiocnt, ram, ramcnt, resv, resvcnt);
-
-    for(int i = 0; i < CAT_SIZE - 5 - fluffy; i++){ 
-        kprintfluffy(40, &art, "");
-    }
-
-    void * heap_start;
-    void * heap_end;
-
-    uintptr_t pma;
-    const void * pp;
-
-
-    // Kernel must fit inside 2MB megapage (one level 1 PTE)
-
-    if (MEGA_SIZE < _kimg_end - _kimg_start) panic(NULL);
-
-    // Initialize main page table with the following direct mapping:
-    //
-    //         0 to RAM_START:           RW gigapages (MMIO region)
-    // _kimg_start to _kimg_end:         RX/R/RW pages based on kernel image
-    // _kimg_end to RAM_START+MEGA_SIZE: RW pages (heap and free page pool)
-    // RAM_START+MEGA_SIZE to RAM_END:   RW megapages (free page pool)
-    //
-    // RAM_START = 0x80000000
-    // MEGA_SIZE = 2 MB
-    // GIGA_SIZE = 1 GB
-
-    // Identity mapping of MMIO region as two gigapage mappings
-    for (pma = 0; pma < RAM_START_PMA; pma += GIGA_SIZE)
-        main_pt2[VPN2(pma)] = leaf_pte((void * )pma, PTE_R | PTE_W | PTE_G);
-
-    // Third gigarange has a second-level subtable
-    main_pt2[VPN2(RAM_START_PMA)] = ptab_pte(main_pt1_0x80000, PTE_G);
-
-    // First two physical megaranges of RAM are mapped as individual pages with
-    // permissions based on kernel image region.
-    //
-    // This also means that the kernel must be smaller than 4 MB
-
-    main_pt1_0x80000[VPN1(RAM_START_PMA)] = ptab_pte(main_pt0_0x80000, PTE_G);
-    main_pt1_0x80000[VPN1(RAM_START_PMA + MEGA_SIZE)] = ptab_pte(main_pt0_0x80001, PTE_G);
-
-    //Map the reserved region before the kernel
-    for (pp = RAM_START; pp < text_start; pp+=PAGE_SIZE) {
-        main_pt0_0x80000[VPN0((uintptr_t)pp)] = leaf_pte(pp, PTE_R);
-    }
-
-    for (pp = text_start; pp < text_end; pp += PAGE_SIZE) {
-        assert(PTE_VALID(main_pt1_0x80000[VPN1((uintptr_t)pp)])); //Kernel too big.
-        struct pte * pt1 = pageptr(main_pt1_0x80000[VPN1((uintptr_t)pp)].ppn);
-        pt1[VPN0((uintptr_t)pp)] = leaf_pte(pp, PTE_R | PTE_X | PTE_G);
-    }
-
-    for (pp = rodata_start; pp < rodata_end; pp += PAGE_SIZE) {
-        assert(PTE_VALID(main_pt1_0x80000[VPN1((uintptr_t)pp)]));
-        struct pte * pt1 = pageptr(main_pt1_0x80000[VPN1((uintptr_t)pp)].ppn);
-        pt1[VPN0((uintptr_t)pp)] = leaf_pte(pp, PTE_R | PTE_G);
-    }
-
-    for (pp = data_start; pp < RAM_START + MEGA_SIZE; pp += PAGE_SIZE) {
-        assert(PTE_VALID(main_pt1_0x80000[VPN1((uintptr_t)pp)]));
-        struct pte * pt1 = pageptr(main_pt1_0x80000[VPN1((uintptr_t)pp)].ppn);
-        pt1[VPN0((uintptr_t)pp)] = leaf_pte(pp, PTE_R | PTE_W | PTE_G);
-    }
-
-    // Remaining RAM mapped in 2MB megapages - dtb area for QEMU
-
-    for (pp = RAM_START + MEGA_SIZE; pp < RAM_END - MEGA_SIZE; pp += MEGA_SIZE) {
-        main_pt1_0x80000[VPN1((uintptr_t)pp)] = leaf_pte(pp, PTE_R | PTE_W | PTE_G);
-    }
-
-    //Map DTB as read only
-    main_pt1_0x80000[VPN1((uintptr_t)pp)] = leaf_pte(pp, PTE_R | PTE_G);
-
-    // Enable paging; this part always makes me nervous.
-
-    main_mtag = ptab_to_mtag(main_pt2, 0);
-    csrw_satp(main_mtag);
-    kprintf("Enabled Address Translation.\n");
-    sfence_vma();
-
-    // Give the memory between the end of the kernel image and the next page
-    // boundary to the heap allocator, but make sure it is at least
-    // HEAP_INIT_MIN bytes.
-
-    heap_start = _kimg_end;
-    heap_end = (void * )ROUND_UP((uintptr_t)heap_start, PAGE_SIZE);
-
-    if (heap_end - heap_start < HEAP_INIT_MIN) {
-        heap_end += ROUND_UP(HEAP_INIT_MIN - (heap_end - heap_start), PAGE_SIZE);
-    }
-
-    if (RAM_END < heap_end)
-        panic("out of memory");
-
-    // Initialize heap memory manager
-
-    heap_init(heap_start, heap_end - heap_start);
-
-    debug("Heap allocator: [%p,%p): %zu KB free", heap_start, heap_end,
-            (heap_end - heap_start) / 1024);
-
-    debug("Heap allocator: [%p,%p): %zu KB free",
-            heap_start, heap_end, (heap_end - heap_start) / 1024);
-
-#ifdef STUDENT
-    // YOUR CODE HERE
-    // Initialize free chunk list
-#else
-    free_chunk_list = heap_end; // heap_end is page aligned
-    free_chunk_list->pagecnt = (RAM_SIZE - (heap_end - RAM_START) - MEGA_SIZE) / PAGE_SIZE;
-    free_chunk_list->next = NULL;
-#endif
-    
-    kprintfluffy(40, &art, "Free Chunk List Initialized!");
-    kprintfluffy(40, &art, "%d Free Pages.", free_phys_page_count());
-    kprintfluffy(40, &art, "");
-
-    debug("Page allocator: [%p,%p): %u pages free",
-            heap_end, RAM_END, free_chunk_list->pagecnt);
-
-    // Allow supervisor to access user memory. We could be more precise by only
-    // enabling supervisor access to user memory when we are explicitly trying
-    // to access user memory, and disable it at other times. This would catch
-    // bugs that cause inadvertent access to user memory (due to bugs).
-
-    csrs_sstatus(RISCV_SSTATUS_SUM);
-
-    memory_initialized = 1;
-}
-#else
 void memory_init (
     const struct mregion * ram_og, unsigned long ramcnt,
     const struct mregion * mmio_og, unsigned long mmiocnt,
@@ -672,62 +484,36 @@ static void heapSort(uintptr_t arr, uintptr_t elem_sz, uint32_t n_elem, int(*cmp
 static void sort(uintptr_t arr, uintptr_t elem_sz, uint32_t n_elem, int(*cmp)(void * a, void * b)) {
     heapSort(arr, elem_sz, n_elem, cmp);
 }
-#endif
 
 mtag_t active_mspace(void) {
-#ifdef STUDENT
-    // YOUR CODE HERE
-    return 0;
-#else
     return active_space_mtag();
-#endif
 }
 
 mtag_t switch_mspace(mtag_t mtag) {
-#ifdef STUDENT
-    // YOUR CODE HERE
-    return 0;
-#else
     mtag_t prev_mtag;
 
     prev_mtag = csrrw_satp(mtag);
     sfence_vma();
 
     return prev_mtag;
-#endif
 }
 
 mtag_t clone_active_mspace(void) {
-#ifdef STUDENT
-    // YOUR CODE HERE
-    return 0;
-#else
     return ptab_to_mtag(ptab_clone(active_space_ptab()), 0);
-#endif
 }
 
 void reset_active_mspace(void) {
-#ifdef STUDENT
-    // YOUR CODE HERE
-    return;
-#else
     ptab_reset(active_space_ptab());
     sfence_vma();
-#endif
 }
 
 mtag_t discard_active_mspace(void) {
-#ifdef STUDENT
-    // YOUR CODE HERE
-    return 0;
-#else
     struct pte * ptab;
 
     ptab = active_space_ptab();
     switch_mspace(main_mtag);
     ptab_discard(ptab);
     return main_mtag;
-#endif
 }
 
 // The map_page() function maps a single page into the active address space at
@@ -741,21 +527,12 @@ mtag_t discard_active_mspace(void) {
 // mapping megapages and gigapages.
 
 void * map_page(uintptr_t vma, void * pp, int rwxug_flags) {
-#ifdef STUDENT
-    // YOUR CODE HERE
-    return NULL;
-#else
     ptab_insert(active_space_ptab(), VPN(vma), pp, rwxug_flags);
     sfence_vma();
     return (void *)vma;
-#endif
 }
 
 void * map_range(uintptr_t vma, size_t size, void * pp, int rwxug_flags) {
-#ifdef STUDENT
-    // YOUR CODE HERE
-    return NULL;
-#else
     uintptr_t const vma_start = vma;
 
     assert (vma % PAGE_SIZE == 0);
@@ -769,14 +546,9 @@ void * map_range(uintptr_t vma, size_t size, void * pp, int rwxug_flags) {
     }
     sfence_vma();
     return (void *)vma_start;
-#endif
 }
 
 void * alloc_and_map_range(uintptr_t vma, size_t size, int rwxug_flags) {
-#ifdef STUDENT
-    // YOUR CODE HERE
-    return NULL;
-#else
     struct pte * ptab;
     unsigned long vpn;
 
@@ -788,14 +560,9 @@ void * alloc_and_map_range(uintptr_t vma, size_t size, int rwxug_flags) {
         ptab_insert(ptab, vpn, alloc_phys_page(), rwxug_flags);
     sfence_vma();
     return (void *)vma;
-#endif
 }
 
 void set_range_flags(const void * vp, size_t size, int rwxug_flags) {
-#ifdef STUDENT
-    // YOUR CODE HERE
-    return;
-#else
     uintptr_t const vma = (uintptr_t)vp;
     struct pte * root;
     unsigned long vpn;
@@ -807,14 +574,9 @@ void set_range_flags(const void * vp, size_t size, int rwxug_flags) {
     for (vpn = VPN(vma); vpn < VPN(vma+size); vpn++)
         ptab_adjust(root, vpn, rwxug_flags);
     sfence_vma();
-#endif
 }
 
 void unmap_and_free_range(void * vp, size_t size) {
-#ifdef STUDENT
-    // YOUR CODE HERE
-    return;
-#else
     uintptr_t const vma = (uintptr_t)vp;
     struct pte * ptab;
     unsigned long vpn;
@@ -829,14 +591,9 @@ void unmap_and_free_range(void * vp, size_t size) {
         free_phys_page(pp); // ok if null
     }
     sfence_vma();
-#endif
 }
 
 int enforce_vptr(const void * vp, size_t size, int rwxug_flags) {
-#ifdef STUDENT
-    // YOUR CODE HERE
-    return 0;
-#else
     uintptr_t const vma = (uintptr_t)vp;
     struct pte * ptab;
     unsigned long vpn;
@@ -872,14 +629,9 @@ int enforce_vptr(const void * vp, size_t size, int rwxug_flags) {
             return -EACCESS;
     }
     return 0;
-#endif
 }
 
 int validate_vstr(const char * vs, int rwxug_flags) {
-#ifdef STUDENT
-    // YOUR CODE HERE
-    return 0;
-#else
     struct pte * ptab;
     unsigned long vpn;
     struct pte * pte;
@@ -905,32 +657,17 @@ int validate_vstr(const char * vs, int rwxug_flags) {
             vs += 1;
         }
     }
-#endif
 }
 
 void * alloc_phys_page(void) {
-#ifdef STUDENT
-    // YOUR CODE HERE
-    return NULL;
-#else
     return alloc_phys_pages(1);
-#endif
 }
 
 void free_phys_page(void * pp) {
-#ifdef STUDENT
-    // YOUR CODE HERE
-    return;
-#else
     free_phys_pages(pp, 1);
-#endif
 }
 
 void * alloc_phys_pages(unsigned int cnt) {
-#ifdef STUDENT
-    // YOUR CODE HERE
-    return NULL;
-#else
     struct page_chunk * best = NULL;
     struct page_chunk * * chunkptr;
     struct page_chunk * chunk;
@@ -966,14 +703,9 @@ void * alloc_phys_pages(unsigned int cnt) {
 
     best->pagecnt -= cnt;
     return (void *)best + best->pagecnt * PAGE_SIZE;
-#endif
 }
 
 void free_phys_pages(void * pp, unsigned int cnt) {
-#ifdef STUDENT
-    // YOUR CODE HERE
-    return;
-#else
     struct page_chunk * const chunk = pp;
 
     if (pp == NULL)
@@ -985,14 +717,9 @@ void free_phys_pages(void * pp, unsigned int cnt) {
     chunk->next = free_chunk_list;
     chunk->pagecnt = cnt;
     free_chunk_list = chunk;
-#endif
 }
 
 unsigned long free_phys_page_count(void) {
-#ifdef STUDENT
-    // YOUR CODE HERE
-    return 0;
-#else
     const struct page_chunk * chunk;
     unsigned long cnt = 0;
 
@@ -1000,14 +727,9 @@ unsigned long free_phys_page_count(void) {
         cnt += chunk->pagecnt;
 
     return cnt;
-#endif
 }
 
 int handle_umode_page_fault(struct trap_frame * tfr, uintptr_t vma) {
-#ifdef STUDENT
-    // YOUR CODE HERE
-    return 0;
-#else
     struct pte * pte;
     void * pp;
 
@@ -1027,13 +749,11 @@ int handle_umode_page_fault(struct trap_frame * tfr, uintptr_t vma) {
     }
 
     return 0; // not handled
-#endif
 }
 
 // INTERNAL FUNCTION DEFINITIONS
 //
 
-#ifndef STUDENT
 int _ptab_reset(unsigned int lvl, struct pte * pt, int keep_global) {
     int empty = 1; // subtable contains a mapping
     unsigned int i;
@@ -1203,7 +923,6 @@ struct pte * _ptab_fetch(int lvl, struct pte * pt, unsigned long vpn) {
 struct pte * ptab_fetch(struct pte * ptab, unsigned long vpn) {
     return _ptab_fetch(2, ptab, vpn);
 }
-#endif
 
 mtag_t active_space_mtag(void) {
     return csrr_satp();
