@@ -27,7 +27,7 @@
 //
 
 #ifndef BOLT_FREQ
-#define BOLT_FREQ 50 // Hz [MP3cp3]
+#define BOLT_FREQ 0 // Hz [MP3cp3]
 #endif
 
 // INTERNAL TYPE DEFINITIONS

@@ -16,7 +16,7 @@
 #include "cache.h"
 #include "conf.h"
 #include "device.h"
-#include "memory.h"
+#include "page_table.h"
 #include "error.h"
 #include "string.h"
 #include "thread.h"
@@ -162,8 +162,8 @@ struct cache * create_cache(struct io * bkgio, unsigned long cache_blksz) {
     condition_init(&cache->nodirty, "cache.nodirty");
 
 #ifndef MP3CP1
-    cache->blkbuf = alloc_phys_pages (
-        (CACHE_CAPACITY * cache_blksz + PAGE_SIZE-1) / PAGE_SIZE);
+    cache->blkbuf = IDENTITY_PMA_TO_VMA(alloc_phys_pages(
+        (CACHE_CAPACITY * cache_blksz + PAGE_SIZE-1) / PAGE_SIZE));
 #endif
 
     for (i = 0; i < CACHE_CAPACITY; i++) {

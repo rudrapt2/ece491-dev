@@ -8,7 +8,7 @@
 
 #include "console.h" // console_init();
 #include "heap.h" // heap_init()
-#include "memory.h" // memory_init()
+#include "page_table.h" // memory_init()
 
 // Run-time QEMU configuration
 //
@@ -79,21 +79,21 @@ static struct mregion qvirt_resv[] = {
 
 void board_init(unsigned int hartid, void * dtb) {    
     console_init();
-    plic_init((void*)PLIC_MMIO_BASE);
+	page_table_init(qvirt_ram, 1, qvirt_mmio, 1, qvirt_resv, 3);
+    plic_init((void*)IDENTITY_PMA_TO_VMA(PLIC_MMIO_BASE));
     timer_init(TIMER_FREQ);
-    memory_init(qvirt_ram, 1, qvirt_mmio, 1, qvirt_resv, 3);
 }
 
 void attach_board_devices(void) {
     int i;
 
-    attach_rtc((void*)RTC_MMIO_BASE);
+    attach_rtc((void*)IDENTITY_PMA_TO_VMA(RTC_MMIO_BASE));
 
     for (i = 0; i < NUART; i++)
-        attach_uart((void*)UART_MMIO_BASE(i), UART0_INTR_SRCNO+i);
+        attach_uart((void*)IDENTITY_PMA_TO_VMA(UART_MMIO_BASE(i)), UART0_INTR_SRCNO+i);
     
     for (i = 0; i < 8; i++)
-        attach_virtio((void*)VIRTIO_MMIO_BASE(i), VIRTIO0_INTR_SRCNO+i);
+        attach_virtio((void*)IDENTITY_PMA_TO_VMA(VIRTIO_MMIO_BASE(i)), VIRTIO0_INTR_SRCNO+i);
 }
 
 // When memory is not present, we call this function so we don't have to change
@@ -101,12 +101,12 @@ void attach_board_devices(void) {
 //
 // We will otherwise call the actual one.
 
-void __attribute__ ((weak)) memory_init(const struct mregion * ram,
-                                          unsigned long ramcnt,
-                                          const struct mregion * mmio,
-                                          unsigned long mmiocnt,
-                                          const struct mregion * resv,
-                                          unsigned long resvcnt) {
-    heap_init(_kimg_end, (void*)(RAM_END - (void*)MEGA_SIZE) - (void*)_kimg_end);
-}
-
+//void __attribute__ ((weak)) memory_init(const struct mregion * ram,
+//                                          unsigned long ramcnt,
+//                                          const struct mregion * mmio,
+//                                          unsigned long mmiocnt,
+//                                          const struct mregion * resv,
+//                                          unsigned long resvcnt) {
+//    heap_init(_kimg_end, (void*)(RAM_END - (void*)MEGA_SIZE) - (void*)_kimg_end);
+//}
+//

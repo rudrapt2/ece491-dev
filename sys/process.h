@@ -16,7 +16,7 @@
 
 #include "conf.h"
 #include "thread.h"
-#include "memory.h" // mtag_t
+#include "page_table.h" // mtag_t
 #include "io.h" // struct io *
 
 // EXPORTED TYPE DEFINITIONS

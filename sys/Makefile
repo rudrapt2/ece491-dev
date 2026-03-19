@@ -36,9 +36,12 @@ OBJS = \
 	intr.o \
 	io.o \
 	misc.o \
+	page_table.o \
 	plic.o \
+	process.o \
 	sbi.o \
 	string.o \
+	syscall.o \
 	thrasm.o \
 	thread.o \
 	timer.o \
@@ -96,15 +99,6 @@ QEMUOPTS += -device virtio-blk-device,drive=blk1
 QEMUOPTS += -drive file=fs/tarfs.tar,id=blk1,if=none,format=raw,readonly=false
 
 
-ifeq ($(STUDENT_CP1), 1)
-	CFLAGS += -DSTUDENT_CP1
-	ASFLAGS += -defsym STUDENT_CP1=1
-else
-	OBJS += \
-		memory.o \
-		process.o \
-		syscall.o
-endif
 
 all: kernel.elf
 

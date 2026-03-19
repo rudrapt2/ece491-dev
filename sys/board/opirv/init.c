@@ -7,7 +7,7 @@
 #include <stddef.h>
 
 #include "console.h" // console_init();
-#include "memory.h" // memory_init();
+#include "page_table.h" // memory_init();
 
 // Run-time configuration
 //

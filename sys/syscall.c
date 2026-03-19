@@ -20,7 +20,7 @@
 #include "filesys.h"
 #include "heap.h"
 #include "intr.h"
-#include "memory.h"
+#include "page_table.h"
 #include "misc.h"
 #include "process.h"
 #include "scnum.h"

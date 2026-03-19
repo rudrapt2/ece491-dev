@@ -28,7 +28,7 @@
 
 #ifndef MP2
 #include "process.h"
-#include "memory.h"
+#include "page_table.h"
 #endif
 
 // COMPILE-TIME PARAMETERS
@@ -836,7 +836,7 @@ struct thread * create_thread(const char * name) {
     thr = kcalloc(1, sizeof(struct thread));
 
 #if !(defined(MP2) || defined(MP3CP1))
-    stkmem = alloc_phys_page();
+    stkmem = IDENTITY_PMA_TO_VMA(alloc_phys_page());
     anchor = stkmem + PAGE_SIZE;
 #else
     stkmem = kmalloc(HEAP_ALLOC_MAX);

@@ -17,7 +17,7 @@
 #include "thread.h"
 #include "misc.h"
 #include "string.h"
-#include "memory.h"
+#include "page_table.h"
 #include "error.h"
 #include "device.h"
 #include "heap.h"

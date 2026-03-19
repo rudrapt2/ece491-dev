@@ -20,7 +20,7 @@
 #include "error.h"
 #include "filesys.h"
 #include "heap.h"
-#include "memory.h"
+#include "page_table.h"
 #include "misc.h"
 #include "riscv.h"
 #include "string.h"

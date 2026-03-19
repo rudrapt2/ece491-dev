@@ -15,7 +15,7 @@
 #include "trap.h"
 
 #ifndef MP2
-#include "memory.h"
+#include "page_table.h"
 #include "process.h"
 #endif
 

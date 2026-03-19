@@ -6,7 +6,7 @@
 
 #include "console.h"
 #include "thread.h"
-#include "memory.h"
+#include "page_table.h"
 #include "string.h"
 #include "heap.h"
 #include "misc.h"

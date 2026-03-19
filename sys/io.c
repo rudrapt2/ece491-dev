@@ -13,7 +13,7 @@
 #endif
 
 #ifndef MP2
-#include "memory.h"
+#include "page_table.h"
 #endif
 #include "io.h"
 #include "ioimpl.h"

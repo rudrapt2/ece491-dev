@@ -12,7 +12,7 @@
 #define DEBUG
 #endif
 
-#include "memory.h"
+#include "page_table.h"
 #include "conf.h"
 #include "board-conf.h"
 #include "console.h"

@@ -1,11 +1,12 @@
-// memory.h - Physical and virtual memory manager
+
+// page_table.h - Physical and virtual memory manager
 //
 // Copyright (c) 2024-2025 University of Illinois
 // SPDX-License-identifier: NCSA
 //
 
-#ifndef _MEMORY_H_
-#define _MEMORY_H_
+#ifndef _PAGE_TABLE_H
+#define _PAGE_TABLE_H
 
 #include <stddef.h>
 #include <stdint.h>
@@ -14,6 +15,12 @@
 
 // EXPORTED CONSTANTS
 //
+
+
+#define KERNEL_VMA_OFFSET 0xFFFFFFC000000000
+
+#define IDENTITY_PMA_TO_VMA(x) ((uintptr_t)x + KERNEL_VMA_OFFSET)
+#define IDENTITY_VMA_TO_PMA(x) ((uintptr_t)x - KERNEL_VMA_OFFSET)
 
 #define PAGE_ORDER 12
 #define PAGE_SIZE (1UL << PAGE_ORDER)
@@ -56,7 +63,7 @@ extern char memory_initialized;
  * the heap memory manager, and adds remaining memory to the free chunk list
  * @return None
  */
-extern void memory_init (
+extern void page_table_init (
     const struct mregion * ram, unsigned long ramcnt,
     const struct mregion * mmio, unsigned long mmiocnt,
     const struct mregion * resv, unsigned long resvcnt);

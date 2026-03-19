@@ -96,15 +96,18 @@ boot:
 
 .extern _smode_trap_entry
 
-	la		t0, _smode_trap_entry
+	la		t0, _smode_trap_entry_full
+	ld		t0, 0(t0)
 	csrw	stvec, t0
 	csrs	scounteren, 7
 	csrw	sscratch, x0
 	mv		fp, x0
-	la		sp, _main_stack_anchor
-	la		ra, sbi_shutdown
+	la		sp, _main_stack_anchor_full
+	ld		sp, 0(sp)
+	la		ra, sbi_shutdown_full
+	ld		ra, 0(ra)
 
-	la		t0, main_func
+	la		t0, main_func_full
 	ld		t0, 0(t0)
 	jr		t0
 
@@ -122,11 +125,22 @@ boot_table_pt_2:
 
 
 .section .data, "wx", @progbits
-.extern main # main is defined externally
 
-main_func:
+.extern main # main is defined externally
+main_func_full:
 	.dword main
 
+.extern _smode_trap_entry
+_smode_trap_entry_full:
+	.dword _smode_trap_entry
+
+.extern _main_stack_anchor
+_main_stack_anchor_full:
+	.dword _main_stack_anchor
+
+.extern sbi_shutdown
+sbi_shutdown_full:
+	.dword sbi_shutdown
 
 .section	.data.stack, "wa", @progbts
 .balign		16

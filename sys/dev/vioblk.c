@@ -224,13 +224,13 @@ void vioblk_attach(volatile struct virtio_mmio_regs * regs, int irqno) {
     // avail and used rings. It is an indirect descriptor that points to three
     // chained descriptors, vb->vq.desc[1..3].
 
-    vb->vq.desc[0].addr = (uintptr_t)(vb->vq.desc + 1);
+    vb->vq.desc[0].addr = (uintptr_t)IDENTITY_VMA_TO_PMA((vb->vq.desc + 1));
     vb->vq.desc[0].len = 3 * sizeof(struct virtq_desc);
     vb->vq.desc[0].flags = VIRTQ_DESC_F_INDIRECT;
     vb->vq.desc[0].next = -1;
 
     // First descriptor in indirect descriptor chain points to request header.
-    vb->vq.desc[1].addr = (uintptr_t)&vb->vq.req_header;
+    vb->vq.desc[1].addr = (uintptr_t)IDENTITY_VMA_TO_PMA(&vb->vq.req_header);
     vb->vq.desc[1].len = sizeof(struct vioblk_request_header);
     vb->vq.desc[1].flags = VIRTQ_DESC_F_NEXT;
     vb->vq.desc[1].next = 1; // relative chain
@@ -240,7 +240,7 @@ void vioblk_attach(volatile struct virtio_mmio_regs * regs, int irqno) {
     vb->vq.desc[2].next = 2;
 
     // Third descriptor in indirect descriptor chain points to request status.
-    vb->vq.desc[3].addr = (uintptr_t)&vb->vq.req_status;
+    vb->vq.desc[3].addr = (uintptr_t)IDENTITY_VMA_TO_PMA(&vb->vq.req_status);
     vb->vq.desc[3].len = 1;
     vb->vq.desc[3].flags = VIRTQ_DESC_F_WRITE;
     vb->vq.desc[3].next = -1;
@@ -252,9 +252,9 @@ void vioblk_attach(volatile struct virtio_mmio_regs * regs, int irqno) {
 
     virtio_attach_virtq (
         regs, 0, 1,
-        (uintptr_t)&vb->vq.desc,
-        (uintptr_t)&vb->vq.used,
-        (uintptr_t)&vb->vq.avail);
+        (uintptr_t)IDENTITY_VMA_TO_PMA(&vb->vq.desc),
+        (uintptr_t)IDENTITY_VMA_TO_PMA(&vb->vq.used),
+        (uintptr_t)IDENTITY_VMA_TO_PMA(&vb->vq.avail));
 
     // Register device
 
@@ -336,7 +336,7 @@ long vioblk_fetch (
     vb->vq.req_header.type = VIRTIO_BLK_T_IN;
     vb->vq.desc[2].flags = VIRTQ_DESC_F_NEXT | VIRTQ_DESC_F_WRITE;
     // Note: /buf/ must be a valid pma, so must not be in user space.
-    vb->vq.desc[2].addr = (uintptr_t)buf;
+    vb->vq.desc[2].addr = (uintptr_t)IDENTITY_VMA_TO_PMA(buf);
     vb->vq.desc[2].len = bytecnt;
 
     __sync_synchronize(); // fence w,w
@@ -404,7 +404,7 @@ long vioblk_store (
     vb->vq.req_header.type = VIRTIO_BLK_T_OUT;
     vb->vq.desc[2].flags = VIRTQ_DESC_F_NEXT;
     // Note: /buf/ must be a valid pma, so must not be in user space.
-    vb->vq.desc[2].addr = (uintptr_t)buf;
+    vb->vq.desc[2].addr = (uintptr_t)IDENTITY_VMA_TO_PMA(buf);
     vb->vq.desc[2].len = bytecnt;
     __sync_synchronize(); // fence w,w
     vb->vq.avail.idx += 1;

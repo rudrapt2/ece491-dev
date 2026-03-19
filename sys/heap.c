@@ -19,7 +19,7 @@
 #include "misc.h"
 #include "conf.h"
 #include "string.h"
-#include "memory.h"
+#include "page_table.h"
 
 #ifndef HEAP_ALIGN
 #define HEAP_ALIGN 8
@@ -283,7 +283,7 @@ void * heap_alloc(size_t size, void * call_ra) {
 
     if (cptr == NULL) {
         assert (unsorted_free_chunks == NULL);
-        unsorted_free_chunks = make_chunk(alloc_phys_page(), PAGE_SIZE);
+        unsorted_free_chunks = make_chunk(IDENTITY_PMA_TO_VMA(alloc_phys_page()), PAGE_SIZE);
         heap_managed_bytes += PAGE_SIZE;
         cptr = &unsorted_free_chunks;
     }

@@ -16,7 +16,7 @@
 #include "conf.h"
 #include "io.h"
 #include "string.h"
-#include "memory.h"
+#include "page_table.h"
 #include "error.h"
 #include "misc.h"
 

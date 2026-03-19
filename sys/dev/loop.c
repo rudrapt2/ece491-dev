@@ -17,7 +17,7 @@
 #include "heap.h"
 #include "thread.h"
 #include "console.h"
-#include "memory.h"
+#include "page_table.h"
 #include "device.h"
 #include "misc.h"
 #include "ioimpl.h"

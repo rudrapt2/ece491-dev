@@ -15,7 +15,7 @@
 #include "thread.h"
 #include "string.h"
 #include "console.h"
-#include "memory.h"
+#include "page_table.h"
 #include "virtio.h"
 
 #include <limits.h>

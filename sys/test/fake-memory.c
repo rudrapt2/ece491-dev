@@ -4,7 +4,7 @@
 // SPDX-License-identifier: NCSA
 //
 
-#include "memory.h"
+#include "page_table.h"
 #include "heap.h"
 #include "misc.h"
 #include "string.h"
