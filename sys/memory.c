@@ -503,7 +503,7 @@ mtag_t clone_active_mspace(void) {
 }
 
 void reset_active_mspace(void) {
-    ptab_reset(active_space_ptab());
+    ptab_reset(IDENTITY_PMA_TO_VMA(active_space_ptab()));
     sfence_vma();
 }
 

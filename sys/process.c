@@ -27,6 +27,7 @@
 #include "thread.h"
 #include "trap.h"
 #include "io.h"
+#include "console.h"
 
 // INTERNAL FUNCTION DECLARATIONS
 //
@@ -81,7 +82,7 @@ int process_exec(struct io * exeio, int argc, char ** argv) {
 
     // Create the stack page. We will map it into the new memory space later.
 
-    stack = alloc_phys_page();
+    stack = IDENTITY_PMA_TO_VMA(alloc_phys_page());
 
     // If we are implementing command-line argument support, call build_stack()
     // to build the new stack page containing argv[] and the strings it points
@@ -131,6 +132,8 @@ int process_exec(struct io * exeio, int argc, char ** argv) {
     tfr.sstatus = csrr_sstatus();
     tfr.sstatus |= RISCV_SSTATUS_SPIE;
     tfr.sstatus &= ~RISCV_SSTATUS_SPP;
+
+	kprintf("Everything good, about to jump into user space\n");
     
     trap_frame_jump(&tfr, running_thread_stack_anchor() - sizeof(tfr));
 #endif

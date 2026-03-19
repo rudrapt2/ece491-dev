@@ -8,11 +8,11 @@
 //
 
 #ifndef UMEM_START_VMA
-#define UMEM_START_VMA 0x0C0000000UL
+#define UMEM_START_VMA 0x0
 #endif
 
 #ifndef UMEM_END_VMA
-#define UMEM_END_VMA 0x100000000UL
+#define UMEM_END_VMA 0x3FFFFFFFFF
 #endif
 
 #if UMEM_END_VMA <= UMEM_START_VMA

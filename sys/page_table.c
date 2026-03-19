@@ -455,7 +455,7 @@ int _ptab_reset(unsigned int lvl, struct pte * pt, int keep_global) {
                     pt[i] = null_pte();
                 } else {
                     assert (!PTE_LEAF(pt[i]));
-                    int entry_empty = _ptab_reset(lvl - 1, pp, keep_global);
+                    int entry_empty = _ptab_reset(lvl - 1, IDENTITY_PMA_TO_VMA(pp), keep_global);
                     if (entry_empty)pt[i] = null_pte(); //Remove the mapping if
                                         //it's empty
                     empty &= entry_empty;
@@ -526,7 +526,7 @@ void _ptab_insert (
     } else {
         if (!PTE_VALID(pt[i])) {
             cpt = alloc_phys_page();
-            memset(cpt, 0, PAGE_SIZE);
+            memset(IDENTITY_PMA_TO_VMA(cpt), 0, PAGE_SIZE);
             pt[i] = ptab_pte(cpt, 0); // intermediate page tables should NEVER be global
         } else {
             assert (!PTE_LEAF(pt[i]));
@@ -535,7 +535,7 @@ void _ptab_insert (
             cpt = pageptr(pt[i].ppn);
         }
 
-        _ptab_insert(lvl - 1, cpt, vpn, pp, rwxug_flags);
+        _ptab_insert(lvl - 1, IDENTITY_PMA_TO_VMA(cpt), vpn, pp, rwxug_flags);
     }
 }
 
@@ -568,7 +568,7 @@ int _ptab_adjust (
     } else {
         assert (!PTE_LEAF(pt[i]));
         cpt = pageptr(pt[i].ppn);
-        g_flag = _ptab_adjust(lvl - 1, cpt, vpn, rwxug_flags);
+        g_flag = _ptab_adjust(lvl - 1, IDENTITY_PMA_TO_VMA(cpt), vpn, rwxug_flags);
         // Clear G bit if updated flags have G bit clear
         pt[i].flags &= (pt[i].flags & g_flag) | ~PTE_G;
     }
@@ -625,7 +625,7 @@ static inline struct pte * mtag_to_ptab(mtag_t mtag) {
 }
 
 static inline struct pte * active_space_ptab(void) {
-    return mtag_to_ptab(active_space_mtag());
+    return IDENTITY_PMA_TO_VMA(mtag_to_ptab(active_space_mtag()));
 }
 
 static inline void * pageptr(uintptr_t n) {
